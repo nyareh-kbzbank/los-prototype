@@ -1,0 +1,21 @@
+{
+  "projectName": "vite-workflow",
+  "mode": "file-router",
+  "typescript": true,
+  "tailwind": true,
+  "packageManager": "npm",
+  "addOnOptions": {},
+  "git": true,
+  "version": 1,
+  "framework": "react-cra",
+  "chosenAddOns": [
+    "biome",
+    "form",
+    "tanstack-query",
+    "store",
+    "start",
+    "table",
+    "shadcn",
+    "tanchat"
+  ]
+}
