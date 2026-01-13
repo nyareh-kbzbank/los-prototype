@@ -11,6 +11,8 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as WorkflowRouteImport } from './routes/workflow'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as LoanSetupRouteImport } from './routes/loan/setup'
+import { Route as LoanScorecardSetupRouteImport } from './routes/loan/scorecard-setup'
 import { Route as DemoTanstackQueryRouteImport } from './routes/demo/tanstack-query'
 import { Route as DemoTanchatRouteImport } from './routes/demo/tanchat'
 import { Route as DemoTableRouteImport } from './routes/demo/table'
@@ -37,6 +39,16 @@ const WorkflowRoute = WorkflowRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoanSetupRoute = LoanSetupRouteImport.update({
+  id: '/loan/setup',
+  path: '/loan/setup',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoanScorecardSetupRoute = LoanScorecardSetupRouteImport.update({
+  id: '/loan/scorecard-setup',
+  path: '/loan/scorecard-setup',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DemoTanstackQueryRoute = DemoTanstackQueryRouteImport.update({
@@ -132,6 +144,8 @@ export interface FileRoutesByFullPath {
   '/demo/table': typeof DemoTableRoute
   '/demo/tanchat': typeof DemoTanchatRoute
   '/demo/tanstack-query': typeof DemoTanstackQueryRoute
+  '/loan/scorecard-setup': typeof LoanScorecardSetupRoute
+  '/loan/setup': typeof LoanSetupRoute
   '/demo/api/names': typeof DemoApiNamesRoute
   '/demo/api/tanchat': typeof DemoApiTanchatRoute
   '/demo/api/tq-todos': typeof DemoApiTqTodosRoute
@@ -153,6 +167,8 @@ export interface FileRoutesByTo {
   '/demo/table': typeof DemoTableRoute
   '/demo/tanchat': typeof DemoTanchatRoute
   '/demo/tanstack-query': typeof DemoTanstackQueryRoute
+  '/loan/scorecard-setup': typeof LoanScorecardSetupRoute
+  '/loan/setup': typeof LoanSetupRoute
   '/demo/api/names': typeof DemoApiNamesRoute
   '/demo/api/tanchat': typeof DemoApiTanchatRoute
   '/demo/api/tq-todos': typeof DemoApiTqTodosRoute
@@ -175,6 +191,8 @@ export interface FileRoutesById {
   '/demo/table': typeof DemoTableRoute
   '/demo/tanchat': typeof DemoTanchatRoute
   '/demo/tanstack-query': typeof DemoTanstackQueryRoute
+  '/loan/scorecard-setup': typeof LoanScorecardSetupRoute
+  '/loan/setup': typeof LoanSetupRoute
   '/demo/api/names': typeof DemoApiNamesRoute
   '/demo/api/tanchat': typeof DemoApiTanchatRoute
   '/demo/api/tq-todos': typeof DemoApiTqTodosRoute
@@ -198,6 +216,8 @@ export interface FileRouteTypes {
     | '/demo/table'
     | '/demo/tanchat'
     | '/demo/tanstack-query'
+    | '/loan/scorecard-setup'
+    | '/loan/setup'
     | '/demo/api/names'
     | '/demo/api/tanchat'
     | '/demo/api/tq-todos'
@@ -219,6 +239,8 @@ export interface FileRouteTypes {
     | '/demo/table'
     | '/demo/tanchat'
     | '/demo/tanstack-query'
+    | '/loan/scorecard-setup'
+    | '/loan/setup'
     | '/demo/api/names'
     | '/demo/api/tanchat'
     | '/demo/api/tq-todos'
@@ -240,6 +262,8 @@ export interface FileRouteTypes {
     | '/demo/table'
     | '/demo/tanchat'
     | '/demo/tanstack-query'
+    | '/loan/scorecard-setup'
+    | '/loan/setup'
     | '/demo/api/names'
     | '/demo/api/tanchat'
     | '/demo/api/tq-todos'
@@ -262,6 +286,8 @@ export interface RootRouteChildren {
   DemoTableRoute: typeof DemoTableRoute
   DemoTanchatRoute: typeof DemoTanchatRoute
   DemoTanstackQueryRoute: typeof DemoTanstackQueryRoute
+  LoanScorecardSetupRoute: typeof LoanScorecardSetupRoute
+  LoanSetupRoute: typeof LoanSetupRoute
   DemoApiNamesRoute: typeof DemoApiNamesRoute
   DemoApiTanchatRoute: typeof DemoApiTanchatRoute
   DemoApiTqTodosRoute: typeof DemoApiTqTodosRoute
@@ -291,6 +317,20 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/loan/setup': {
+      id: '/loan/setup'
+      path: '/loan/setup'
+      fullPath: '/loan/setup'
+      preLoaderRoute: typeof LoanSetupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/loan/scorecard-setup': {
+      id: '/loan/scorecard-setup'
+      path: '/loan/scorecard-setup'
+      fullPath: '/loan/scorecard-setup'
+      preLoaderRoute: typeof LoanScorecardSetupRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/demo/tanstack-query': {
@@ -422,6 +462,8 @@ const rootRouteChildren: RootRouteChildren = {
   DemoTableRoute: DemoTableRoute,
   DemoTanchatRoute: DemoTanchatRoute,
   DemoTanstackQueryRoute: DemoTanstackQueryRoute,
+  LoanScorecardSetupRoute: LoanScorecardSetupRoute,
+  LoanSetupRoute: LoanSetupRoute,
   DemoApiNamesRoute: DemoApiNamesRoute,
   DemoApiTanchatRoute: DemoApiTanchatRoute,
   DemoApiTqTodosRoute: DemoApiTqTodosRoute,
