@@ -1,0 +1,124 @@
+{
+	"nodes": [
+		{
+			"id": "CUSTOMER_APPLY",
+			"data": {
+				"label": "Customer Apply",
+				"actor": "CUSTOMER",
+				"status": "PENDING"
+			}
+		},
+		{
+			"id": "BRANCH_REVIEW",
+			"data": {
+				"label": "Branch Review",
+				"actor": "BRANCH",
+				"status": "PENDING"
+			}
+		},
+		{
+			"id": "RM_REVIEW",
+			"data": {
+				"label": "RM Review",
+				"actor": "RELATIONSHIP_MANAGER",
+				"status": "PENDING"
+			}
+		},
+		{
+			"id": "OPERATOR_PROCESS",
+			"data": {
+				"label": "Operator Process",
+				"actor": "OPERATOR",
+				"status": "PENDING"
+			}
+		},
+		{
+			"id": "CHECKER_APPROVAL",
+			"data": {
+				"label": "Checker Approval",
+				"actor": "CHECKER",
+				"status": "PENDING"
+			}
+		},
+		{
+			"id": "APPROVED",
+			"data": {
+				"label": "Approved",
+				"actor": "SYSTEM",
+				"status": "PENDING"
+			}
+		},
+		{
+			"id": "REJECTED",
+			"data": {
+				"label": "Rejected",
+				"actor": "SYSTEM",
+				"status": "PENDING"
+			}
+		},
+		{
+			"id": "REQUIRED_DOCUMENT",
+			"data": {
+				"label": "Requried Document",
+				"actor": "SYSTEM",
+				"status": "PENDING"
+			}
+		},
+		{
+			"id": "BRANCH_REVIEW",
+			"data": {
+				"label": "Branch Review",
+				"actor": "BRANCH",
+				"status": "PENDING"
+			}
+		}
+	],
+	"edges": [
+		{
+			"from": "CUSTOMER_APPLY",
+			"to": "BRANCH_REVIEW",
+			"data": {
+				"condition": "ALWAYS",
+				"other Data": "etsitnas;dlfkjsafd"
+			}
+		},
+		{
+			"from": "CUSTOMER_APPLY",
+			"to": "RM_REVIEW",
+			"data": {
+				"condition": "loanAmount>=5000000"
+			}
+		},
+		{
+			"to": "REQUIRED_DOCUMENT",
+			"from": "RM_REVIEW",
+			"data": {
+				"condition": "Bwahahah"
+			}
+		},
+		{
+			"to": "RM_REVIEW",
+			"from": "BRANCH_REVIEW",
+			"data": {
+				"condition": "branchDecision==APPROVE",
+				"other Data": "etsitnas;dlfkjsafd"
+			}
+		},
+		{
+			"from": "RM_REVIEW",
+			"to": ["OPERATOR_PROCESS", "CHECKER_APPROVAL"],
+			"data": {
+				"condition": "loanAmount>=5000000",
+				"parallel": true
+			}
+		},
+		{
+			"from": ["OPERATOR_PROCESS", "CHECKER_APPROVAL"],
+			"to": "APPROVED",
+			"data": {
+				"condition": "ALL_COMPLETED",
+				"join": true
+			}
+		}
+	]
+}

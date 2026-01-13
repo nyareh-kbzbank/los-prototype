@@ -1,0 +1,21 @@
+{
+	"folders": [
+		{
+			"path": ".."
+		}
+	],
+	"settings": {
+		"[tsx]": { "editor.defaultFormatter": "biomejs.biome" },
+		"editor.codeActionsOnSave": { "source.organizeImports": "never" }
+	},"launch": {
+    "version": "0.2.0",
+    "configurations": [{
+      "name": "Launch Edge",
+      "request": "launch",
+      "type": "chrome",
+      "url": "http://localhost:3000",
+      "webRoot": "${workspaceFolder}"
+    }],
+    "compounds": []
+  }
+}
