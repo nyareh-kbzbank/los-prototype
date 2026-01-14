@@ -1,6 +1,12 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { type ChangeEvent, useEffect, useMemo, useState } from "react";
 import {
+	type ChannelConfig,
+	type LoanProduct,
+	useLoanSetupStore,
+} from "@/lib/loan-setup-store";
+import { getWorkflowList, useWorkflowStore } from "@/lib/workflow-store";
+import {
 	evaluateScoreCard,
 	inferFieldKind,
 	type ScoreEngineResult,
@@ -40,15 +46,6 @@ const workflowStepClass = (status: "COMPLETED" | "IN_PROGRESS" | "PENDING") => {
 // --------------------
 // Loan Product Setup
 // --------------------
-type LoanProduct = {
-	productCode: string;
-	productName: string;
-	minAmount: number;
-	maxAmount: number;
-	tenureMonths: number[];
-	baseInterestRate: number;
-};
-
 const loanProductSetup: LoanProduct = {
 	productCode: "PL-STD",
 	productName: "Personal Loan Standard",
@@ -62,6 +59,10 @@ function RouteComponent() {
 	const scoreCards = useScoreCardStore((s) => s.scoreCards);
 	const selectedScoreCardId = useScoreCardStore((s) => s.selectedScoreCardId);
 	const selectScoreCard = useScoreCardStore((s) => s.selectScoreCard);
+	const workflows = useWorkflowStore((s) => s.workflows);
+	const selectedWorkflowId = useWorkflowStore((s) => s.selectedWorkflowId);
+	const selectWorkflow = useWorkflowStore((s) => s.selectWorkflow);
+	const addLoanSetup = useLoanSetupStore((s) => s.addSetup);
 	const configuredScoreCard = scoreCards[selectedScoreCardId];
 	const configuredScoreCardFallback = useMemo(() => {
 		return Object.values(scoreCards)[0];
@@ -73,6 +74,10 @@ function RouteComponent() {
 	const [workflowStep, setWorkflowStep] = useState(0);
 	const [riskResult, setRiskResult] = useState<ScoreEngineResult | null>(null);
 	const [workflow, setWorkflow] = useState(runWorkflow(0));
+	const [channels, setChannels] = useState<ChannelConfig[]>([
+		{ name: "", code: "" },
+	]);
+	const workflowList = useMemo(() => getWorkflowList(workflows), [workflows]);
 	const [tenureInput, setTenureInput] = useState(
 		loanProductSetup.tenureMonths.join(", "),
 	);
@@ -103,9 +108,9 @@ function RouteComponent() {
 
 	const configuredFields = useMemo(() => {
 		return activeScoreCard
-			? Array.from(new Set(activeScoreCard.rules.map((r) => r.field))).sort((a, b) =>
-				a.localeCompare(b),
-			)
+			? Array.from(new Set(activeScoreCard.rules.map((r) => r.field))).sort(
+					(a, b) => a.localeCompare(b),
+				)
 			: [];
 	}, [activeScoreCard]);
 
@@ -146,6 +151,28 @@ function RouteComponent() {
 		setTenureInput(loanProductSetup.tenureMonths.join(", "));
 	};
 
+	const addChannelRow = () => {
+		setChannels((prev) => [...prev, { name: "", code: "" }]);
+	};
+
+	const updateChannel =
+		(index: number, field: "name" | "code") =>
+		(e: ChangeEvent<HTMLInputElement>) => {
+			const { value } = e.target;
+			setChannels((prev) =>
+				prev.map((row, idx) =>
+					idx === index ? { ...row, [field]: value } : row,
+				),
+			);
+		};
+
+	const removeChannelRow = (index: number) => {
+		setChannels((prev) => {
+			if (prev.length === 1) return [{ name: "", code: "" }];
+			return prev.filter((_, idx) => idx !== index);
+		});
+	};
+
 	const onEvaluateScore = () => {
 		if (!activeScoreCard) return;
 		const result = evaluateScoreCard(activeScoreCard, scoreInputs);
@@ -159,10 +186,26 @@ function RouteComponent() {
 		setWorkflow(runWorkflow(next));
 	};
 
+	const onSaveWorkflowSetup = () => {
+		addLoanSetup({
+			product,
+			channels,
+			scorecardId: activeScoreCard?.scoreCardId ?? null,
+			scorecardName: activeScoreCard?.name ?? null,
+			workflowId: selectedWorkflowId,
+			workflowName: selectedWorkflowId
+				? workflows[selectedWorkflowId]?.name ?? "(unnamed workflow)"
+				: null,
+			riskResult,
+		});
+	};
+
 	return (
 		<div className="p-6 font-sans max-w-5xl mx-auto">
 			<div className="flex items-center justify-between mb-4">
-				<h1 className="text-2xl font-bold">Loan Product Setup & Workflow (React)</h1>
+				<h1 className="text-2xl font-bold">
+					Loan Product Setup & Workflow (React)
+				</h1>
 				<Link
 					to="/loan/scorecard-setup"
 					className="text-sm border px-3 py-1 rounded hover:bg-gray-50"
@@ -312,7 +355,7 @@ function RouteComponent() {
 				{configuredFields.length === 0 ? (
 					<div className="text-sm text-gray-700 border rounded p-3 bg-gray-50">
 						No fields configured in this scorecard yet. Add fields/conditions in
-						 the setup page.
+						the setup page.
 					</div>
 				) : (
 					<div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
@@ -333,7 +376,7 @@ function RouteComponent() {
 													...prev,
 													[field]: e.target.value,
 												}))
-										}
+											}
 											className="border px-2 py-2 rounded"
 										>
 											<option value="">(not set)</option>
@@ -350,7 +393,7 @@ function RouteComponent() {
 													...prev,
 													[field]: e.target.value,
 												}))
-										}
+											}
 											className="border px-2 py-2 rounded"
 											placeholder={
 												(rulesByField[field] ?? []).some(
@@ -392,7 +435,8 @@ function RouteComponent() {
 					</button>
 					{riskResult && (
 						<span className="text-sm text-gray-700">
-							Score: {riskResult.totalScore} / {riskResult.maxScore} — {riskResult.riskGrade}
+							Score: {riskResult.totalScore} / {riskResult.maxScore} —{" "}
+							{riskResult.riskGrade}
 						</span>
 					)}
 				</div>
@@ -402,7 +446,8 @@ function RouteComponent() {
 						<div className="bg-green-50 border rounded p-3 text-sm">
 							<div className="font-semibold">Score Breakdown</div>
 							<div className="text-gray-700 mb-2">
-								Matched {riskResult.matchedRules} of {activeScoreCard?.rules.length ?? 0} rules
+								Matched {riskResult.matchedRules} of{" "}
+								{activeScoreCard?.rules.length ?? 0} rules
 							</div>
 							<ul className="space-y-1">
 								{riskResult.breakdown.map((item, idx) => (
@@ -439,29 +484,117 @@ function RouteComponent() {
 				</section>
 			)}
 
-			{/* Workflow Visualization */}
-			<section className="border p-4 rounded">
-				<h2 className="font-semibold mb-2">Workflow Engine</h2>
-				<div className="flex flex-col gap-2">
-					{workflow.map((step) => (
-						<div
-							key={step.stepId}
-							className={`p-2 rounded border text-sm ${
-								workflowStepClass(step.status)
-							}`}
-						>
-							{step.label} — {step.status}
+			{/* Workflow selection */}
+			<section className="border p-4 rounded mb-6">
+				<div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
+					<div>
+						<h2 className="font-semibold">Workflow</h2>
+						<div className="text-xs text-gray-600">
+							Choose a saved workflow to visualize/apply.
 						</div>
-					))}
+					</div>
+					<select
+						className="border px-2 py-2 rounded"
+						value={selectedWorkflowId ?? ""}
+						onChange={(e) => selectWorkflow(e.target.value || null)}
+					>
+						<option value="">(none selected)</option>
+						{workflowList.map((wf) => (
+							<option key={wf.workflowId} value={wf.workflowId}>
+								{wf.name}
+							</option>
+						))}
+					</select>
+				</div>
+				{selectedWorkflowId && workflows[selectedWorkflowId] ? (
+					<div className="mt-3 text-xs text-gray-700">
+						<span className="font-semibold">Selected:</span>{" "}
+						{workflows[selectedWorkflowId].name}
+					</div>
+				) : null}
+			</section>
+
+			{/* Channel configuration */}
+			<section className="border p-4 rounded mb-6">
+				<div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between mb-3">
+					<div>
+						<h2 className="font-semibold">Channel Configuration</h2>
+						<div className="text-xs text-gray-600">
+							Add delivery channels with a display name and code.
+						</div>
+					</div>
+					<button
+						type="button"
+						onClick={addChannelRow}
+						className="text-sm border px-3 py-1 rounded hover:bg-gray-100"
+					>
+						Add channel
+					</button>
 				</div>
 
-				<button
-					onClick={nextStep}
-					type="button"
-					className="mt-3 bg-purple-600 text-white px-3 py-1 rounded"
-				>
-					Next Workflow Step
-				</button>
+				<div className="space-y-3">
+					{channels.map((channel, idx) => {
+						const nameId = `channel-name-${idx}`;
+						const codeId = `channel-code-${idx}`;
+						return (
+							<div
+								key={`${channel.code || "code"}-${idx}`}
+								className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_1fr_auto] md:items-end"
+							>
+								<label className="flex flex-col gap-1 text-sm" htmlFor={nameId}>
+									<span>Channel name</span>
+									<input
+										id={nameId}
+										type="text"
+										value={channel.name}
+										onChange={updateChannel(idx, "name")}
+										className="border px-2 py-2 rounded"
+										placeholder="e.g. WhatsApp"
+									/>
+								</label>
+								<label className="flex flex-col gap-1 text-sm" htmlFor={codeId}>
+									<span>Channel code</span>
+									<input
+										id={codeId}
+										type="text"
+										value={channel.code}
+										onChange={updateChannel(idx, "code")}
+										className="border px-2 py-2 rounded"
+										placeholder="e.g. WA-01"
+									/>
+								</label>
+								<button
+									type="button"
+									onClick={() => removeChannelRow(idx)}
+									className="text-sm border px-3 py-2 rounded hover:bg-gray-100"
+								>
+									Remove
+								</button>
+							</div>
+						);
+					})}
+				</div>
+			</section>
+
+			<section className="mt-8">
+				<div className="flex flex-col gap-2">
+					<button
+						onClick={onSaveWorkflowSetup}
+						type="button"
+						className="w-full py-4 text-lg font-semibold bg-emerald-600 text-white rounded-lg shadow hover:bg-emerald-700"
+					>
+						Save Product Setup
+					</button>
+					<div className="flex flex-col gap-1 text-sm text-gray-700 md:flex-row md:items-center md:justify-between">
+						<span>Saved locally via Zustand. No edit flow yet.</span>
+						<Link
+							to="/loan/workflow-list"
+							className="text-blue-600 hover:underline"
+						>
+							View saved loan setups
+						</Link>
+					</div>
+				</div>
 			</section>
 		</div>
 	);

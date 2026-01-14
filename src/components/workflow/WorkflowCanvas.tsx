@@ -13,6 +13,7 @@ import {
 import "@xyflow/react/dist/style.css";
 import { useCallback, useEffect, useState } from "react";
 import { v4 as uuidV4 } from "uuid";
+import { useWorkflowStore } from "@/lib/workflow-store";
 import { ConditionNode } from "./ConditionNode";
 import { CustomEdge } from "./CustomEdge";
 import { CustomNode } from "./CustomNode";
@@ -263,7 +264,11 @@ export default function WorkflowCanvas({
 		...workflowJson.edges,
 	]);
 
+	const addWorkflow = useWorkflowStore((s) => s.addWorkflow);
+
 	const [showJson, setShowJson] = useState(false);
+	const [saveName, setSaveName] = useState("");
+	const [saveError, setSaveError] = useState<string | null>(null);
 
 	const onNodesChange = useCallback(
 		(changes: NodeChange<WorkflowJsonNode>[]) => {
@@ -300,6 +305,18 @@ export default function WorkflowCanvas({
 	useEffect(() => {
 		console.log({ nodes, edges });
 	}, [nodes, edges]);
+
+	const handleSave = () => {
+		try {
+			setSaveError(null);
+			addWorkflow(saveName, { nodes, edges }, { sourceInstanceId: instanceId });
+			setSaveName("");
+		} catch (err) {
+			setSaveError(
+				err instanceof Error ? err.message : "Unable to save workflow",
+			);
+		}
+	};
 
 	return (
 		<div className="w-80vw h-200 border border-cyan-500">
@@ -344,9 +361,31 @@ export default function WorkflowCanvas({
 				{showJson ? "Show Canvas" : "Show JSON"}
 			</button>
 
+			<div className="mt-2 flex items-center gap-2">
+				<input
+					type="text"
+					className="border px-2 py-1 rounded"
+					placeholder="Workflow name"
+					value={saveName}
+					onChange={(e) => setSaveName(e.target.value)}
+				/>
+				<button
+					type="button"
+					onClick={handleSave}
+					className="px-3 py-1 bg-blue-600 text-white rounded"
+				>
+					Save Workflow
+				</button>
+				{saveError ? (
+					<span className="text-sm text-red-600">{saveError}</span>
+				) : null}
+			</div>
+
 			{showJson ? (
 				<div className="mt-2 h-full overflow-auto bg-gray-50 p-2">
-					<pre className="text-xs">{JSON.stringify({ nodes, edges }, null, 2)}</pre>
+					<pre className="text-xs">
+						{JSON.stringify({ nodes, edges }, null, 2)}
+					</pre>
 				</div>
 			) : (
 				<ReactFlow

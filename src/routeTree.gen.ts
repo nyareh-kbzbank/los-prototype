@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as WorkflowRouteImport } from './routes/workflow'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as LoanWorkflowListRouteImport } from './routes/loan/workflow-list'
 import { Route as LoanSetupRouteImport } from './routes/loan/setup'
 import { Route as LoanScorecardSetupRouteImport } from './routes/loan/scorecard-setup'
 import { Route as DemoTanstackQueryRouteImport } from './routes/demo/tanstack-query'
@@ -39,6 +40,11 @@ const WorkflowRoute = WorkflowRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoanWorkflowListRoute = LoanWorkflowListRouteImport.update({
+  id: '/loan/workflow-list',
+  path: '/loan/workflow-list',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoanSetupRoute = LoanSetupRouteImport.update({
@@ -146,6 +152,7 @@ export interface FileRoutesByFullPath {
   '/demo/tanstack-query': typeof DemoTanstackQueryRoute
   '/loan/scorecard-setup': typeof LoanScorecardSetupRoute
   '/loan/setup': typeof LoanSetupRoute
+  '/loan/workflow-list': typeof LoanWorkflowListRoute
   '/demo/api/names': typeof DemoApiNamesRoute
   '/demo/api/tanchat': typeof DemoApiTanchatRoute
   '/demo/api/tq-todos': typeof DemoApiTqTodosRoute
@@ -169,6 +176,7 @@ export interface FileRoutesByTo {
   '/demo/tanstack-query': typeof DemoTanstackQueryRoute
   '/loan/scorecard-setup': typeof LoanScorecardSetupRoute
   '/loan/setup': typeof LoanSetupRoute
+  '/loan/workflow-list': typeof LoanWorkflowListRoute
   '/demo/api/names': typeof DemoApiNamesRoute
   '/demo/api/tanchat': typeof DemoApiTanchatRoute
   '/demo/api/tq-todos': typeof DemoApiTqTodosRoute
@@ -193,6 +201,7 @@ export interface FileRoutesById {
   '/demo/tanstack-query': typeof DemoTanstackQueryRoute
   '/loan/scorecard-setup': typeof LoanScorecardSetupRoute
   '/loan/setup': typeof LoanSetupRoute
+  '/loan/workflow-list': typeof LoanWorkflowListRoute
   '/demo/api/names': typeof DemoApiNamesRoute
   '/demo/api/tanchat': typeof DemoApiTanchatRoute
   '/demo/api/tq-todos': typeof DemoApiTqTodosRoute
@@ -218,6 +227,7 @@ export interface FileRouteTypes {
     | '/demo/tanstack-query'
     | '/loan/scorecard-setup'
     | '/loan/setup'
+    | '/loan/workflow-list'
     | '/demo/api/names'
     | '/demo/api/tanchat'
     | '/demo/api/tq-todos'
@@ -241,6 +251,7 @@ export interface FileRouteTypes {
     | '/demo/tanstack-query'
     | '/loan/scorecard-setup'
     | '/loan/setup'
+    | '/loan/workflow-list'
     | '/demo/api/names'
     | '/demo/api/tanchat'
     | '/demo/api/tq-todos'
@@ -264,6 +275,7 @@ export interface FileRouteTypes {
     | '/demo/tanstack-query'
     | '/loan/scorecard-setup'
     | '/loan/setup'
+    | '/loan/workflow-list'
     | '/demo/api/names'
     | '/demo/api/tanchat'
     | '/demo/api/tq-todos'
@@ -288,6 +300,7 @@ export interface RootRouteChildren {
   DemoTanstackQueryRoute: typeof DemoTanstackQueryRoute
   LoanScorecardSetupRoute: typeof LoanScorecardSetupRoute
   LoanSetupRoute: typeof LoanSetupRoute
+  LoanWorkflowListRoute: typeof LoanWorkflowListRoute
   DemoApiNamesRoute: typeof DemoApiNamesRoute
   DemoApiTanchatRoute: typeof DemoApiTanchatRoute
   DemoApiTqTodosRoute: typeof DemoApiTqTodosRoute
@@ -317,6 +330,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/loan/workflow-list': {
+      id: '/loan/workflow-list'
+      path: '/loan/workflow-list'
+      fullPath: '/loan/workflow-list'
+      preLoaderRoute: typeof LoanWorkflowListRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/loan/setup': {
@@ -464,6 +484,7 @@ const rootRouteChildren: RootRouteChildren = {
   DemoTanstackQueryRoute: DemoTanstackQueryRoute,
   LoanScorecardSetupRoute: LoanScorecardSetupRoute,
   LoanSetupRoute: LoanSetupRoute,
+  LoanWorkflowListRoute: LoanWorkflowListRoute,
   DemoApiNamesRoute: DemoApiNamesRoute,
   DemoApiTanchatRoute: DemoApiTanchatRoute,
   DemoApiTqTodosRoute: DemoApiTqTodosRoute,
