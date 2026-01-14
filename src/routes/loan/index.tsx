@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo } from "react";
 import { getLoanSetupList, useLoanSetupStore } from "@/lib/loan-setup-store";
 
-export const Route = createFileRoute("/loan/workflow-list")({
+export const Route = createFileRoute("/loan/")({
 	component: LoanWorkflowList,
 });
 
@@ -19,12 +19,32 @@ function LoanWorkflowList() {
 						Snapshots are saved from the Loan Setup page.
 					</p>
 				</div>
-				<Link
-					to="/loan/setup"
-					className="text-sm border px-3 py-1 rounded hover:bg-gray-50"
-				>
-					Back to setup
-				</Link>
+				<div className="flex gap-2">
+					<Link
+						to="/loan/setup"
+						className="text-sm border px-3 rounded hover:bg-gray-50"
+					>
+						Create
+					</Link>
+					<Link
+						to="/workflow"
+						className="text-sm border px-3 rounded hover:bg-gray-50"
+					>
+						Create Workflow
+					</Link>
+					<Link
+						to="/loan/repayment-setup"
+						className="text-sm border px-3 rounded hover:bg-gray-50"
+					>
+						Create Repayment Setup
+					</Link>
+					<Link
+						to="/loan/scorecard-setup"
+						className="text-sm border px-3 rounded hover:bg-gray-50"
+					>
+						Create Score Card
+					</Link>
+				</div>
 			</div>
 
 			{rows.length === 0 ? (
@@ -39,6 +59,7 @@ function LoanWorkflowList() {
 								<th className="px-3 py-2 font-semibold">Product</th>
 								<th className="px-3 py-2 font-semibold">Scorecard</th>
 								<th className="px-3 py-2 font-semibold">Workflow</th>
+								<th className="px-3 py-2 font-semibold">Repayment</th>
 								<th className="px-3 py-2 font-semibold">Risk</th>
 								<th className="px-3 py-2 font-semibold">Created</th>
 							</tr>
@@ -59,8 +80,11 @@ function LoanWorkflowList() {
 										{row.workflowName ?? row.workflowId ?? "—"}
 									</td>
 									<td className="px-3 py-2">
+										{row.repaymentPlanName ?? row.repaymentPlanId ?? "—"}
+									</td>
+									<td className="px-3 py-2">
 										{row.riskGrade ?? "—"}
-										{row.totalScore != null ? ` (${row.totalScore})` : ""}
+										{row.totalScore == null ? "" : ` (${row.totalScore})`}
 									</td>
 									<td className="px-3 py-2 whitespace-nowrap">
 										{new Date(row.createdAt).toLocaleString()}

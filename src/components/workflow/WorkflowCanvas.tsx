@@ -11,6 +11,7 @@ import {
 	ReactFlow,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
+import { useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
 import { v4 as uuidV4 } from "uuid";
 import { useWorkflowStore } from "@/lib/workflow-store";
@@ -247,6 +248,7 @@ export default function WorkflowCanvas({
 	workflowJson: WorkflowJSON;
 	instanceId: string;
 }>) {
+	const navigate = useNavigate();
 	const [nodes, setNodes] = useState<WorkflowJsonNode[]>([
 		defaultStartNode,
 		firstDefaultNode,
@@ -311,6 +313,7 @@ export default function WorkflowCanvas({
 			setSaveError(null);
 			addWorkflow(saveName, { nodes, edges }, { sourceInstanceId: instanceId });
 			setSaveName("");
+			navigate({ to: "/loan" });
 		} catch (err) {
 			setSaveError(
 				err instanceof Error ? err.message : "Unable to save workflow",

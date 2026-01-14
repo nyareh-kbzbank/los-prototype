@@ -11,14 +11,18 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as WorkflowRouteImport } from './routes/workflow'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as LoanWorkflowListRouteImport } from './routes/loan/workflow-list'
+import { Route as LoanIndexRouteImport } from './routes/loan/index'
 import { Route as LoanSetupRouteImport } from './routes/loan/setup'
 import { Route as LoanScorecardSetupRouteImport } from './routes/loan/scorecard-setup'
+import { Route as LoanRepaymentSetupRouteImport } from './routes/loan/repayment-setup'
 import { Route as DemoTanstackQueryRouteImport } from './routes/demo/tanstack-query'
 import { Route as DemoTanchatRouteImport } from './routes/demo/tanchat'
 import { Route as DemoTableRouteImport } from './routes/demo/table'
 import { Route as DemoStoreRouteImport } from './routes/demo/store'
+import { Route as LoanApplicationsIndexRouteImport } from './routes/loan/applications/index'
 import { Route as ExampleGuitarsIndexRouteImport } from './routes/example.guitars/index'
+import { Route as LoanApplicationsCreateRouteImport } from './routes/loan/applications/create'
+import { Route as LoanApplicationsApplicationIdRouteImport } from './routes/loan/applications/$applicationId'
 import { Route as ExampleGuitarsGuitarIdRouteImport } from './routes/example.guitars/$guitarId'
 import { Route as DemoStartServerFuncsRouteImport } from './routes/demo/start.server-funcs'
 import { Route as DemoStartApiRequestRouteImport } from './routes/demo/start.api-request'
@@ -42,9 +46,9 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const LoanWorkflowListRoute = LoanWorkflowListRouteImport.update({
-  id: '/loan/workflow-list',
-  path: '/loan/workflow-list',
+const LoanIndexRoute = LoanIndexRouteImport.update({
+  id: '/loan/',
+  path: '/loan/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoanSetupRoute = LoanSetupRouteImport.update({
@@ -55,6 +59,11 @@ const LoanSetupRoute = LoanSetupRouteImport.update({
 const LoanScorecardSetupRoute = LoanScorecardSetupRouteImport.update({
   id: '/loan/scorecard-setup',
   path: '/loan/scorecard-setup',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoanRepaymentSetupRoute = LoanRepaymentSetupRouteImport.update({
+  id: '/loan/repayment-setup',
+  path: '/loan/repayment-setup',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DemoTanstackQueryRoute = DemoTanstackQueryRouteImport.update({
@@ -77,11 +86,27 @@ const DemoStoreRoute = DemoStoreRouteImport.update({
   path: '/demo/store',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LoanApplicationsIndexRoute = LoanApplicationsIndexRouteImport.update({
+  id: '/loan/applications/',
+  path: '/loan/applications/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ExampleGuitarsIndexRoute = ExampleGuitarsIndexRouteImport.update({
   id: '/example/guitars/',
   path: '/example/guitars/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LoanApplicationsCreateRoute = LoanApplicationsCreateRouteImport.update({
+  id: '/loan/applications/create',
+  path: '/loan/applications/create',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoanApplicationsApplicationIdRoute =
+  LoanApplicationsApplicationIdRouteImport.update({
+    id: '/loan/applications/$applicationId',
+    path: '/loan/applications/$applicationId',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ExampleGuitarsGuitarIdRoute = ExampleGuitarsGuitarIdRouteImport.update({
   id: '/example/guitars/$guitarId',
   path: '/example/guitars/$guitarId',
@@ -150,9 +175,10 @@ export interface FileRoutesByFullPath {
   '/demo/table': typeof DemoTableRoute
   '/demo/tanchat': typeof DemoTanchatRoute
   '/demo/tanstack-query': typeof DemoTanstackQueryRoute
+  '/loan/repayment-setup': typeof LoanRepaymentSetupRoute
   '/loan/scorecard-setup': typeof LoanScorecardSetupRoute
   '/loan/setup': typeof LoanSetupRoute
-  '/loan/workflow-list': typeof LoanWorkflowListRoute
+  '/loan': typeof LoanIndexRoute
   '/demo/api/names': typeof DemoApiNamesRoute
   '/demo/api/tanchat': typeof DemoApiTanchatRoute
   '/demo/api/tq-todos': typeof DemoApiTqTodosRoute
@@ -161,7 +187,10 @@ export interface FileRoutesByFullPath {
   '/demo/start/api-request': typeof DemoStartApiRequestRoute
   '/demo/start/server-funcs': typeof DemoStartServerFuncsRoute
   '/example/guitars/$guitarId': typeof ExampleGuitarsGuitarIdRoute
+  '/loan/applications/$applicationId': typeof LoanApplicationsApplicationIdRoute
+  '/loan/applications/create': typeof LoanApplicationsCreateRoute
   '/example/guitars': typeof ExampleGuitarsIndexRoute
+  '/loan/applications': typeof LoanApplicationsIndexRoute
   '/demo/start/ssr/data-only': typeof DemoStartSsrDataOnlyRoute
   '/demo/start/ssr/full-ssr': typeof DemoStartSsrFullSsrRoute
   '/demo/start/ssr/spa-mode': typeof DemoStartSsrSpaModeRoute
@@ -174,9 +203,10 @@ export interface FileRoutesByTo {
   '/demo/table': typeof DemoTableRoute
   '/demo/tanchat': typeof DemoTanchatRoute
   '/demo/tanstack-query': typeof DemoTanstackQueryRoute
+  '/loan/repayment-setup': typeof LoanRepaymentSetupRoute
   '/loan/scorecard-setup': typeof LoanScorecardSetupRoute
   '/loan/setup': typeof LoanSetupRoute
-  '/loan/workflow-list': typeof LoanWorkflowListRoute
+  '/loan': typeof LoanIndexRoute
   '/demo/api/names': typeof DemoApiNamesRoute
   '/demo/api/tanchat': typeof DemoApiTanchatRoute
   '/demo/api/tq-todos': typeof DemoApiTqTodosRoute
@@ -185,7 +215,10 @@ export interface FileRoutesByTo {
   '/demo/start/api-request': typeof DemoStartApiRequestRoute
   '/demo/start/server-funcs': typeof DemoStartServerFuncsRoute
   '/example/guitars/$guitarId': typeof ExampleGuitarsGuitarIdRoute
+  '/loan/applications/$applicationId': typeof LoanApplicationsApplicationIdRoute
+  '/loan/applications/create': typeof LoanApplicationsCreateRoute
   '/example/guitars': typeof ExampleGuitarsIndexRoute
+  '/loan/applications': typeof LoanApplicationsIndexRoute
   '/demo/start/ssr/data-only': typeof DemoStartSsrDataOnlyRoute
   '/demo/start/ssr/full-ssr': typeof DemoStartSsrFullSsrRoute
   '/demo/start/ssr/spa-mode': typeof DemoStartSsrSpaModeRoute
@@ -199,9 +232,10 @@ export interface FileRoutesById {
   '/demo/table': typeof DemoTableRoute
   '/demo/tanchat': typeof DemoTanchatRoute
   '/demo/tanstack-query': typeof DemoTanstackQueryRoute
+  '/loan/repayment-setup': typeof LoanRepaymentSetupRoute
   '/loan/scorecard-setup': typeof LoanScorecardSetupRoute
   '/loan/setup': typeof LoanSetupRoute
-  '/loan/workflow-list': typeof LoanWorkflowListRoute
+  '/loan/': typeof LoanIndexRoute
   '/demo/api/names': typeof DemoApiNamesRoute
   '/demo/api/tanchat': typeof DemoApiTanchatRoute
   '/demo/api/tq-todos': typeof DemoApiTqTodosRoute
@@ -210,7 +244,10 @@ export interface FileRoutesById {
   '/demo/start/api-request': typeof DemoStartApiRequestRoute
   '/demo/start/server-funcs': typeof DemoStartServerFuncsRoute
   '/example/guitars/$guitarId': typeof ExampleGuitarsGuitarIdRoute
+  '/loan/applications/$applicationId': typeof LoanApplicationsApplicationIdRoute
+  '/loan/applications/create': typeof LoanApplicationsCreateRoute
   '/example/guitars/': typeof ExampleGuitarsIndexRoute
+  '/loan/applications/': typeof LoanApplicationsIndexRoute
   '/demo/start/ssr/data-only': typeof DemoStartSsrDataOnlyRoute
   '/demo/start/ssr/full-ssr': typeof DemoStartSsrFullSsrRoute
   '/demo/start/ssr/spa-mode': typeof DemoStartSsrSpaModeRoute
@@ -225,9 +262,10 @@ export interface FileRouteTypes {
     | '/demo/table'
     | '/demo/tanchat'
     | '/demo/tanstack-query'
+    | '/loan/repayment-setup'
     | '/loan/scorecard-setup'
     | '/loan/setup'
-    | '/loan/workflow-list'
+    | '/loan'
     | '/demo/api/names'
     | '/demo/api/tanchat'
     | '/demo/api/tq-todos'
@@ -236,7 +274,10 @@ export interface FileRouteTypes {
     | '/demo/start/api-request'
     | '/demo/start/server-funcs'
     | '/example/guitars/$guitarId'
+    | '/loan/applications/$applicationId'
+    | '/loan/applications/create'
     | '/example/guitars'
+    | '/loan/applications'
     | '/demo/start/ssr/data-only'
     | '/demo/start/ssr/full-ssr'
     | '/demo/start/ssr/spa-mode'
@@ -249,9 +290,10 @@ export interface FileRouteTypes {
     | '/demo/table'
     | '/demo/tanchat'
     | '/demo/tanstack-query'
+    | '/loan/repayment-setup'
     | '/loan/scorecard-setup'
     | '/loan/setup'
-    | '/loan/workflow-list'
+    | '/loan'
     | '/demo/api/names'
     | '/demo/api/tanchat'
     | '/demo/api/tq-todos'
@@ -260,7 +302,10 @@ export interface FileRouteTypes {
     | '/demo/start/api-request'
     | '/demo/start/server-funcs'
     | '/example/guitars/$guitarId'
+    | '/loan/applications/$applicationId'
+    | '/loan/applications/create'
     | '/example/guitars'
+    | '/loan/applications'
     | '/demo/start/ssr/data-only'
     | '/demo/start/ssr/full-ssr'
     | '/demo/start/ssr/spa-mode'
@@ -273,9 +318,10 @@ export interface FileRouteTypes {
     | '/demo/table'
     | '/demo/tanchat'
     | '/demo/tanstack-query'
+    | '/loan/repayment-setup'
     | '/loan/scorecard-setup'
     | '/loan/setup'
-    | '/loan/workflow-list'
+    | '/loan/'
     | '/demo/api/names'
     | '/demo/api/tanchat'
     | '/demo/api/tq-todos'
@@ -284,7 +330,10 @@ export interface FileRouteTypes {
     | '/demo/start/api-request'
     | '/demo/start/server-funcs'
     | '/example/guitars/$guitarId'
+    | '/loan/applications/$applicationId'
+    | '/loan/applications/create'
     | '/example/guitars/'
+    | '/loan/applications/'
     | '/demo/start/ssr/data-only'
     | '/demo/start/ssr/full-ssr'
     | '/demo/start/ssr/spa-mode'
@@ -298,9 +347,10 @@ export interface RootRouteChildren {
   DemoTableRoute: typeof DemoTableRoute
   DemoTanchatRoute: typeof DemoTanchatRoute
   DemoTanstackQueryRoute: typeof DemoTanstackQueryRoute
+  LoanRepaymentSetupRoute: typeof LoanRepaymentSetupRoute
   LoanScorecardSetupRoute: typeof LoanScorecardSetupRoute
   LoanSetupRoute: typeof LoanSetupRoute
-  LoanWorkflowListRoute: typeof LoanWorkflowListRoute
+  LoanIndexRoute: typeof LoanIndexRoute
   DemoApiNamesRoute: typeof DemoApiNamesRoute
   DemoApiTanchatRoute: typeof DemoApiTanchatRoute
   DemoApiTqTodosRoute: typeof DemoApiTqTodosRoute
@@ -309,7 +359,10 @@ export interface RootRouteChildren {
   DemoStartApiRequestRoute: typeof DemoStartApiRequestRoute
   DemoStartServerFuncsRoute: typeof DemoStartServerFuncsRoute
   ExampleGuitarsGuitarIdRoute: typeof ExampleGuitarsGuitarIdRoute
+  LoanApplicationsApplicationIdRoute: typeof LoanApplicationsApplicationIdRoute
+  LoanApplicationsCreateRoute: typeof LoanApplicationsCreateRoute
   ExampleGuitarsIndexRoute: typeof ExampleGuitarsIndexRoute
+  LoanApplicationsIndexRoute: typeof LoanApplicationsIndexRoute
   DemoStartSsrDataOnlyRoute: typeof DemoStartSsrDataOnlyRoute
   DemoStartSsrFullSsrRoute: typeof DemoStartSsrFullSsrRoute
   DemoStartSsrSpaModeRoute: typeof DemoStartSsrSpaModeRoute
@@ -332,11 +385,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/loan/workflow-list': {
-      id: '/loan/workflow-list'
-      path: '/loan/workflow-list'
-      fullPath: '/loan/workflow-list'
-      preLoaderRoute: typeof LoanWorkflowListRouteImport
+    '/loan/': {
+      id: '/loan/'
+      path: '/loan'
+      fullPath: '/loan'
+      preLoaderRoute: typeof LoanIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/loan/setup': {
@@ -351,6 +404,13 @@ declare module '@tanstack/react-router' {
       path: '/loan/scorecard-setup'
       fullPath: '/loan/scorecard-setup'
       preLoaderRoute: typeof LoanScorecardSetupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/loan/repayment-setup': {
+      id: '/loan/repayment-setup'
+      path: '/loan/repayment-setup'
+      fullPath: '/loan/repayment-setup'
+      preLoaderRoute: typeof LoanRepaymentSetupRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/demo/tanstack-query': {
@@ -381,11 +441,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DemoStoreRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/loan/applications/': {
+      id: '/loan/applications/'
+      path: '/loan/applications'
+      fullPath: '/loan/applications'
+      preLoaderRoute: typeof LoanApplicationsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/example/guitars/': {
       id: '/example/guitars/'
       path: '/example/guitars'
       fullPath: '/example/guitars'
       preLoaderRoute: typeof ExampleGuitarsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/loan/applications/create': {
+      id: '/loan/applications/create'
+      path: '/loan/applications/create'
+      fullPath: '/loan/applications/create'
+      preLoaderRoute: typeof LoanApplicationsCreateRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/loan/applications/$applicationId': {
+      id: '/loan/applications/$applicationId'
+      path: '/loan/applications/$applicationId'
+      fullPath: '/loan/applications/$applicationId'
+      preLoaderRoute: typeof LoanApplicationsApplicationIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/example/guitars/$guitarId': {
@@ -482,9 +563,10 @@ const rootRouteChildren: RootRouteChildren = {
   DemoTableRoute: DemoTableRoute,
   DemoTanchatRoute: DemoTanchatRoute,
   DemoTanstackQueryRoute: DemoTanstackQueryRoute,
+  LoanRepaymentSetupRoute: LoanRepaymentSetupRoute,
   LoanScorecardSetupRoute: LoanScorecardSetupRoute,
   LoanSetupRoute: LoanSetupRoute,
-  LoanWorkflowListRoute: LoanWorkflowListRoute,
+  LoanIndexRoute: LoanIndexRoute,
   DemoApiNamesRoute: DemoApiNamesRoute,
   DemoApiTanchatRoute: DemoApiTanchatRoute,
   DemoApiTqTodosRoute: DemoApiTqTodosRoute,
@@ -493,7 +575,10 @@ const rootRouteChildren: RootRouteChildren = {
   DemoStartApiRequestRoute: DemoStartApiRequestRoute,
   DemoStartServerFuncsRoute: DemoStartServerFuncsRoute,
   ExampleGuitarsGuitarIdRoute: ExampleGuitarsGuitarIdRoute,
+  LoanApplicationsApplicationIdRoute: LoanApplicationsApplicationIdRoute,
+  LoanApplicationsCreateRoute: LoanApplicationsCreateRoute,
   ExampleGuitarsIndexRoute: ExampleGuitarsIndexRoute,
+  LoanApplicationsIndexRoute: LoanApplicationsIndexRoute,
   DemoStartSsrDataOnlyRoute: DemoStartSsrDataOnlyRoute,
   DemoStartSsrFullSsrRoute: DemoStartSsrFullSsrRoute,
   DemoStartSsrSpaModeRoute: DemoStartSsrSpaModeRoute,

@@ -1,6 +1,7 @@
 import { v4 as uuidV4 } from "uuid";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import type { RepaymentPlan } from "./repayment-setup-store.ts";
 import type { ScoreEngineResult } from "./scorecard-engine";
 
 export type LoanProduct = {
@@ -17,6 +18,12 @@ export type ChannelConfig = {
 	code: string;
 };
 
+export type DisbursementType = "FULL" | "PARTIAL";
+
+export type DisbursementDestinationType = "BANK" | "WALLET";
+
+export type DisbursementDestination = { type: "BANK" } | { type: "WALLET" };
+
 export type LoanWorkflowSnapshot = {
 	id: string;
 	createdAt: number;
@@ -28,6 +35,12 @@ export type LoanWorkflowSnapshot = {
 	workflowName: string | null;
 	riskGrade: string | null;
 	totalScore: number | null;
+	disbursementType: DisbursementType;
+	partialInterestRate: number | null;
+	disbursementDestinations: DisbursementDestination[];
+	repaymentPlanId: string | null;
+	repaymentPlanName: string | null;
+	repaymentPlan: RepaymentPlan | null;
 };
 
 type LoanWorkflowInput = {
@@ -38,6 +51,10 @@ type LoanWorkflowInput = {
 	workflowId?: string | null;
 	workflowName?: string | null;
 	riskResult?: ScoreEngineResult | null;
+	disbursementType?: DisbursementType;
+	partialInterestRate?: number | null;
+	disbursementDestinations?: DisbursementDestination[];
+	repaymentPlan?: RepaymentPlan | null;
 };
 
 type LoanWorkflowState = {
@@ -71,6 +88,22 @@ export const useLoanSetupStore = create<LoanWorkflowState>()(
 					workflowName: input.workflowName ?? null,
 					riskGrade: input.riskResult?.riskGrade ?? null,
 					totalScore: input.riskResult?.totalScore ?? null,
+					disbursementType: input.disbursementType ?? "FULL",
+					partialInterestRate:
+						input.disbursementType === "PARTIAL"
+							? (input.partialInterestRate ?? null)
+							: null,
+					disbursementDestinations: (
+						input.disbursementDestinations ?? []
+					).filter(
+						(d): d is DisbursementDestination =>
+							d?.type === "BANK" || d?.type === "WALLET",
+					),
+					repaymentPlanId: input.repaymentPlan?.planId ?? null,
+					repaymentPlanName: input.repaymentPlan?.name ?? null,
+					repaymentPlan: input.repaymentPlan
+						? { ...input.repaymentPlan }
+						: null,
 				};
 				set((prev) => ({
 					setups: { ...prev.setups, [entry.id]: entry },

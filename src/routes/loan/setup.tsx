@@ -1,10 +1,16 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { type ChangeEvent, useEffect, useMemo, useState } from "react";
 import {
 	type ChannelConfig,
+	type DisbursementDestination,
+	type DisbursementDestinationType,
 	type LoanProduct,
 	useLoanSetupStore,
 } from "@/lib/loan-setup-store";
+import {
+	getRepaymentPlanList,
+	useRepaymentSetupStore,
+} from "@/lib/repayment-setup-store";
 import { getWorkflowList, useWorkflowStore } from "@/lib/workflow-store";
 import {
 	evaluateScoreCard,
@@ -16,32 +22,6 @@ import { type Rule, useScoreCardStore } from "../../lib/scorecard-store";
 export const Route = createFileRoute("/loan/setup")({
 	component: RouteComponent,
 });
-
-// --------------------
-// Workflow Engine (Frontend Mock)
-// --------------------
-const workflowDefinition = [
-	{ stepId: "KYC", label: "KYC Verification" },
-	{ stepId: "DOCUMENT", label: "Document Upload" },
-	{ stepId: "CREDIT", label: "Credit Check" },
-	{ stepId: "RISK", label: "Risk Assessment" },
-	{ stepId: "APPROVAL", label: "Approval" },
-];
-
-const runWorkflow = (currentStepIndex: number) => {
-	return workflowDefinition.map((step, index) => {
-		let status: "COMPLETED" | "IN_PROGRESS" | "PENDING" = "PENDING";
-		if (index < currentStepIndex) status = "COMPLETED";
-		else if (index === currentStepIndex) status = "IN_PROGRESS";
-		return { ...step, status };
-	});
-};
-
-const workflowStepClass = (status: "COMPLETED" | "IN_PROGRESS" | "PENDING") => {
-	if (status === "COMPLETED") return "bg-green-100";
-	if (status === "IN_PROGRESS") return "bg-yellow-100";
-	return "bg-gray-100";
-};
 
 // --------------------
 // Loan Product Setup
@@ -56,6 +36,8 @@ const loanProductSetup: LoanProduct = {
 };
 
 function RouteComponent() {
+	const navigate = useNavigate();
+
 	const scoreCards = useScoreCardStore((s) => s.scoreCards);
 	const selectedScoreCardId = useScoreCardStore((s) => s.selectedScoreCardId);
 	const selectScoreCard = useScoreCardStore((s) => s.selectScoreCard);
@@ -63,6 +45,11 @@ function RouteComponent() {
 	const selectedWorkflowId = useWorkflowStore((s) => s.selectedWorkflowId);
 	const selectWorkflow = useWorkflowStore((s) => s.selectWorkflow);
 	const addLoanSetup = useLoanSetupStore((s) => s.addSetup);
+	const repaymentPlans = useRepaymentSetupStore((s) => s.plans);
+	const selectedRepaymentPlanId = useRepaymentSetupStore(
+		(s) => s.selectedPlanId,
+	);
+	const selectRepaymentPlan = useRepaymentSetupStore((s) => s.selectPlan);
 	const configuredScoreCard = scoreCards[selectedScoreCardId];
 	const configuredScoreCardFallback = useMemo(() => {
 		return Object.values(scoreCards)[0];
@@ -71,13 +58,40 @@ function RouteComponent() {
 
 	const [product, setProduct] = useState(loanProductSetup);
 	const [scoreInputs, setScoreInputs] = useState<Record<string, string>>({});
-	const [workflowStep, setWorkflowStep] = useState(0);
 	const [riskResult, setRiskResult] = useState<ScoreEngineResult | null>(null);
-	const [workflow, setWorkflow] = useState(runWorkflow(0));
 	const [channels, setChannels] = useState<ChannelConfig[]>([
 		{ name: "", code: "" },
 	]);
+	const [destinationTypes, setDestinationTypes] = useState<
+		DisbursementDestinationType[]
+	>(["BANK", "WALLET"]);
+	const destinationOptions: Array<{
+		type: DisbursementDestinationType;
+		label: string;
+		hint: string;
+	}> = [
+		{
+			type: "BANK",
+			label: "Bank transfer",
+			hint: "Send to any linked bank account. Details captured later in the journey.",
+		},
+		{
+			type: "WALLET",
+			label: "Mobile wallet",
+			hint: "Push to KBZpay or other supported wallets without collecting account numbers here.",
+		},
+	];
 	const workflowList = useMemo(() => getWorkflowList(workflows), [workflows]);
+	const repaymentPlanList = useMemo(
+		() => getRepaymentPlanList(repaymentPlans),
+		[repaymentPlans],
+	);
+	const activeRepaymentPlan = useMemo(() => {
+		if (selectedRepaymentPlanId && repaymentPlans[selectedRepaymentPlanId]) {
+			return repaymentPlans[selectedRepaymentPlanId];
+		}
+		return repaymentPlanList[0];
+	}, [repaymentPlanList, repaymentPlans, selectedRepaymentPlanId]);
 	const [tenureInput, setTenureInput] = useState(
 		loanProductSetup.tenureMonths.join(", "),
 	);
@@ -159,11 +173,12 @@ function RouteComponent() {
 		(index: number, field: "name" | "code") =>
 		(e: ChangeEvent<HTMLInputElement>) => {
 			const { value } = e.target;
-			setChannels((prev) =>
-				prev.map((row, idx) =>
-					idx === index ? { ...row, [field]: value } : row,
-				),
-			);
+			setChannels((prev) => {
+				const next = [...prev];
+				const current = next[index] ?? { name: "", code: "" };
+				next[index] = { ...current, [field]: value };
+				return next;
+			});
 		};
 
 	const removeChannelRow = (index: number) => {
@@ -173,20 +188,26 @@ function RouteComponent() {
 		});
 	};
 
+	const toggleDestination = (type: DisbursementDestinationType) => {
+		setDestinationTypes((prev) => {
+			if (prev.includes(type)) return prev.filter((item) => item !== type);
+			return [...prev, type];
+		});
+	};
+
 	const onEvaluateScore = () => {
 		if (!activeScoreCard) return;
 		const result = evaluateScoreCard(activeScoreCard, scoreInputs);
 		setRiskResult(result);
-		setWorkflow(runWorkflow(3)); // after risk step
 	};
 
-	const nextStep = () => {
-		const next = Math.min(workflowStep + 1, workflowDefinition.length - 1);
-		setWorkflowStep(next);
-		setWorkflow(runWorkflow(next));
-	};
+	const onSaveLoanSetup = () => {
+		const mappedDestinations = destinationTypes.map((type) =>
+			type === "BANK"
+				? ({ type: "BANK" } satisfies DisbursementDestination)
+				: ({ type: "WALLET" } satisfies DisbursementDestination),
+		);
 
-	const onSaveWorkflowSetup = () => {
 		addLoanSetup({
 			product,
 			channels,
@@ -194,10 +215,15 @@ function RouteComponent() {
 			scorecardName: activeScoreCard?.name ?? null,
 			workflowId: selectedWorkflowId,
 			workflowName: selectedWorkflowId
-				? workflows[selectedWorkflowId]?.name ?? "(unnamed workflow)"
+				? (workflows[selectedWorkflowId]?.name ?? "(unnamed workflow)")
 				: null,
 			riskResult,
+			disbursementType: "FULL",
+			partialInterestRate: null,
+			disbursementDestinations: mappedDestinations,
+			repaymentPlan: activeRepaymentPlan ?? null,
 		});
+		navigate({ to: "/loan" });
 	};
 
 	return (
@@ -206,12 +232,20 @@ function RouteComponent() {
 				<h1 className="text-2xl font-bold">
 					Loan Product Setup & Workflow (React)
 				</h1>
-				<Link
-					to="/loan/scorecard-setup"
-					className="text-sm border px-3 py-1 rounded hover:bg-gray-50"
-				>
-					Configure Scorecard
-				</Link>
+				<div className="flex justify-end gap-2">
+					<Link
+						to="/loan/scorecard-setup"
+						className="text-sm border px-3 py-1 rounded hover:bg-gray-50"
+					>
+						Configure Scorecard
+					</Link>
+					<Link
+						to="/workflow"
+						className="text-sm border px-3 py-1 rounded hover:bg-gray-50"
+					>
+						Configure workflow
+					</Link>
+				</div>
 			</div>
 
 			{/* Product Setup */}
@@ -514,6 +548,90 @@ function RouteComponent() {
 				) : null}
 			</section>
 
+			{/* Repayment */}
+			<section className="border p-4 rounded mb-6">
+				<div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between mb-3">
+					<div>
+						<h2 className="font-semibold">Repayment</h2>
+						<div className="text-xs text-gray-600">
+							Choose a repayment plan configured in Repayment Setup.
+						</div>
+					</div>
+					<div className="flex gap-2 flex-wrap">
+						<select
+							className="border px-2 py-2 rounded min-w-50"
+							value={
+								selectedRepaymentPlanId ?? activeRepaymentPlan?.planId ?? ""
+							}
+							onChange={(e) => selectRepaymentPlan(e.target.value || null)}
+						>
+							{repaymentPlanList.map((plan) => (
+								<option key={plan.planId} value={plan.planId}>
+									{plan.name}
+								</option>
+							))}
+						</select>
+						<Link
+							to="/loan/repayment-setup"
+							className="text-sm border px-3 py-2 rounded hover:bg-gray-100"
+						>
+							Manage plans
+						</Link>
+					</div>
+				</div>
+
+				{activeRepaymentPlan ? (
+					<div className="bg-gray-50 border rounded p-3 text-sm">
+						<div className="font-semibold mb-1">{activeRepaymentPlan.name}</div>
+						<div className="text-xs text-gray-700 mb-2">
+							{activeRepaymentPlan.method} · {activeRepaymentPlan.frequency}
+						</div>
+						<dl className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 text-xs text-gray-700">
+							<div>
+								<dt>Due day</dt>
+								<dd>{activeRepaymentPlan.dueDayOfMonth ?? "—"}</dd>
+							</div>
+							<div>
+								<dt>Grace period</dt>
+								<dd>{activeRepaymentPlan.gracePeriodDays} days</dd>
+							</div>
+							<div>
+								<dt>Late fee</dt>
+								<dd>
+									{activeRepaymentPlan.lateFeeFlat.toLocaleString()} +{" "}
+									{activeRepaymentPlan.lateFeePct}%
+								</dd>
+							</div>
+							<div>
+								<dt>Prepayment</dt>
+								<dd>{activeRepaymentPlan.prepaymentPenaltyPct}%</dd>
+							</div>
+							<div>
+								<dt>Autopay</dt>
+								<dd>
+									{activeRepaymentPlan.autopayRequired
+										? "Required"
+										: "Optional"}
+								</dd>
+							</div>
+							<div>
+								<dt>Rounding step</dt>
+								<dd>{activeRepaymentPlan.roundingStep}</dd>
+							</div>
+						</dl>
+						{activeRepaymentPlan.description ? (
+							<p className="text-xs text-gray-700 mt-2">
+								{activeRepaymentPlan.description}
+							</p>
+						) : null}
+					</div>
+				) : (
+					<div className="text-sm text-gray-700">
+						No repayment plans yet. Create one in Repayment Setup.
+					</div>
+				)}
+			</section>
+
 			{/* Channel configuration */}
 			<section className="border p-4 rounded mb-6">
 				<div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between mb-3">
@@ -576,10 +694,61 @@ function RouteComponent() {
 				</div>
 			</section>
 
+			{/* Disbursement */}
+			<section className="border p-4 rounded mb-6">
+				<div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between mb-3">
+					<div>
+						<h2 className="font-semibold">Disbursement</h2>
+						<div className="text-xs text-gray-600">
+							Pick every destination you want to enable. We will collect account
+							and wallet details later in the flow.
+						</div>
+					</div>
+					<div className="text-xs text-gray-600">
+						Multi-select — no bank setup here.
+					</div>
+				</div>
+
+				<div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+					{destinationOptions.map((option) => {
+						const checked = destinationTypes.includes(option.type);
+						return (
+							<label
+								key={option.type}
+								className={`flex gap-3 border rounded p-3 text-sm transition hover:border-blue-300 ${
+									checked ? "border-blue-500 bg-blue-50" : "border-gray-200"
+								}`}
+							>
+								<input
+									type="checkbox"
+									className="mt-1 accent-blue-600"
+									checked={checked}
+									onChange={() => toggleDestination(option.type)}
+								/>
+								<div className="flex flex-col gap-1">
+									<span className="font-semibold">{option.label}</span>
+									<span className="text-xs text-gray-700">{option.hint}</span>
+								</div>
+							</label>
+						);
+					})}
+				</div>
+
+				{destinationTypes.length === 0 ? (
+					<p className="text-xs text-red-700 mt-3">
+						Choose at least one payout rail to proceed.
+					</p>
+				) : (
+					<div className="mt-3 text-xs text-gray-700">
+						Enabled: {destinationTypes.join(", ")}
+					</div>
+				)}
+			</section>
+
 			<section className="mt-8">
 				<div className="flex flex-col gap-2">
 					<button
-						onClick={onSaveWorkflowSetup}
+						onClick={onSaveLoanSetup}
 						type="button"
 						className="w-full py-4 text-lg font-semibold bg-emerald-600 text-white rounded-lg shadow hover:bg-emerald-700"
 					>
@@ -587,10 +756,7 @@ function RouteComponent() {
 					</button>
 					<div className="flex flex-col gap-1 text-sm text-gray-700 md:flex-row md:items-center md:justify-between">
 						<span>Saved locally via Zustand. No edit flow yet.</span>
-						<Link
-							to="/loan/workflow-list"
-							className="text-blue-600 hover:underline"
-						>
+						<Link to="/loan" className="text-blue-600 hover:underline">
 							View saved loan setups
 						</Link>
 					</div>
