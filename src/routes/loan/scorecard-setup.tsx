@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { Plus, Save, Trash2, X } from "lucide-react";
 import { type ChangeEvent, useEffect, useMemo, useState } from "react";
 import {
@@ -30,6 +30,23 @@ const createRuleForField = (field: string): Rule => ({
 const generateScoreCardId = () =>
 	globalThis.crypto?.randomUUID?.() ?? `scorecard_${Date.now()}`;
 
+const createEmptyScoreCard = (): ScoreCard => ({
+	scoreCardId: generateScoreCardId(),
+	name: "New Scorecard",
+	maxScore: 100,
+	rules: [],
+	bureauProvider: "Experian",
+	bureauPurpose: "Credit assessment",
+	bureauConsentRequired: true,
+});
+
+const withBureauDefaults = (card: ScoreCard): ScoreCard => ({
+	...card,
+	bureauProvider: card.bureauProvider ?? "Experian",
+	bureauPurpose: card.bureauPurpose ?? "Credit assessment",
+	bureauConsentRequired: card.bureauConsentRequired ?? true,
+});
+
 function ScorecardSetupComponent() {
 	const scoreCards = useScoreCardStore((s) => s.scoreCards);
 	const selectedScoreCardId = useScoreCardStore((s) => s.selectedScoreCardId);
@@ -39,15 +56,14 @@ function ScorecardSetupComponent() {
 
 	const selectedFromStore = scoreCards[selectedScoreCardId];
 
-	const [scoreCard, setScoreCard] = useState<ScoreCard>({
-		...(selectedFromStore ?? {
-			scoreCardId: generateScoreCardId(),
-			name: "New Scorecard",
-			maxScore: 100,
-			rules: [],
-		}),
-		rules: selectedFromStore?.rules ?? [],
-	});
+	const [scoreCard, setScoreCard] = useState<ScoreCard>(
+		selectedFromStore
+			? withBureauDefaults({
+					...selectedFromStore,
+					rules: selectedFromStore.rules,
+				})
+			: createEmptyScoreCard(),
+	);
 	const [newFieldName, setNewFieldName] = useState("");
 	const [isTestOpen, setIsTestOpen] = useState(false);
 	const [testInputs, setTestInputs] = useState<Record<string, string>>({});
@@ -66,7 +82,12 @@ function ScorecardSetupComponent() {
 
 	useEffect(() => {
 		if (!selectedFromStore) return;
-		setScoreCard({ ...selectedFromStore, rules: selectedFromStore.rules });
+		setScoreCard(
+			withBureauDefaults({
+				...selectedFromStore,
+				rules: selectedFromStore.rules,
+			}),
+		);
 	}, [selectedFromStore]);
 
 	const handleCardInfoChange = (e: ChangeEvent<HTMLInputElement>) => {
@@ -80,6 +101,12 @@ function ScorecardSetupComponent() {
 			}
 			if (name === "name") {
 				return { ...prev, name: value };
+			}
+			if (name === "bureauProvider") {
+				return { ...prev, bureauProvider: value };
+			}
+			if (name === "bureauPurpose") {
+				return { ...prev, bureauPurpose: value };
 			}
 			return prev;
 		});
@@ -138,27 +165,26 @@ function ScorecardSetupComponent() {
 		setTestResult(evaluateScoreCard(scoreCard, testInputs));
 	};
 
+	const navigate = useNavigate();
 	const onSave = () => {
 		upsertScoreCard(scoreCard, { select: true });
+		navigate({ to: "/" });
 	};
 
 	const onSaveAsNew = () => {
 		const next: ScoreCard = {
 			...scoreCard,
 			scoreCardId: generateScoreCardId(),
-			name: scoreCard.name.trim() ? `${scoreCard.name} (copy)` : "New Scorecard",
+			name: scoreCard.name.trim()
+				? `${scoreCard.name} (copy)`
+				: "New Scorecard",
 		};
 		upsertScoreCard(next, { select: true });
 		setScoreCard(next);
 	};
 
 	const onNewScoreCard = () => {
-		const next: ScoreCard = {
-			scoreCardId: generateScoreCardId(),
-			name: "New Scorecard",
-			maxScore: 100,
-			rules: [],
-		};
+		const next = createEmptyScoreCard();
 		setScoreCard(next);
 		setNewFieldName("");
 		setTestInputs({});
@@ -177,14 +203,22 @@ function ScorecardSetupComponent() {
 
 	return (
 		<div className="p-6 font-sans max-w-4xl mx-auto">
-			<div className="flex items-center justify-between mb-4">
+			<div className="flex items-center justify-between mb-4 gap-3">
 				<h1 className="text-2xl font-bold">Scorecard Engine Setup</h1>
-				<Link
-					to="/loan/setup"
-					className="text-sm border px-3 py-1 rounded hover:bg-gray-50"
-				>
-					Back to Loan Setup
-				</Link>
+				<div className="flex gap-2">
+					<Link
+						to="/loan/scorecards"
+						className="text-sm border px-3 py-1 rounded hover:bg-gray-50"
+					>
+						View Scorecards
+					</Link>
+					<Link
+						to="/loan/setup"
+						className="text-sm border px-3 py-1 rounded hover:bg-gray-50"
+					>
+						Back to Loan Setup
+					</Link>
+				</div>
 			</div>
 
 			<section className="border p-4 rounded mb-6 bg-white">
@@ -209,17 +243,10 @@ function ScorecardSetupComponent() {
 					<div className="flex gap-2">
 						<button
 							type="button"
-							onClick={onNewScoreCard}
+							onClick={onSave}
 							className="border px-3 py-2 rounded text-sm hover:bg-gray-50"
 						>
-							New
-						</button>
-						<button
-							type="button"
-							onClick={onSaveAsNew}
-							className="border px-3 py-2 rounded text-sm hover:bg-gray-50"
-						>
-							Save as New
+              Create
 						</button>
 						<button
 							type="button"
@@ -270,6 +297,51 @@ function ScorecardSetupComponent() {
 							onChange={handleCardInfoChange}
 							className="border px-2 py-1 rounded"
 						/>
+					</label>
+				</div>
+
+				<div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+					<label className="flex flex-col gap-1 text-sm">
+						<span>Bureau provider</span>
+						<input
+							type="text"
+							name="bureauProvider"
+							value={scoreCard.bureauProvider ?? ""}
+							onChange={handleCardInfoChange}
+							className="border px-2 py-1 rounded"
+							placeholder="e.g., Experian"
+						/>
+					</label>
+					<label className="flex flex-col gap-1 text-sm">
+						<span>Bureau purpose</span>
+						<input
+							type="text"
+							name="bureauPurpose"
+							value={scoreCard.bureauPurpose ?? ""}
+							onChange={handleCardInfoChange}
+							className="border px-2 py-1 rounded"
+							placeholder="e.g., Credit assessment"
+						/>
+					</label>
+					<label className="flex flex-col gap-2 text-sm">
+						<span>Bureau consent required</span>
+						<div className="flex items-center gap-2">
+							<input
+								type="checkbox"
+								className="h-4 w-4"
+								checked={Boolean(scoreCard.bureauConsentRequired)}
+								onChange={(e) =>
+									setScoreCard((prev) => ({
+										...prev,
+										bureauConsentRequired: e.target.checked,
+									}))
+								}
+							/>
+							<span className="text-xs text-gray-700">
+								Indicates whether applicant consent must be captured before
+								bureau pulls.
+							</span>
+						</div>
 					</label>
 				</div>
 			</section>
@@ -385,14 +457,14 @@ function ScorecardSetupComponent() {
 				<div className="flex items-center justify-between mb-2">
 					<h2 className="font-semibold text-lg">Live JSON Output</h2>
 					<div className="flex gap-2">
-						<button
+						{/* <button
 							onClick={onSave}
 							type="button"
 							className="bg-emerald-600 text-white px-3 py-1 rounded text-sm flex items-center gap-2"
 						>
 							<Save className="w-4 h-4" />
 							Save
-						</button>
+						</button> */}
 						<button
 							onClick={openTestModal}
 							type="button"

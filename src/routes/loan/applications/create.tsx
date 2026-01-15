@@ -49,17 +49,40 @@ function RouteComponent() {
 	const destinationChoices: DisbursementDestinationType[] = (
 		activeSetup?.disbursementDestinations ?? []
 	).map((d) => d.type);
+	const defaultBureauProvider = "Myanmar Credit Bureau";
+	const defaultBureauPurpose = "Credit assessment";
 
 	const activeScoreCard = useMemo(() => {
 		if (!activeSetup?.scorecardId) return null;
 		return scoreCards[activeSetup.scorecardId] ?? null;
 	}, [activeSetup?.scorecardId, scoreCards]);
 
+	const bureauProviders = useMemo(() => {
+		const set = new Set<string>();
+		set.add(defaultBureauProvider);
+		if (activeScoreCard?.bureauProvider?.trim()) {
+			set.add(activeScoreCard.bureauProvider.trim());
+		}
+		return Array.from(set);
+	}, [activeScoreCard?.bureauProvider]);
+
+	const bureauPurposes = useMemo(() => {
+		const set = new Set<string>();
+		set.add(defaultBureauPurpose);
+		set.add("Pre-approval");
+		set.add("Account review");
+		set.add("Regulatory reporting");
+		if (activeScoreCard?.bureauPurpose?.trim()) {
+			set.add(activeScoreCard.bureauPurpose.trim());
+		}
+		return Array.from(set);
+	}, [activeScoreCard?.bureauPurpose]);
+
 	const configuredFields = useMemo(() => {
 		return activeScoreCard
-			? Array.from(new Set(activeScoreCard.rules.map((r) => r.field))).sort((a, b) =>
-						a.localeCompare(b),
-				  )
+			? Array.from(new Set(activeScoreCard.rules.map((r) => r.field))).sort(
+					(a, b) => a.localeCompare(b),
+				)
 			: [];
 	}, [activeScoreCard]);
 
@@ -91,10 +114,17 @@ function RouteComponent() {
 	const [channelCode, setChannelCode] = useState(channelOptions[0]?.code ?? "");
 	const [destinationType, setDestinationType] =
 		useState<DisbursementDestinationType>(destinationChoices[0] ?? "BANK");
+	const [bureauProvider, setBureauProvider] = useState(defaultBureauProvider);
+	const [bureauPurpose, setBureauPurpose] = useState(defaultBureauPurpose);
+	const [bureauConsent, setBureauConsent] = useState(false);
+	const [bureauReference, setBureauReference] = useState("");
+	const [bureauRequestedAt, setBureauRequestedAt] = useState("");
 	const [notes, setNotes] = useState("");
 	const [formError, setFormError] = useState<string | null>(null);
 	const [scoreInputs, setScoreInputs] = useState<Record<string, string>>({});
-	const [scoreResult, setScoreResult] = useState<ScoreEngineResult | null>(null);
+	const [scoreResult, setScoreResult] = useState<ScoreEngineResult | null>(
+		null,
+	);
 
 	useEffect(() => {
 		setTenureValue(tenureOptions[0] ?? null);
@@ -118,6 +148,16 @@ function RouteComponent() {
 		});
 		setScoreResult(null);
 	}, [activeSetup?.id, scoreInputFields]);
+
+	useEffect(() => {
+		const nextProvider = activeScoreCard?.bureauProvider?.trim() || defaultBureauProvider;
+		const nextPurpose = activeScoreCard?.bureauPurpose?.trim() || defaultBureauPurpose;
+		setBureauProvider(nextProvider);
+		setBureauPurpose(nextPurpose);
+		setBureauConsent(false);
+		setBureauReference("");
+		setBureauRequestedAt("");
+	}, [activeScoreCard?.scoreCardId]);
 
 	const disabled = setupList.length === 0;
 	const statusBadge: LoanApplicationStatus | "" = "DRAFT";
@@ -194,6 +234,29 @@ function RouteComponent() {
 			return;
 		}
 
+		if (!bureauProvider.trim()) {
+			setFormError("Select a credit bureau provider.");
+			return;
+		}
+
+		if (!bureauPurpose.trim()) {
+			setFormError("Enter the purpose for the bureau check.");
+			return;
+		}
+
+		if (!bureauConsent) {
+			setFormError("Applicant consent is required before checking the bureau.");
+			return;
+		}
+
+		const parsedBureauRequestedAt = bureauRequestedAt
+			? Date.parse(bureauRequestedAt)
+			: null;
+		if (bureauRequestedAt && Number.isNaN(parsedBureauRequestedAt)) {
+			setFormError("Enter a valid requested-at date/time.");
+			return;
+		}
+
 		setFormError(null);
 		const creditScoreToSave =
 			scoreResult?.totalScore ?? activeSetup.totalScore ?? null;
@@ -210,6 +273,11 @@ function RouteComponent() {
 			tenureMonths: tenureValue,
 			channelCode,
 			destinationType,
+			bureauProvider,
+			bureauPurpose,
+			bureauConsent,
+			bureauReference,
+			bureauRequestedAt: parsedBureauRequestedAt,
 			notes,
 			setupId: activeSetup.id,
 			productCode: activeSetup.product.productCode,
@@ -358,7 +426,7 @@ function RouteComponent() {
 								{scoreResult ? (
 									<div className="text-sm text-gray-700">
 										Score {scoreResult.totalScore} / {scoreResult.maxScore} —
-										 {scoreResult.riskGrade}
+										{scoreResult.riskGrade}
 									</div>
 								) : null}
 							</div>
@@ -371,7 +439,11 @@ function RouteComponent() {
 											const value = scoreInputs[field] ?? "";
 											const inputId = `score-${field}`;
 											return (
-												<label key={field} className="flex flex-col gap-1 text-sm" htmlFor={inputId}>
+												<label
+													key={field}
+													className="flex flex-col gap-1 text-sm"
+													htmlFor={inputId}
+												>
 													<span>{field}</span>
 													{kind === "boolean" ? (
 														<select
@@ -379,7 +451,10 @@ function RouteComponent() {
 															value={value}
 															onChange={(e) => {
 																const nextValue = e.target.value;
-																setScoreInputs((prev) => ({ ...prev, [field]: nextValue }));
+																setScoreInputs((prev) => ({
+																	...prev,
+																	[field]: nextValue,
+																}));
 															}}
 															className="border px-2 py-2 rounded"
 															disabled={disabled}
@@ -395,11 +470,16 @@ function RouteComponent() {
 															value={value}
 															onChange={(e) => {
 																const nextValue = e.target.value;
-																setScoreInputs((prev) => ({ ...prev, [field]: nextValue }));
+																setScoreInputs((prev) => ({
+																	...prev,
+																	[field]: nextValue,
+																}));
 															}}
 															className="border px-2 py-2 rounded"
 															placeholder={
-																(rulesByField[field] ?? []).some((r) => r.operator === "between")
+																(rulesByField[field] ?? []).some(
+																	(r) => r.operator === "between",
+																)
 																	? "For between: e.g. 25,45"
 																	: ""
 															}
@@ -422,16 +502,120 @@ function RouteComponent() {
 										</button>
 										{scoreResult ? (
 											<span className="text-sm text-gray-700">
-												Result: {scoreResult.totalScore} / {scoreResult.maxScore} — {scoreResult.riskGrade}
+												Result: {scoreResult.totalScore} /{" "}
+												{scoreResult.maxScore} — {scoreResult.riskGrade}
 											</span>
 										) : null}
 									</div>
 								</>
 							) : (
 								<p className="text-sm text-gray-700">
-									Link a scorecard in Loan Setup to calculate credit scores per applicant.
+									Link a scorecard in Loan Setup to calculate credit scores per
+									applicant.
 								</p>
 							)}
+						</div>
+
+						<div className="space-y-3 border rounded p-4">
+							<div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
+								<div>
+									<div className="text-sm text-gray-600">
+										Credit bureau check
+									</div>
+									<div className="text-base font-semibold">
+										Capture consent and request details
+									</div>
+								</div>
+								{bureauConsent ? (
+									<span className="text-xs px-2 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100">
+										Consent ready
+									</span>
+								) : (
+									<span className="text-xs px-2 py-1 rounded-full bg-yellow-50 text-yellow-800 border border-yellow-200">
+										Consent required
+									</span>
+								)}
+							</div>
+
+							<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+								<label className="flex flex-col gap-1 text-sm">
+									<span>Bureau provider</span>
+									<select
+										className="border px-2 py-2 rounded"
+										value={bureauProvider}
+										onChange={(e) => setBureauProvider(e.target.value)}
+										disabled={disabled}
+									>
+										{bureauProviders.map((provider) => (
+											<option key={provider} value={provider}>
+												{provider}
+											</option>
+										))}
+									</select>
+								</label>
+
+								<label className="flex flex-col gap-1 text-sm">
+									<span>Purpose</span>
+									<input
+										type="text"
+										className="border px-2 py-2 rounded"
+										value={bureauPurpose}
+										onChange={(e) => setBureauPurpose(e.target.value)}
+										list="bureau-purpose-options"
+										disabled={disabled}
+									/>
+									<datalist id="bureau-purpose-options">
+										{bureauPurposes.map((purpose) => (
+											<option key={purpose} value={purpose}>
+												{purpose}
+											</option>
+										))}
+									</datalist>
+								</label>
+
+								<label className="flex flex-col gap-2 text-sm">
+									<div className="flex items-center gap-2">
+										<input
+											type="checkbox"
+											className="h-4 w-4"
+											checked={bureauConsent}
+											onChange={(e) => setBureauConsent(e.target.checked)}
+											disabled={disabled}
+										/>
+										<span>Applicant consent captured</span>
+									</div>
+									<span className="text-xs text-gray-600">
+										Consent must be obtained before requesting a bureau report.
+									</span>
+								</label>
+
+								<label className="flex flex-col gap-1 text-sm">
+									<span>Bureau reference (case ID)</span>
+									<input
+										type="text"
+										className="border px-2 py-2 rounded"
+										value={bureauReference}
+										onChange={(e) => setBureauReference(e.target.value)}
+										disabled={disabled}
+										placeholder="e.g. REF-12345"
+									/>
+								</label>
+
+								<label className="flex flex-col gap-1 text-sm">
+									<span>Bureau requested at</span>
+									<input
+										type="datetime-local"
+										className="border px-2 py-2 rounded"
+										value={bureauRequestedAt}
+										onChange={(e) => setBureauRequestedAt(e.target.value)}
+										disabled={disabled}
+									/>
+									<span className="text-xs text-gray-600">
+										Optional timestamp to track when the bureau request was
+										sent.
+									</span>
+								</label>
+							</div>
 						</div>
 
 						<div className="grid grid-cols-1 md:grid-cols-3 gap-4">

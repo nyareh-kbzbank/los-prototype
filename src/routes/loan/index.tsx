@@ -44,6 +44,12 @@ function LoanWorkflowList() {
 					>
 						Create Score Card
 					</Link>
+					<Link
+						to="/loan/scorecards"
+						className="text-sm border px-3 rounded hover:bg-gray-50"
+					>
+						Score Card List
+					</Link>
 				</div>
 			</div>
 

@@ -13,6 +13,7 @@ import { Route as WorkflowRouteImport } from './routes/workflow'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as LoanIndexRouteImport } from './routes/loan/index'
 import { Route as LoanSetupRouteImport } from './routes/loan/setup'
+import { Route as LoanScorecardsRouteImport } from './routes/loan/scorecards'
 import { Route as LoanScorecardSetupRouteImport } from './routes/loan/scorecard-setup'
 import { Route as LoanRepaymentSetupRouteImport } from './routes/loan/repayment-setup'
 import { Route as DemoTanstackQueryRouteImport } from './routes/demo/tanstack-query'
@@ -54,6 +55,11 @@ const LoanIndexRoute = LoanIndexRouteImport.update({
 const LoanSetupRoute = LoanSetupRouteImport.update({
   id: '/loan/setup',
   path: '/loan/setup',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoanScorecardsRoute = LoanScorecardsRouteImport.update({
+  id: '/loan/scorecards',
+  path: '/loan/scorecards',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoanScorecardSetupRoute = LoanScorecardSetupRouteImport.update({
@@ -177,6 +183,7 @@ export interface FileRoutesByFullPath {
   '/demo/tanstack-query': typeof DemoTanstackQueryRoute
   '/loan/repayment-setup': typeof LoanRepaymentSetupRoute
   '/loan/scorecard-setup': typeof LoanScorecardSetupRoute
+  '/loan/scorecards': typeof LoanScorecardsRoute
   '/loan/setup': typeof LoanSetupRoute
   '/loan': typeof LoanIndexRoute
   '/demo/api/names': typeof DemoApiNamesRoute
@@ -205,6 +212,7 @@ export interface FileRoutesByTo {
   '/demo/tanstack-query': typeof DemoTanstackQueryRoute
   '/loan/repayment-setup': typeof LoanRepaymentSetupRoute
   '/loan/scorecard-setup': typeof LoanScorecardSetupRoute
+  '/loan/scorecards': typeof LoanScorecardsRoute
   '/loan/setup': typeof LoanSetupRoute
   '/loan': typeof LoanIndexRoute
   '/demo/api/names': typeof DemoApiNamesRoute
@@ -234,6 +242,7 @@ export interface FileRoutesById {
   '/demo/tanstack-query': typeof DemoTanstackQueryRoute
   '/loan/repayment-setup': typeof LoanRepaymentSetupRoute
   '/loan/scorecard-setup': typeof LoanScorecardSetupRoute
+  '/loan/scorecards': typeof LoanScorecardsRoute
   '/loan/setup': typeof LoanSetupRoute
   '/loan/': typeof LoanIndexRoute
   '/demo/api/names': typeof DemoApiNamesRoute
@@ -264,6 +273,7 @@ export interface FileRouteTypes {
     | '/demo/tanstack-query'
     | '/loan/repayment-setup'
     | '/loan/scorecard-setup'
+    | '/loan/scorecards'
     | '/loan/setup'
     | '/loan'
     | '/demo/api/names'
@@ -292,6 +302,7 @@ export interface FileRouteTypes {
     | '/demo/tanstack-query'
     | '/loan/repayment-setup'
     | '/loan/scorecard-setup'
+    | '/loan/scorecards'
     | '/loan/setup'
     | '/loan'
     | '/demo/api/names'
@@ -320,6 +331,7 @@ export interface FileRouteTypes {
     | '/demo/tanstack-query'
     | '/loan/repayment-setup'
     | '/loan/scorecard-setup'
+    | '/loan/scorecards'
     | '/loan/setup'
     | '/loan/'
     | '/demo/api/names'
@@ -349,6 +361,7 @@ export interface RootRouteChildren {
   DemoTanstackQueryRoute: typeof DemoTanstackQueryRoute
   LoanRepaymentSetupRoute: typeof LoanRepaymentSetupRoute
   LoanScorecardSetupRoute: typeof LoanScorecardSetupRoute
+  LoanScorecardsRoute: typeof LoanScorecardsRoute
   LoanSetupRoute: typeof LoanSetupRoute
   LoanIndexRoute: typeof LoanIndexRoute
   DemoApiNamesRoute: typeof DemoApiNamesRoute
@@ -397,6 +410,13 @@ declare module '@tanstack/react-router' {
       path: '/loan/setup'
       fullPath: '/loan/setup'
       preLoaderRoute: typeof LoanSetupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/loan/scorecards': {
+      id: '/loan/scorecards'
+      path: '/loan/scorecards'
+      fullPath: '/loan/scorecards'
+      preLoaderRoute: typeof LoanScorecardsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/loan/scorecard-setup': {
@@ -565,6 +585,7 @@ const rootRouteChildren: RootRouteChildren = {
   DemoTanstackQueryRoute: DemoTanstackQueryRoute,
   LoanRepaymentSetupRoute: LoanRepaymentSetupRoute,
   LoanScorecardSetupRoute: LoanScorecardSetupRoute,
+  LoanScorecardsRoute: LoanScorecardsRoute,
   LoanSetupRoute: LoanSetupRoute,
   LoanIndexRoute: LoanIndexRoute,
   DemoApiNamesRoute: DemoApiNamesRoute,

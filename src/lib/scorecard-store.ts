@@ -28,6 +28,9 @@ export type ScoreCard = {
 	name: string;
 	maxScore: number;
 	rules: Rule[];
+	bureauProvider?: string;
+	bureauPurpose?: string;
+	bureauConsentRequired?: boolean;
 };
 
 export const defaultScoreCard: ScoreCard = {
@@ -39,6 +42,9 @@ export const defaultScoreCard: ScoreCard = {
 		{ field: "age", operator: "between", value: "40,60", score: 15 },
 		{ field: "monthlyIncome", operator: ">", value: "50000", score: 20 },
 	],
+	bureauProvider: "Experian",
+	bureauPurpose: "Credit assessment",
+	bureauConsentRequired: true,
 };
 
 type ScoreCardState = {
@@ -99,7 +105,7 @@ export const useScoreCardStore = create<ScoreCardState>()(
 		}),
 		{
 			name: "loan-scorecard",
-			version: 2,
+			version: 3,
 			migrate: (persistedState, version) => {
 				if (version === 1) {
 					const legacy = persistedState as { scoreCard?: ScoreCard };
@@ -111,6 +117,24 @@ export const useScoreCardStore = create<ScoreCardState>()(
 						};
 					}
 				}
+
+				if (version === 2) {
+					const state = persistedState as PersistedScoreCardState;
+					const patchedCards: Record<string, ScoreCard> = {};
+					for (const [id, card] of Object.entries(state.scoreCards)) {
+						patchedCards[id] = {
+							bureauProvider: card.bureauProvider ?? "Experian",
+							bureauPurpose: card.bureauPurpose ?? "Credit assessment",
+							bureauConsentRequired: card.bureauConsentRequired ?? true,
+							...card,
+						};
+					}
+					return {
+						scoreCards: patchedCards,
+						selectedScoreCardId: state.selectedScoreCardId,
+					};
+				}
+
 				return persistedState as PersistedScoreCardState;
 			},
 		},

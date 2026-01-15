@@ -37,6 +37,11 @@ export type LoanApplication = {
   workflowName: string | null;
   workflowStageIndex: number;
   workflowHistory: ApplicationWorkflowEvent[];
+  bureauProvider: string;
+  bureauPurpose: string;
+  bureauConsent: boolean;
+  bureauReference: string;
+  bureauRequestedAt: number | null;
 };
 
 export type LoanApplicationInput = {
@@ -57,6 +62,11 @@ export type LoanApplicationInput = {
   creditMax?: number | null;
   workflowId?: string | null;
   workflowName?: string | null;
+  bureauProvider: string;
+  bureauPurpose: string;
+  bureauConsent: boolean;
+  bureauReference?: string;
+  bureauRequestedAt?: number | null;
 };
 
 type LoanApplicationState = {
@@ -115,6 +125,15 @@ export const useLoanApplicationStore = create<LoanApplicationState>()(
           workflowName: input.workflowName ?? null,
           workflowStageIndex: -1,
           workflowHistory: [],
+          bureauProvider: input.bureauProvider.trim() || "Unknown",
+          bureauPurpose: input.bureauPurpose.trim() || "",
+          bureauConsent: Boolean(input.bureauConsent),
+          bureauReference: input.bureauReference?.trim() ?? "",
+          bureauRequestedAt:
+            Number.isFinite(input.bureauRequestedAt || NaN) &&
+            input.bureauRequestedAt !== null
+              ? input.bureauRequestedAt
+              : null,
         };
         set((prev) => ({
           applications: { ...prev.applications, [application.id]: application },
@@ -180,7 +199,7 @@ export const useLoanApplicationStore = create<LoanApplicationState>()(
     }),
     {
       name: "loan-applications",
-      version: 3,
+      version: 4,
       partialize: (state) => ({ applications: state.applications }),
       migrate: (persistedState, version) => {
         const base = persistedState as Partial<LoanApplicationState> &
@@ -210,6 +229,21 @@ export const useLoanApplicationStore = create<LoanApplicationState>()(
             const productCode = (app as LoanApplication).productCode ?? "APP";
             patched[id] = {
               applicationNo: generateApplicationNo(productCode),
+              ...(app as LoanApplication),
+            };
+          }
+          return { ...base, applications: patched } satisfies Partial<LoanApplicationState>;
+        }
+
+        if (version < 4) {
+          const patched: Record<string, LoanApplication> = {};
+          for (const [id, app] of Object.entries(applications)) {
+            patched[id] = {
+              bureauConsent: false,
+              bureauProvider: "Unknown",
+              bureauPurpose: "",
+              bureauReference: "",
+              bureauRequestedAt: null,
               ...(app as LoanApplication),
             };
           }

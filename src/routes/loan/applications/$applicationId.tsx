@@ -86,10 +86,35 @@ function RouteComponent() {
 		return `${application.creditScore.toLocaleString()} / ${application.creditMax.toLocaleString()}`;
 	}, [application?.creditMax, application?.creditScore]);
 
+	const bureauRequestedAtLabel = useMemo(() => {
+		if (!application?.bureauRequestedAt) return "—";
+		return new Date(application.bureauRequestedAt).toLocaleString();
+	}, [application?.bureauRequestedAt]);
+
 	const statuses: LoanApplicationStatus[] = useMemo(
 		() => ["DRAFT", "SUBMITTED", "APPROVED", "REJECTED"],
 		[],
 	);
+
+	const getStatusTone = (statusLabel: string) => {
+		switch (statusLabel) {
+			case "Completed":
+				return {
+					badge: "bg-green-50 text-green-700 border-green-200",
+					card: "border-green-200 bg-green-50/40",
+				};
+			case "Current":
+				return {
+					badge: "bg-blue-50 text-blue-700 border-blue-200",
+					card: "border-blue-200 bg-blue-50/40",
+				};
+			default:
+				return {
+					badge: "bg-gray-50 text-gray-700 border-gray-200",
+					card: "border-gray-200 bg-white",
+				};
+		}
+	};
 
 	if (!application) {
 		return (
@@ -176,6 +201,11 @@ function RouteComponent() {
 					<Field label="Destination" value={application.destinationType} />
 					<Field label="Setup ID" value={application.setupId} />
 					<Field label="Score result" value={scoreLabel} />
+					<Field label="Bureau provider" value={application.bureauProvider || "—"} />
+					<Field label="Bureau purpose" value={application.bureauPurpose || "—"} />
+					<Field label="Bureau consent" value={application.bureauConsent ? "Yes" : "No"} />
+					<Field label="Bureau reference" value={application.bureauReference || "—"} />
+					<Field label="Bureau requested at" value={bureauRequestedAtLabel} />
 				</div>
 				<div>
 					<div className="font-semibold mb-1">Notes</div>
@@ -236,11 +266,12 @@ function RouteComponent() {
 									? "Completed"
 									: idx === currentStageIndex
 										? "Current"
-										: "Pending";
+									: "Pending";
+							const statusTone = getStatusTone(statusLabel);
 							return (
 								<div
 									key={`${stage.id}-${idx}`}
-									className="flex items-start justify-between gap-2 border rounded p-3"
+									className={`flex items-start justify-between gap-2 border rounded p-3 ${statusTone.card}`}
 								>
 									<div className="space-y-1">
 										<div className="font-semibold">{getStageLabel(stage)}</div>
@@ -251,7 +282,9 @@ function RouteComponent() {
 											</div>
 										) : null}
 									</div>
-									<span className="text-xs px-2 py-1 rounded-full border bg-gray-50">
+										<span
+											className={`text-xs px-2 py-1 rounded-full border ${statusTone.badge}`}
+										>
 										{statusLabel}
 									</span>
 								</div>

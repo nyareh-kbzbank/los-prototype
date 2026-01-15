@@ -1,7 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import {
+	Archive,
 	ClipboardList,
+	FilePlus2,
 	LayoutTemplate,
+	ListChecks,
 	Network,
 	Receipt,
 	Table,
@@ -9,7 +12,101 @@ import {
 
 export const Route = createFileRoute("/")({ component: App });
 
+const configureCards = [
+  {
+    title: "Loan Setup",
+    description:
+      "Configure product details, channels, disbursement options, and workflow selection.",
+    to: "/loan/setup",
+    icon: LayoutTemplate,
+    accent: "bg-cyan-500/15 text-cyan-400",
+  },
+  {
+    title: "Workflow Builder",
+    description: "Design and visualize the processing steps for each loan.",
+    to: "/workflow",
+    icon: Network,
+    accent: "bg-sky-500/15 text-sky-300",
+  },
+  {
+    title: "Scorecard Setup",
+    description:
+      "Define rules, weights, and test inputs to calculate risk scores.",
+    to: "/loan/scorecard-setup",
+    icon: ClipboardList,
+    accent: "bg-amber-500/15 text-amber-300",
+  },
+  {
+    title: "Repayment Setup",
+    description:
+      "Create and manage reusable repayment plans for loan products.",
+    to: "/loan/repayment-setup",
+    icon: Receipt,
+    accent: "bg-emerald-500/15 text-emerald-300",
+  },
+];
+
 function App() {
+
+	const libraryCards = [
+		{
+			title: "Loan Setup Library",
+			description: "Browse saved loan product setups and snapshots.",
+			to: "/loan",
+			icon: Archive,
+			accent: "bg-indigo-500/15 text-indigo-300",
+		},
+		{
+			title: "Scorecard Library",
+			description: "View saved scorecards and open them for editing or use.",
+			to: "/loan/scorecards",
+			icon: ListChecks,
+			accent: "bg-fuchsia-500/15 text-fuchsia-300",
+		},
+		{
+			title: "Loan Applications",
+			description: "Review submitted applications and drill into details.",
+			to: "/loan/applications",
+			icon: Table,
+			accent: "bg-teal-500/15 text-teal-300",
+		},
+	];
+
+	const actionCards = [
+		{
+			title: "New Application",
+			description: "Capture applicant info, calculate scores, and submit.",
+			to: "/loan/applications/create",
+			icon: FilePlus2,
+			accent: "bg-lime-500/15 text-lime-300",
+		},
+	];
+
+	const renderCard = (card: {
+		title: string;
+		description: string;
+		to: string;
+		icon: typeof LayoutTemplate;
+		accent: string;
+	}) => {
+		const Icon = card.icon;
+		return (
+			<Link
+				key={card.to}
+				to={card.to}
+				className="group flex items-start gap-3 rounded-xl border border-slate-800 bg-slate-900/60 p-4 hover:border-cyan-500/60 hover:bg-slate-900 transition-colors"
+			>
+				<span className={`rounded-lg p-2 ${card.accent}`}>
+					<Icon className="w-5 h-5" />
+				</span>
+				<div>
+					<h2 className="text-xl font-semibold">{card.title}</h2>
+					<p className="text-slate-400 text-sm">{card.description}</p>
+				</div>
+			</Link>
+		);
+	};
+
 	return (
 		<div className="min-h-screen bg-slate-950 text-white">
 			<section className="px-6 py-16 max-w-5xl mx-auto">
@@ -23,96 +120,33 @@ function App() {
 						one spot. Choose where you want to start below.
 					</p>
 
-					<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-						<Link
-							to="/loan/repayment-setup"
-							className="group flex items-start gap-3 rounded-xl border border-slate-800 bg-slate-900/60 p-4 hover:border-cyan-500/60 hover:bg-slate-900 transition-colors"
-						>
-							<span className="rounded-lg bg-emerald-500/15 text-emerald-300 p-2">
-								<Receipt className="w-5 h-5" />
-							</span>
-							<div>
-								<h2 className="text-xl font-semibold">Repayment Setup</h2>
-								<p className="text-slate-400 text-sm">
-									Create and manage reusable repayment plans for loan products.
-								</p>
+					<div className="space-y-8">
+						<div>
+							<h2 className="text-lg font-semibold text-slate-200 mb-3">
+								Configure
+							</h2>
+							<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+								{configureCards.map(renderCard)}
 							</div>
-						</Link>
-						<Link
-							to="/loan/scorecard-setup"
-							className="group flex items-start gap-3 rounded-xl border border-slate-800 bg-slate-900/60 p-4 hover:border-cyan-500/60 hover:bg-slate-900 transition-colors"
-						>
-							<span className="rounded-lg bg-amber-500/15 text-amber-300 p-2">
-								<ClipboardList className="w-5 h-5" />
-							</span>
-							<div>
-								<h2 className="text-xl font-semibold">Scorecard Setup</h2>
-								<p className="text-slate-400 text-sm">
-									Define rules, weights, and test inputs to calculate risk
-									scores.
-								</p>
-							</div>
-						</Link>
+						</div>
 
-						<Link
-							to="/workflow"
-							className="group flex items-start gap-3 rounded-xl border border-slate-800 bg-slate-900/60 p-4 hover:border-cyan-500/60 hover:bg-slate-900 transition-colors"
-						>
-							<span className="rounded-lg bg-sky-500/15 text-sky-300 p-2">
-								<Network className="w-5 h-5" />
-							</span>
-							<div>
-								<h2 className="text-xl font-semibold">Workflows</h2>
-								<p className="text-slate-400 text-sm">
-									Design and visualize the processing steps for each loan.
-								</p>
+						<div>
+							<h2 className="text-lg font-semibold text-slate-200 mb-3">
+								Libraries & Lists
+							</h2>
+							<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+								{libraryCards.map(renderCard)}
 							</div>
-						</Link>
-						<Link
-							to="/loan/setup"
-							className="group flex items-start gap-3 rounded-xl border border-slate-800 bg-slate-900/60 p-4 hover:border-cyan-500/60 hover:bg-slate-900 transition-colors"
-						>
-							<span className="rounded-lg bg-cyan-500/15 text-cyan-400 p-2">
-								<LayoutTemplate className="w-5 h-5" />
-							</span>
-							<div>
-								<h2 className="text-xl font-semibold">Loan Setup</h2>
-								<p className="text-slate-400 text-sm">
-									Configure product details, channels, disbursement options, and
-									workflow selection.
-								</p>
-							</div>
-						</Link>
+						</div>
 
-						<Link
-							to="/loan/applications"
-							className="group flex items-start gap-3 rounded-xl border border-slate-800 bg-slate-900/60 p-4 hover:border-cyan-500/60 hover:bg-slate-900 transition-colors"
-						>
-							<span className="rounded-lg bg-emerald-500/15 text-emerald-300 p-2">
-								<Table className="w-5 h-5" />
-							</span>
-							<div>
-								<h2 className="text-xl font-semibold">Loan Applications</h2>
-								<p className="text-slate-400 text-sm">
-									Review saved applications and open details.
-								</p>
+						<div>
+							<h2 className="text-lg font-semibold text-slate-200 mb-3">
+								Actions
+							</h2>
+							<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+								{actionCards.map(renderCard)}
 							</div>
-						</Link>
-
-						<Link
-							to="/loan/applications/create"
-							className="group flex items-start gap-3 rounded-xl border border-slate-800 bg-slate-900/60 p-4 hover:border-cyan-500/60 hover:bg-slate-900 transition-colors"
-						>
-							<span className="rounded-lg bg-indigo-500/15 text-indigo-300 p-2">
-								<ClipboardList className="w-5 h-5" />
-							</span>
-							<div>
-								<h2 className="text-xl font-semibold">New Application</h2>
-								<p className="text-slate-400 text-sm">
-									Capture applicant info, calculate scores, and submit.
-								</p>
-							</div>
-						</Link>
+						</div>
 					</div>
 				</div>
 			</section>
