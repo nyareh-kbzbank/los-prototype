@@ -35,8 +35,8 @@ export const defaultScoreCard: ScoreCard = {
 	name: "New Scorecard",
 	maxScore: 100,
 	rules: [
-		{ field: "age", operator: ">=", value: "25", score: 10 },
-		{ field: "age", operator: "<", value: "40", score: 15 },
+		{ field: "age", operator: "between", value: "20,39", score: 10 },
+		{ field: "age", operator: "between", value: "40,60", score: 15 },
 		{ field: "monthlyIncome", operator: ">", value: "50000", score: 20 },
 	],
 };
