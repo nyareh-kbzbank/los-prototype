@@ -1,13 +1,13 @@
 import { Link } from "@tanstack/react-router";
 import {
-  ClipboardType,
-  Home,
-  Menu,
-  Network,
+	ClipboardType,
+	Home,
+	Menu,
+	Network,
 	Receipt,
-  SquareFunction,
-  Table,
-  X,
+	SquareFunction,
+	Table,
+	X,
 } from "lucide-react";
 
 import { useState } from "react";
@@ -22,7 +22,7 @@ export default function Header() {
 					onClick={() => setIsOpen(true)}
 					className="p-2 hover:bg-gray-700 rounded-lg transition-colors"
 					aria-label="Open menu"
-          type="button"
+					type="button"
 				>
 					<Menu size={24} />
 				</button>

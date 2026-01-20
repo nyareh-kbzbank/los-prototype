@@ -60,11 +60,11 @@ function RouteComponent() {
 	const bureauProviders = useMemo(() => {
 		const set = new Set<string>();
 		set.add(defaultBureauProvider);
-		if (activeScoreCard?.bureauProvider?.trim()) {
-			set.add(activeScoreCard.bureauProvider.trim());
+		if (activeSetup?.bureauProvider?.trim()) {
+			set.add(activeSetup.bureauProvider.trim());
 		}
 		return Array.from(set);
-	}, [activeScoreCard?.bureauProvider]);
+	}, [activeSetup?.bureauProvider]);
 
 	const bureauPurposes = useMemo(() => {
 		const set = new Set<string>();
@@ -72,15 +72,17 @@ function RouteComponent() {
 		set.add("Pre-approval");
 		set.add("Account review");
 		set.add("Regulatory reporting");
-		if (activeScoreCard?.bureauPurpose?.trim()) {
-			set.add(activeScoreCard.bureauPurpose.trim());
+		if (activeSetup?.bureauPurpose?.trim()) {
+			set.add(activeSetup.bureauPurpose.trim());
 		}
 		return Array.from(set);
-	}, [activeScoreCard?.bureauPurpose]);
+	}, [activeSetup?.bureauPurpose]);
 
 	const configuredFields = useMemo(() => {
 		return activeScoreCard
-			? [...activeScoreCard.fields.map((f) => f.field)].sort((a, b) => a.localeCompare(b))
+			? [...activeScoreCard.fields.map((f) => f.field)].sort((a, b) =>
+					a.localeCompare(b),
+				)
 			: [];
 	}, [activeScoreCard]);
 
@@ -147,14 +149,16 @@ function RouteComponent() {
 	}, [activeSetup?.id, scoreInputFields]);
 
 	useEffect(() => {
-		const nextProvider = activeScoreCard?.bureauProvider?.trim() || defaultBureauProvider;
-		const nextPurpose = activeScoreCard?.bureauPurpose?.trim() || defaultBureauPurpose;
+		const nextProvider =
+			activeSetup?.bureauProvider?.trim() || defaultBureauProvider;
+		const nextPurpose =
+			activeSetup?.bureauPurpose?.trim() || defaultBureauPurpose;
 		setBureauProvider(nextProvider);
 		setBureauPurpose(nextPurpose);
 		setBureauConsent(false);
 		setBureauReference("");
 		setBureauRequestedAt("");
-	}, [activeScoreCard?.scoreCardId]);
+	}, [activeSetup?.bureauProvider, activeSetup?.bureauPurpose]);
 
 	const disabled = setupList.length === 0;
 	const statusBadge: LoanApplicationStatus | "" = "DRAFT";
@@ -231,19 +235,23 @@ function RouteComponent() {
 			return;
 		}
 
-		if (!bureauProvider.trim()) {
-			setFormError("Select a credit bureau provider.");
-			return;
-		}
+		if (activeSetup.bureauConsentRequired) {
+			if (!bureauProvider.trim()) {
+				setFormError("Select a credit bureau provider.");
+				return;
+			}
 
-		if (!bureauPurpose.trim()) {
-			setFormError("Enter the purpose for the bureau check.");
-			return;
-		}
+			if (!bureauPurpose.trim()) {
+				setFormError("Enter the purpose for the bureau check.");
+				return;
+			}
 
-		if (!bureauConsent) {
-			setFormError("Beneficiary consent is required before checking the bureau.");
-			return;
+			if (!bureauConsent) {
+				setFormError(
+					"Beneficiary consent is required before checking the bureau.",
+				);
+				return;
+			}
 		}
 
 		const parsedBureauRequestedAt = bureauRequestedAt
@@ -513,107 +521,110 @@ function RouteComponent() {
 							)}
 						</div>
 
-						<div className="space-y-3 border rounded p-4">
-							<div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
-								<div>
-									<div className="text-sm text-gray-600">
-										Credit bureau check
+						{activeSetup?.bureauCheckRequired ? (
+							<div className="space-y-3 border rounded p-4">
+								<div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
+									<div>
+										<div className="text-sm text-gray-600">
+											Credit bureau check
+										</div>
+										<div className="text-base font-semibold">
+											Capture consent and request details
+										</div>
 									</div>
-									<div className="text-base font-semibold">
-										Capture consent and request details
-									</div>
+									{bureauConsent ? (
+										<span className="text-xs px-2 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100">
+											Consent ready
+										</span>
+									) : (
+										<span className="text-xs px-2 py-1 rounded-full bg-yellow-50 text-yellow-800 border border-yellow-200">
+											Consent required
+										</span>
+									)}
 								</div>
-								{bureauConsent ? (
-									<span className="text-xs px-2 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100">
-										Consent ready
-									</span>
-								) : (
-									<span className="text-xs px-2 py-1 rounded-full bg-yellow-50 text-yellow-800 border border-yellow-200">
-										Consent required
-									</span>
-								)}
-							</div>
 
-							<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-								<label className="flex flex-col gap-1 text-sm">
-									<span>Bureau provider</span>
-									<select
-										className="border px-2 py-2 rounded"
-										value={bureauProvider}
-										onChange={(e) => setBureauProvider(e.target.value)}
-										disabled={disabled}
-									>
-										{bureauProviders.map((provider) => (
-											<option key={provider} value={provider}>
-												{provider}
-											</option>
-										))}
-									</select>
-								</label>
+								<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+									<label className="flex flex-col gap-1 text-sm">
+										<span>Bureau provider</span>
+										<select
+											className="border px-2 py-2 rounded"
+											value={bureauProvider}
+											onChange={(e) => setBureauProvider(e.target.value)}
+											disabled={disabled}
+										>
+											{bureauProviders.map((provider) => (
+												<option key={provider} value={provider}>
+													{provider}
+												</option>
+											))}
+										</select>
+									</label>
 
-								<label className="flex flex-col gap-1 text-sm">
-									<span>Purpose</span>
-									<input
-										type="text"
-										className="border px-2 py-2 rounded"
-										value={bureauPurpose}
-										onChange={(e) => setBureauPurpose(e.target.value)}
-										list="bureau-purpose-options"
-										disabled={disabled}
-									/>
-									<datalist id="bureau-purpose-options">
-										{bureauPurposes.map((purpose) => (
-											<option key={purpose} value={purpose}>
-												{purpose}
-											</option>
-										))}
-									</datalist>
-								</label>
-
-								<label className="flex flex-col gap-2 text-sm">
-									<div className="flex items-center gap-2">
+									<label className="flex flex-col gap-1 text-sm">
+										<span>Purpose</span>
 										<input
-											type="checkbox"
-											className="h-4 w-4"
-											checked={bureauConsent}
-											onChange={(e) => setBureauConsent(e.target.checked)}
+											type="text"
+											className="border px-2 py-2 rounded"
+											value={bureauPurpose}
+											onChange={(e) => setBureauPurpose(e.target.value)}
+											list="bureau-purpose-options"
 											disabled={disabled}
 										/>
-										<span>Beneficiary consent captured</span>
-									</div>
-									<span className="text-xs text-gray-600">
-										Consent must be obtained before requesting a bureau report.
-									</span>
-								</label>
+										<datalist id="bureau-purpose-options">
+											{bureauPurposes.map((purpose) => (
+												<option key={purpose} value={purpose}>
+													{purpose}
+												</option>
+											))}
+										</datalist>
+									</label>
 
-								<label className="flex flex-col gap-1 text-sm">
-									<span>Bureau reference (case ID)</span>
-									<input
-										type="text"
-										className="border px-2 py-2 rounded"
-										value={bureauReference}
-										onChange={(e) => setBureauReference(e.target.value)}
-										disabled={disabled}
-										placeholder="e.g. REF-12345"
-									/>
-								</label>
+									<label className="flex flex-col gap-2 text-sm">
+										<div className="flex items-center gap-2">
+											<input
+												type="checkbox"
+												className="h-4 w-4"
+												checked={bureauConsent}
+												onChange={(e) => setBureauConsent(e.target.checked)}
+												disabled={disabled}
+											/>
+											<span>Beneficiary consent captured</span>
+										</div>
+										<span className="text-xs text-gray-600">
+											Consent must be obtained before requesting a bureau
+											report.
+										</span>
+									</label>
 
-								<label className="flex flex-col gap-1 text-sm">
-									<span>Bureau requested at</span>
-									<input
-										type="datetime-local"
-										className="border px-2 py-2 rounded"
-										value={bureauRequestedAt}
-										onChange={(e) => setBureauRequestedAt(e.target.value)}
-										disabled={disabled}
-									/>
-									<span className="text-xs text-gray-600">
-										Optional timestamp to track when the bureau request was
-										sent.
-									</span>
-								</label>
+									<label className="flex flex-col gap-1 text-sm">
+										<span>Bureau reference (case ID)</span>
+										<input
+											type="text"
+											className="border px-2 py-2 rounded"
+											value={bureauReference}
+											onChange={(e) => setBureauReference(e.target.value)}
+											disabled={disabled}
+											placeholder="e.g. REF-12345"
+										/>
+									</label>
+
+									<label className="flex flex-col gap-1 text-sm">
+										<span>Bureau requested at</span>
+										<input
+											type="datetime-local"
+											className="border px-2 py-2 rounded"
+											value={bureauRequestedAt}
+											onChange={(e) => setBureauRequestedAt(e.target.value)}
+											disabled={disabled}
+										/>
+										<span className="text-xs text-gray-600">
+											Optional timestamp to track when the bureau request was
+											sent.
+										</span>
+									</label>
+								</div>
 							</div>
-						</div>
+						) : null}
 
 						<div className="grid grid-cols-1 md:grid-cols-3 gap-4">
 							<label className="flex flex-col gap-1 text-sm">

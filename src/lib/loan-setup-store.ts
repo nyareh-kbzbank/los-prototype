@@ -41,6 +41,10 @@ export type LoanWorkflowSnapshot = {
 	repaymentPlanId: string | null;
 	repaymentPlanName: string | null;
 	repaymentPlan: RepaymentPlan | null;
+	bureauProvider: string | null;
+	bureauPurpose: string | null;
+	bureauCheckRequired: boolean | null;
+	bureauConsentRequired: boolean | null;
 };
 
 type LoanWorkflowInput = {
@@ -55,17 +59,22 @@ type LoanWorkflowInput = {
 	partialInterestRate?: number | null;
 	disbursementDestinations?: DisbursementDestination[];
 	repaymentPlan?: RepaymentPlan | null;
+	bureauProvider?: string;
+	bureauPurpose?: string;
+	bureauCheckRequired?: boolean;
+	bureauConsentRequired?: boolean;
 };
 
 type LoanWorkflowState = {
 	setups: Record<string, LoanWorkflowSnapshot>;
 	addSetup: (input: LoanWorkflowInput) => LoanWorkflowSnapshot;
+	updateSetup: (id: string, input: LoanWorkflowInput) => void;
 	resetStore: () => void;
 };
 
 export const useLoanSetupStore = create<LoanWorkflowState>()(
 	persist(
-		(set) => ({
+		(set, get) => ({
 			setups: {},
 			addSetup: (input) => {
 				const channels = (input.channels ?? [])
@@ -104,11 +113,64 @@ export const useLoanSetupStore = create<LoanWorkflowState>()(
 					repaymentPlan: input.repaymentPlan
 						? { ...input.repaymentPlan }
 						: null,
+					bureauCheckRequired: input.bureauCheckRequired || false,
+					bureauConsentRequired: input.bureauConsentRequired || false,
+					bureauProvider: input.bureauProvider || null,
+					bureauPurpose: input.bureauPurpose || null,
 				};
 				set((prev) => ({
 					setups: { ...prev.setups, [entry.id]: entry },
 				}));
 				return entry;
+			},
+			updateSetup: (id, input) => {
+				const current = get().setups[id];
+				if (!current) return;
+
+				const channels = (input.channels ?? [])
+					.map((c) => ({
+						name: c.name.trim(),
+						code: c.code.trim(),
+					}))
+					.filter((c) => c.name || c.code);
+
+				const updated: LoanWorkflowSnapshot = {
+					...current,
+					product: {
+						...input.product,
+						tenureMonths: [...input.product.tenureMonths],
+					},
+					channels,
+					scorecardId: input.scorecardId ?? null,
+					scorecardName: input.scorecardName ?? null,
+					workflowId: input.workflowId ?? null,
+					workflowName: input.workflowName ?? null,
+					riskGrade: input.riskResult?.riskGrade ?? current.riskGrade,
+					totalScore: input.riskResult?.totalScore ?? current.totalScore,
+					disbursementType: input.disbursementType ?? "FULL",
+					partialInterestRate:
+						input.disbursementType === "PARTIAL"
+							? (input.partialInterestRate ?? null)
+							: null,
+					disbursementDestinations: (
+						input.disbursementDestinations ?? []
+					).filter(
+						(d): d is DisbursementDestination =>
+							d?.type === "BANK" || d?.type === "WALLET",
+					),
+					repaymentPlanId: input.repaymentPlan?.planId ?? null,
+					repaymentPlanName: input.repaymentPlan?.name ?? null,
+					repaymentPlan: input.repaymentPlan
+						? { ...input.repaymentPlan }
+						: null,
+					bureauCheckRequired: input.bureauCheckRequired || false,
+					bureauConsentRequired: input.bureauConsentRequired || false,
+					bureauProvider: input.bureauProvider || null,
+					bureauPurpose: input.bureauPurpose || null,
+				};
+				set((prev) => ({
+					setups: { ...prev.setups, [id]: updated },
+				}));
 			},
 			resetStore: () => set({ setups: {} }),
 		}),

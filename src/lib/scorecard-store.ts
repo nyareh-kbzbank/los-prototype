@@ -34,9 +34,6 @@ export type ScoreCard = {
 	name: string;
 	maxScore: number;
 	fields: ScoreCardField[];
-	bureauProvider?: string;
-	bureauPurpose?: string;
-	bureauConsentRequired?: boolean;
 };
 
 export const defaultScoreCard: ScoreCard = {
@@ -58,9 +55,6 @@ export const defaultScoreCard: ScoreCard = {
 			rules: [{ field: "monthlyIncome", operator: ">", value: "50000", score: 20 }],
 		},
 	],
-	bureauProvider: "Experian",
-	bureauPurpose: "Credit assessment",
-	bureauConsentRequired: true,
 };
 
 const humanizeFieldName = (field: string): string => {
@@ -100,18 +94,12 @@ const normalizeScoreCard = (card: ScoreCard): ScoreCard => {
 		return {
 			...card,
 			fields: Object.values(byField),
-			bureauProvider: card.bureauProvider ?? "Experian",
-			bureauPurpose: card.bureauPurpose ?? "Credit assessment",
-			bureauConsentRequired: card.bureauConsentRequired ?? true,
 		};
 	}
 
 	return {
 		...card,
 		fields: normalizedFields,
-		bureauProvider: card.bureauProvider ?? "Experian",
-		bureauPurpose: card.bureauPurpose ?? "Credit assessment",
-		bureauConsentRequired: card.bureauConsentRequired ?? true,
 	};
 };
 

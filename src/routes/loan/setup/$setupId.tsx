@@ -11,15 +11,15 @@ import {
 	getRepaymentPlanList,
 	useRepaymentSetupStore,
 } from "@/lib/repayment-setup-store";
-import { getWorkflowList, useWorkflowStore } from "@/lib/workflow-store";
 import {
 	evaluateScoreCard,
 	inferFieldKind,
 	type ScoreEngineResult,
-} from "../../lib/scorecard-engine";
-import { type Rule, useScoreCardStore } from "../../lib/scorecard-store";
+} from "@/lib/scorecard-engine";
+import { type Rule, useScoreCardStore } from "@/lib/scorecard-store";
+import { getWorkflowList, useWorkflowStore } from "@/lib/workflow-store";
 
-export const Route = createFileRoute("/loan/setup")({
+export const Route = createFileRoute("/loan/setup/$setupId")({
 	component: RouteComponent,
 });
 
@@ -36,7 +36,16 @@ const loanProductSetup: LoanProduct = {
 };
 
 function RouteComponent() {
+	const { setupId } = Route.useParams();
 	const navigate = useNavigate();
+
+	const setups = useLoanSetupStore((s) => s.setups);
+	const setup = useMemo(
+		() => (setupId ? setups[setupId] : undefined),
+		[setupId, setups],
+	);
+	const addLoanSetup = useLoanSetupStore((s) => s.addSetup);
+	const updateLoanSetup = useLoanSetupStore((s) => s.updateSetup);
 
 	const scoreCards = useScoreCardStore((s) => s.scoreCards);
 	const selectedScoreCardId = useScoreCardStore((s) => s.selectedScoreCardId);
@@ -44,7 +53,6 @@ function RouteComponent() {
 	const workflows = useWorkflowStore((s) => s.workflows);
 	const selectedWorkflowId = useWorkflowStore((s) => s.selectedWorkflowId);
 	const selectWorkflow = useWorkflowStore((s) => s.selectWorkflow);
-	const addLoanSetup = useLoanSetupStore((s) => s.addSetup);
 	const repaymentPlans = useRepaymentSetupStore((s) => s.plans);
 	const selectedRepaymentPlanId = useRepaymentSetupStore(
 		(s) => s.selectedPlanId,
@@ -95,6 +103,35 @@ function RouteComponent() {
 	const [tenureInput, setTenureInput] = useState(
 		loanProductSetup.tenureMonths.join(", "),
 	);
+	const [bureauRequired, setBureauRequired] = useState(false);
+	const [bureauProvider, setBureauProvider] = useState("MMCB");
+	const [bureauPurpose, setBureauPurpose] = useState("Credit assessment");
+	const [bureauConsentRequired, setBureauConsentRequired] = useState(true);
+
+	useEffect(() => {
+		if (setup) {
+			setProduct(setup.product);
+			setTenureInput(setup.product.tenureMonths.join(", "));
+			if (setup.scorecardId) {
+				selectScoreCard(setup.scorecardId);
+			}
+			if (setup.workflowId) {
+				selectWorkflow(setup.workflowId);
+			}
+			if (setup.repaymentPlanId) {
+				selectRepaymentPlan(setup.repaymentPlanId);
+			}
+			setChannels(setup.channels);
+			setDestinationTypes(setup.disbursementDestinations.map((d) => d.type));
+			setRiskResult(
+				setup.riskResult ? { ...setup.riskResult, inputs: {} } : null,
+			);
+			setBureauRequired(Boolean(setup.bureauProvider));
+			setBureauProvider(setup.bureauProvider ?? "MMCB");
+			setBureauPurpose(setup.bureauPurpose ?? "Credit assessment");
+			setBureauConsentRequired(setup.bureauConsentRequired ?? true);
+		}
+	}, [setup, selectScoreCard, selectWorkflow, selectRepaymentPlan]);
 
 	const handleTextChange =
 		(field: "productCode" | "productName") =>
@@ -122,7 +159,9 @@ function RouteComponent() {
 
 	const configuredFields = useMemo(() => {
 		return activeScoreCard
-			? [...activeScoreCard.fields.map((f) => f.field)].sort((a, b) => a.localeCompare(b))
+			? [...activeScoreCard.fields.map((f) => f.field)].sort((a, b) =>
+					a.localeCompare(b),
+				)
 			: [];
 	}, [activeScoreCard]);
 
@@ -204,7 +243,7 @@ function RouteComponent() {
 				: ({ type: "WALLET" } satisfies DisbursementDestination),
 		);
 
-		addLoanSetup({
+		const payload = {
 			product,
 			channels,
 			scorecardId: activeScoreCard?.scoreCardId ?? null,
@@ -214,11 +253,21 @@ function RouteComponent() {
 				? (workflows[selectedWorkflowId]?.name ?? "(unnamed workflow)")
 				: null,
 			riskResult,
-			disbursementType: "FULL",
+			disbursementType: "FULL" as const,
 			partialInterestRate: null,
 			disbursementDestinations: mappedDestinations,
 			repaymentPlan: activeRepaymentPlan ?? null,
-		});
+			bureauProvider: bureauRequired ? bureauProvider : undefined,
+			bureauPurpose: bureauRequired ? bureauPurpose : undefined,
+			bureauConsentRequired: bureauRequired ? bureauConsentRequired : undefined,
+      bureauCheckRequired: bureauRequired
+		};
+
+		if (setupId) {
+			updateLoanSetup(setupId, payload);
+		} else {
+			addLoanSetup(payload);
+		}
 		navigate({ to: "/loan" });
 	};
 
@@ -226,7 +275,7 @@ function RouteComponent() {
 		<div className="p-6 font-sans max-w-5xl mx-auto">
 			<div className="flex items-center justify-between mb-4">
 				<h1 className="text-2xl font-bold">
-					Loan Product Setup & Workflow (React)
+					{setupId ? "Edit" : "Create"} Loan Product Setup & Workflow
 				</h1>
 				<div className="flex justify-end gap-2">
 					<Link
@@ -358,7 +407,7 @@ function RouteComponent() {
 					<div>
 						<h2 className="font-semibold">
 							Scorecard Engine — {activeScoreCard?.name ?? "(none)"}
-							{activeScoreCard ? ` (Max: ${activeScoreCard.maxScore})` : ""}
+							{activeScoreCard ? ` (Max: ${activeScoreCard.maxScore})` : ``}
 						</h2>
 						<div className="text-xs text-gray-600">
 							Select a saved scorecard to drive the inputs.
@@ -482,18 +531,47 @@ function RouteComponent() {
 							<ul className="space-y-1">
 								{riskResult.breakdown.map((item, idx) => (
 									<li
-										key={`${item.field}-${idx}`}
+										key={"${item.field}-${idx}"}
 										className={`flex justify-between gap-2 ${
 											item.matched ? "text-green-700" : "text-gray-500"
 										}`}
 									>
 										<span>
-											{item.fieldDescription} ({item.field}) {item.operator} {item.value}
+											{item.fieldDescription} ({item.field}) {item.operator}{" "}
+											{item.value}
 										</span>
-										<span>{item.matched ? `+${item.score}` : "0"}</span>
+										<span>{item.matched ? `+${item.score}` : `0`}</span>
 									</li>
 								))}
 							</ul>
+						</div>
+						<div className="bg-gray-50 border rounded p-3 text-sm">
+							<div className="font-semibold mb-2">Decision Engine</div>
+							{riskResult.riskGrade === "LOW" ? (
+								<div className="p-3 rounded bg-green-100 border-green-300 text-green-800">
+									<h3 className="font-bold">Auto-Approved</h3>
+									<p>
+										The application meets all criteria for automatic approval.
+										Proceed to the next step.
+									</p>
+								</div>
+							) : riskResult.riskGrade === "MEDIUM" ? (
+								<div className="p-3 rounded bg-yellow-100 border-yellow-300 text-yellow-800">
+									<h3 className="font-bold">Manual Review Required</h3>
+									<p>
+										The application requires manual review by an underwriter.
+										Additional documents may be requested.
+									</p>
+								</div>
+							) : (
+								<div className="p-3 rounded bg-red-100 border-red-300 text-red-800">
+									<h3 className="font-bold">Auto-Rejected</h3>
+									<p>
+										The application does not meet the minimum criteria for a
+										loan.
+									</p>
+								</div>
+							)}
 						</div>
 					</div>
 				)}
@@ -513,6 +591,69 @@ function RouteComponent() {
 					</ul>
 				</section>
 			)}
+
+			{/* Bureau */}
+			<section className="border p-4 rounded mb-6">
+				<div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between mb-3">
+					<div>
+						<h2 className="font-semibold">Bureau</h2>
+						<div className="text-xs text-gray-600">
+							Configure credit bureau integration settings.
+						</div>
+					</div>
+					<label className="flex items-center gap-2 text-sm">
+						<span>Bureau check required</span>
+						<input
+							type="checkbox"
+							className="h-4 w-4"
+							checked={bureauRequired}
+							onChange={(e) => setBureauRequired(e.target.checked)}
+						/>
+					</label>
+				</div>
+
+				{bureauRequired && (
+					<div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+						<label className="flex flex-col gap-1 text-sm">
+							<span>Bureau provider</span>
+							<input
+								type="text"
+								name="bureauProvider"
+								value={bureauProvider}
+								onChange={(e) => setBureauProvider(e.target.value)}
+								className="border px-2 py-1 rounded"
+								placeholder="e.g., MMCB"
+							/>
+						</label>
+						<label className="flex flex-col gap-1 text-sm">
+							<span>Bureau purpose</span>
+							<input
+								type="text"
+								name="bureauPurpose"
+								value={bureauPurpose}
+								onChange={(e) => setBureauPurpose(e.target.value)}
+								className="border px-2 py-1 rounded"
+								placeholder="e.g., Credit assessment"
+							/>
+						</label>
+						<label className="flex flex-col gap-2 text-sm">
+							<span>Bureau consent required</span>
+							<div className="flex items-center gap-2">
+								<input
+									type="checkbox"
+									className="h-4 w-4"
+									checked={bureauConsentRequired}
+									onChange={(e) => setBureauConsentRequired(e.target.checked)}
+								/>
+								<span className="text-xs text-gray-700">
+									Indicates whether beneficiary consent must be captured before
+									bureau pulls.
+								</span>
+							</div>
+						</label>
+					</div>
+				)}
+			</section>
 
 			{/* Workflow selection */}
 			<section className="border p-4 rounded mb-6">
@@ -652,7 +793,7 @@ function RouteComponent() {
 						const codeId = `channel-code-${idx}`;
 						return (
 							<div
-								key={`${channel.code || "code"}-${idx}`}
+								key={`${channel.code || `code`}-${idx}`}
 								className="grid grid-cols-1 gap-3 md:grid-cols-[1fr_1fr_auto] md:items-end"
 							>
 								<label className="flex flex-col gap-1 text-sm" htmlFor={nameId}>
@@ -748,10 +889,13 @@ function RouteComponent() {
 						type="button"
 						className="w-full py-4 text-lg font-semibold bg-emerald-600 text-white rounded-lg shadow hover:bg-emerald-700"
 					>
-						Save Product Setup
+						{setupId ? "Update" : "Save"} Product Setup
 					</button>
 					<div className="flex flex-col gap-1 text-sm text-gray-700 md:flex-row md:items-center md:justify-between">
-						<span>Saved locally via Zustand. No edit flow yet.</span>
+						<span>
+							Saved locally via Zustand. {setupId ? "Updating" : "Creating new"}{" "}
+							snapshot.
+						</span>
 						<Link to="/loan" className="text-blue-600 hover:underline">
 							View saved loan setups
 						</Link>

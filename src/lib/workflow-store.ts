@@ -20,6 +20,11 @@ type WorkflowState = {
 		opts?: { sourceInstanceId?: string },
 	) => SavedWorkflow;
 	selectWorkflow: (workflowId: string | null) => void;
+	updateWorkflow: (
+		workflowId: string,
+		name: string,
+		workflow: WorkflowJSON,
+	) => void;
 	resetStore: () => void;
 };
 
@@ -45,6 +50,20 @@ export const useWorkflowStore = create<WorkflowState>()(
 					selectedWorkflowId: next.workflowId,
 				}));
 				return next;
+			},
+			updateWorkflow: (workflowId, name, workflow) => {
+				const trimmed = name.trim();
+				if (!trimmed) {
+					throw new Error("Workflow name is required");
+				}
+				set((prev) => {
+					const existing = prev.workflows[workflowId];
+					if (!existing) return prev;
+					const updated = { ...existing, name: trimmed, workflow };
+					return {
+						workflows: { ...prev.workflows, [workflowId]: updated },
+					};
+				});
 			},
 			selectWorkflow: (workflowId) =>
 				set((prev) => {

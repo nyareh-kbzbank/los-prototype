@@ -68,6 +68,7 @@ function LoanWorkflowList() {
 								<th className="px-3 py-2 font-semibold">Repayment</th>
 								<th className="px-3 py-2 font-semibold">Risk</th>
 								<th className="px-3 py-2 font-semibold">Created</th>
+								<th className="px-3 py-2 font-semibold"></th>
 							</tr>
 						</thead>
 						<tbody>
@@ -94,6 +95,15 @@ function LoanWorkflowList() {
 									</td>
 									<td className="px-3 py-2 whitespace-nowrap">
 										{new Date(row.createdAt).toLocaleString()}
+									</td>
+									<td className="px-3 py-2 text-right">
+										<Link
+											to="/loan/setup/$setupId"
+											params={{ setupId: row.id }}
+											className="text-sm border px-3 py-1 rounded hover:bg-gray-100"
+										>
+											Edit
+										</Link>
 									</td>
 								</tr>
 							))}

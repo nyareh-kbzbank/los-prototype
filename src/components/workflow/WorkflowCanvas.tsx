@@ -244,32 +244,37 @@ const firstDefaultNode: WorkflowJsonNode = {
 export default function WorkflowCanvas({
 	instanceId,
 	workflowJson,
+	initialName,
 }: Readonly<{
 	workflowJson: WorkflowJSON;
 	instanceId: string;
+	initialName?: string;
 }>) {
 	const navigate = useNavigate();
-	const [nodes, setNodes] = useState<WorkflowJsonNode[]>([
-		defaultStartNode,
-		firstDefaultNode,
-		...workflowJson.nodes,
-		defaultEndNode,
-	]);
-	const [edges, setEdges] = useState<WorkflowJsonEdge[]>([
-		{
-			id: "e-start-to-first",
-			source: "start",
-			target: firstDefaultNode.id,
-			type: "custom-edge",
-			animated: true,
-		},
-		...workflowJson.edges,
-	]);
+	const [nodes, setNodes] = useState<WorkflowJsonNode[]>(
+		workflowJson.nodes.length > 0
+			? workflowJson.nodes
+			: [defaultStartNode, firstDefaultNode, defaultEndNode],
+	);
+	const [edges, setEdges] = useState<WorkflowJsonEdge[]>(
+		workflowJson.edges.length > 0
+			? workflowJson.edges
+			: [
+					{
+						id: "e-start-to-first",
+						source: "start",
+						target: firstDefaultNode.id,
+						type: "custom-edge",
+						animated: true,
+					},
+				],
+	);
 
 	const addWorkflow = useWorkflowStore((s) => s.addWorkflow);
+	const updateWorkflow = useWorkflowStore((s) => s.updateWorkflow);
 
 	const [showJson, setShowJson] = useState(false);
-	const [saveName, setSaveName] = useState("");
+	const [saveName, setSaveName] = useState(initialName ?? "");
 	const [saveError, setSaveError] = useState<string | null>(null);
 
 	const onNodesChange = useCallback(
@@ -311,9 +316,13 @@ export default function WorkflowCanvas({
 	const handleSave = () => {
 		try {
 			setSaveError(null);
-			addWorkflow(saveName, { nodes, edges }, { sourceInstanceId: instanceId });
+			if (instanceId !== "new-workflow") {
+				updateWorkflow(instanceId, saveName, { nodes, edges });
+			} else {
+				addWorkflow(saveName, { nodes, edges }, { sourceInstanceId: instanceId });
+			}
 			setSaveName("");
-			navigate({ to: "/loan" });
+			navigate({ to: "/workflow" });
 		} catch (err) {
 			setSaveError(
 				err instanceof Error ? err.message : "Unable to save workflow",
@@ -325,6 +334,7 @@ export default function WorkflowCanvas({
 		<div className="w-80vw h-200 border border-cyan-500">
 			<button
 				type="button"
+				className="ml-2 px-2 py-1 border rounded"
 				onClick={(_) => {
 					setNodes((prev) => [
 						...prev,
@@ -342,6 +352,7 @@ export default function WorkflowCanvas({
 
 			<button
 				type="button"
+				className="ml-2 px-2 py-1 border rounded"
 				onClick={(_) => {
 					setNodes((prev) => [
 						...prev,

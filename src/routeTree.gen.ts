@@ -9,25 +9,28 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as WorkflowRouteImport } from './routes/workflow'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as WorkflowIndexRouteImport } from './routes/workflow/index'
 import { Route as LoanIndexRouteImport } from './routes/loan/index'
-import { Route as LoanSetupRouteImport } from './routes/loan/setup'
+import { Route as WorkflowSetupRouteImport } from './routes/workflow/setup'
+import { Route as WorkflowWorkflowIdRouteImport } from './routes/workflow/$workflowId'
 import { Route as LoanScorecardsRouteImport } from './routes/loan/scorecards'
 import { Route as LoanScorecardSetupRouteImport } from './routes/loan/scorecard-setup'
 import { Route as LoanRepaymentSetupRouteImport } from './routes/loan/repayment-setup'
+import { Route as LoanSetupIndexRouteImport } from './routes/loan/setup/index'
 import { Route as LoanApplicationsIndexRouteImport } from './routes/loan/applications/index'
+import { Route as LoanSetupSetupIdRouteImport } from './routes/loan/setup/$setupId'
 import { Route as LoanApplicationsCreateRouteImport } from './routes/loan/applications/create'
 import { Route as LoanApplicationsApplicationIdRouteImport } from './routes/loan/applications/$applicationId'
 
-const WorkflowRoute = WorkflowRouteImport.update({
-  id: '/workflow',
-  path: '/workflow',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const WorkflowIndexRoute = WorkflowIndexRouteImport.update({
+  id: '/workflow/',
+  path: '/workflow/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoanIndexRoute = LoanIndexRouteImport.update({
@@ -35,9 +38,14 @@ const LoanIndexRoute = LoanIndexRouteImport.update({
   path: '/loan/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const LoanSetupRoute = LoanSetupRouteImport.update({
-  id: '/loan/setup',
-  path: '/loan/setup',
+const WorkflowSetupRoute = WorkflowSetupRouteImport.update({
+  id: '/workflow/setup',
+  path: '/workflow/setup',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const WorkflowWorkflowIdRoute = WorkflowWorkflowIdRouteImport.update({
+  id: '/workflow/$workflowId',
+  path: '/workflow/$workflowId',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoanScorecardsRoute = LoanScorecardsRouteImport.update({
@@ -55,9 +63,19 @@ const LoanRepaymentSetupRoute = LoanRepaymentSetupRouteImport.update({
   path: '/loan/repayment-setup',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LoanSetupIndexRoute = LoanSetupIndexRouteImport.update({
+  id: '/loan/setup/',
+  path: '/loan/setup/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LoanApplicationsIndexRoute = LoanApplicationsIndexRouteImport.update({
   id: '/loan/applications/',
   path: '/loan/applications/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoanSetupSetupIdRoute = LoanSetupSetupIdRouteImport.update({
+  id: '/loan/setup/$setupId',
+  path: '/loan/setup/$setupId',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoanApplicationsCreateRoute = LoanApplicationsCreateRouteImport.update({
@@ -74,107 +92,128 @@ const LoanApplicationsApplicationIdRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/workflow': typeof WorkflowRoute
   '/loan/repayment-setup': typeof LoanRepaymentSetupRoute
   '/loan/scorecard-setup': typeof LoanScorecardSetupRoute
   '/loan/scorecards': typeof LoanScorecardsRoute
-  '/loan/setup': typeof LoanSetupRoute
+  '/workflow/$workflowId': typeof WorkflowWorkflowIdRoute
+  '/workflow/setup': typeof WorkflowSetupRoute
   '/loan': typeof LoanIndexRoute
+  '/workflow': typeof WorkflowIndexRoute
   '/loan/applications/$applicationId': typeof LoanApplicationsApplicationIdRoute
   '/loan/applications/create': typeof LoanApplicationsCreateRoute
+  '/loan/setup/$setupId': typeof LoanSetupSetupIdRoute
   '/loan/applications': typeof LoanApplicationsIndexRoute
+  '/loan/setup': typeof LoanSetupIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/workflow': typeof WorkflowRoute
   '/loan/repayment-setup': typeof LoanRepaymentSetupRoute
   '/loan/scorecard-setup': typeof LoanScorecardSetupRoute
   '/loan/scorecards': typeof LoanScorecardsRoute
-  '/loan/setup': typeof LoanSetupRoute
+  '/workflow/$workflowId': typeof WorkflowWorkflowIdRoute
+  '/workflow/setup': typeof WorkflowSetupRoute
   '/loan': typeof LoanIndexRoute
+  '/workflow': typeof WorkflowIndexRoute
   '/loan/applications/$applicationId': typeof LoanApplicationsApplicationIdRoute
   '/loan/applications/create': typeof LoanApplicationsCreateRoute
+  '/loan/setup/$setupId': typeof LoanSetupSetupIdRoute
   '/loan/applications': typeof LoanApplicationsIndexRoute
+  '/loan/setup': typeof LoanSetupIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/workflow': typeof WorkflowRoute
   '/loan/repayment-setup': typeof LoanRepaymentSetupRoute
   '/loan/scorecard-setup': typeof LoanScorecardSetupRoute
   '/loan/scorecards': typeof LoanScorecardsRoute
-  '/loan/setup': typeof LoanSetupRoute
+  '/workflow/$workflowId': typeof WorkflowWorkflowIdRoute
+  '/workflow/setup': typeof WorkflowSetupRoute
   '/loan/': typeof LoanIndexRoute
+  '/workflow/': typeof WorkflowIndexRoute
   '/loan/applications/$applicationId': typeof LoanApplicationsApplicationIdRoute
   '/loan/applications/create': typeof LoanApplicationsCreateRoute
+  '/loan/setup/$setupId': typeof LoanSetupSetupIdRoute
   '/loan/applications/': typeof LoanApplicationsIndexRoute
+  '/loan/setup/': typeof LoanSetupIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
-    | '/workflow'
     | '/loan/repayment-setup'
     | '/loan/scorecard-setup'
     | '/loan/scorecards'
-    | '/loan/setup'
+    | '/workflow/$workflowId'
+    | '/workflow/setup'
     | '/loan'
+    | '/workflow'
     | '/loan/applications/$applicationId'
     | '/loan/applications/create'
+    | '/loan/setup/$setupId'
     | '/loan/applications'
+    | '/loan/setup'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
-    | '/workflow'
     | '/loan/repayment-setup'
     | '/loan/scorecard-setup'
     | '/loan/scorecards'
-    | '/loan/setup'
+    | '/workflow/$workflowId'
+    | '/workflow/setup'
     | '/loan'
+    | '/workflow'
     | '/loan/applications/$applicationId'
     | '/loan/applications/create'
+    | '/loan/setup/$setupId'
     | '/loan/applications'
+    | '/loan/setup'
   id:
     | '__root__'
     | '/'
-    | '/workflow'
     | '/loan/repayment-setup'
     | '/loan/scorecard-setup'
     | '/loan/scorecards'
-    | '/loan/setup'
+    | '/workflow/$workflowId'
+    | '/workflow/setup'
     | '/loan/'
+    | '/workflow/'
     | '/loan/applications/$applicationId'
     | '/loan/applications/create'
+    | '/loan/setup/$setupId'
     | '/loan/applications/'
+    | '/loan/setup/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  WorkflowRoute: typeof WorkflowRoute
   LoanRepaymentSetupRoute: typeof LoanRepaymentSetupRoute
   LoanScorecardSetupRoute: typeof LoanScorecardSetupRoute
   LoanScorecardsRoute: typeof LoanScorecardsRoute
-  LoanSetupRoute: typeof LoanSetupRoute
+  WorkflowWorkflowIdRoute: typeof WorkflowWorkflowIdRoute
+  WorkflowSetupRoute: typeof WorkflowSetupRoute
   LoanIndexRoute: typeof LoanIndexRoute
+  WorkflowIndexRoute: typeof WorkflowIndexRoute
   LoanApplicationsApplicationIdRoute: typeof LoanApplicationsApplicationIdRoute
   LoanApplicationsCreateRoute: typeof LoanApplicationsCreateRoute
+  LoanSetupSetupIdRoute: typeof LoanSetupSetupIdRoute
   LoanApplicationsIndexRoute: typeof LoanApplicationsIndexRoute
+  LoanSetupIndexRoute: typeof LoanSetupIndexRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/workflow': {
-      id: '/workflow'
-      path: '/workflow'
-      fullPath: '/workflow'
-      preLoaderRoute: typeof WorkflowRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/': {
       id: '/'
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/workflow/': {
+      id: '/workflow/'
+      path: '/workflow'
+      fullPath: '/workflow'
+      preLoaderRoute: typeof WorkflowIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/loan/': {
@@ -184,11 +223,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LoanIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/loan/setup': {
-      id: '/loan/setup'
-      path: '/loan/setup'
-      fullPath: '/loan/setup'
-      preLoaderRoute: typeof LoanSetupRouteImport
+    '/workflow/setup': {
+      id: '/workflow/setup'
+      path: '/workflow/setup'
+      fullPath: '/workflow/setup'
+      preLoaderRoute: typeof WorkflowSetupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/workflow/$workflowId': {
+      id: '/workflow/$workflowId'
+      path: '/workflow/$workflowId'
+      fullPath: '/workflow/$workflowId'
+      preLoaderRoute: typeof WorkflowWorkflowIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/loan/scorecards': {
@@ -212,11 +258,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LoanRepaymentSetupRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/loan/setup/': {
+      id: '/loan/setup/'
+      path: '/loan/setup'
+      fullPath: '/loan/setup'
+      preLoaderRoute: typeof LoanSetupIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/loan/applications/': {
       id: '/loan/applications/'
       path: '/loan/applications'
       fullPath: '/loan/applications'
       preLoaderRoute: typeof LoanApplicationsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/loan/setup/$setupId': {
+      id: '/loan/setup/$setupId'
+      path: '/loan/setup/$setupId'
+      fullPath: '/loan/setup/$setupId'
+      preLoaderRoute: typeof LoanSetupSetupIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/loan/applications/create': {
@@ -238,15 +298,18 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  WorkflowRoute: WorkflowRoute,
   LoanRepaymentSetupRoute: LoanRepaymentSetupRoute,
   LoanScorecardSetupRoute: LoanScorecardSetupRoute,
   LoanScorecardsRoute: LoanScorecardsRoute,
-  LoanSetupRoute: LoanSetupRoute,
+  WorkflowWorkflowIdRoute: WorkflowWorkflowIdRoute,
+  WorkflowSetupRoute: WorkflowSetupRoute,
   LoanIndexRoute: LoanIndexRoute,
+  WorkflowIndexRoute: WorkflowIndexRoute,
   LoanApplicationsApplicationIdRoute: LoanApplicationsApplicationIdRoute,
   LoanApplicationsCreateRoute: LoanApplicationsCreateRoute,
+  LoanSetupSetupIdRoute: LoanSetupSetupIdRoute,
   LoanApplicationsIndexRoute: LoanApplicationsIndexRoute,
+  LoanSetupIndexRoute: LoanSetupIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

@@ -15,7 +15,8 @@ const config = defineConfig({
     }),
     tailwindcss(),
     tanstackStart({
-      spa:{enabled: true,
+      spa:{
+        enabled: true,
          prerender: {
           outputPath: '/index.html',
           crawlLinks: true,

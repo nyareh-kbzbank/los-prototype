@@ -1,6 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { Plus, Trash2, X } from "lucide-react";
 import { type ChangeEvent, useEffect, useMemo, useState } from "react";
+import type { scoreCard } from "@/lib/score-card";
 import {
 	evaluateScoreCard,
 	inferFieldKind,
@@ -49,9 +50,6 @@ const createEmptyScoreCard = (): ScoreCard => ({
 	name: "New Scorecard",
 	maxScore: 100,
 	fields: [],
-	bureauProvider: "Experian",
-	bureauPurpose: "Credit assessment",
-	bureauConsentRequired: true,
 });
 
 const operatorPlaceholder = (op: Operator): string => {
@@ -82,28 +80,21 @@ const rulesPlaceholder = (rules: Rule[] | undefined): string => {
 	return "";
 };
 
-const withBureauDefaults = (card: ScoreCard): ScoreCard => ({
-	...card,
-	bureauProvider: card.bureauProvider ?? "Experian",
-	bureauPurpose: card.bureauPurpose ?? "Credit assessment",
-	bureauConsentRequired: card.bureauConsentRequired ?? true,
-});
-
 function ScorecardSetupComponent() {
 	const scoreCards = useScoreCardStore((s) => s.scoreCards);
+// ... existing code...
 	const selectedScoreCardId = useScoreCardStore((s) => s.selectedScoreCardId);
 	const selectScoreCard = useScoreCardStore((s) => s.selectScoreCard);
 	const upsertScoreCard = useScoreCardStore((s) => s.upsertScoreCard);
 	const removeScoreCard = useScoreCardStore((s) => s.removeScoreCard);
-
 	const selectedFromStore = scoreCards[selectedScoreCardId];
 
 	const [scoreCard, setScoreCard] = useState<ScoreCard>(
 		selectedFromStore
-			? withBureauDefaults({
+			? {
 					...selectedFromStore,
 					fields: selectedFromStore.fields ?? [],
-				})
+				}
 			: createEmptyScoreCard(),
 	);
 	const [newFieldName, setNewFieldName] = useState("");
@@ -117,38 +108,25 @@ function ScorecardSetupComponent() {
 
 	useEffect(() => {
 		if (!selectedFromStore) return;
-		setScoreCard(
-			withBureauDefaults({
-				...selectedFromStore,
-				fields: selectedFromStore.fields ?? [],
-			}),
-		);
+		setScoreCard({
+			...selectedFromStore,
+			fields: selectedFromStore.fields ?? [],
+		});
 	}, [selectedFromStore]);
 
 	const handleCardInfoChange = (e: ChangeEvent<HTMLInputElement>) => {
 		const { name, value } = e.target;
 		setScoreCard((prev) => {
-			if (name === "maxScore") {
-				return { ...prev, maxScore: Number(value) };
-			}
-			if (name === "scoreCardId") {
-				return { ...prev, scoreCardId: value };
-			}
+
 			if (name === "name") {
 				return { ...prev, name: value };
-			}
-			if (name === "bureauProvider") {
-				return { ...prev, bureauProvider: value };
-			}
-			if (name === "bureauPurpose") {
-				return { ...prev, bureauPurpose: value };
 			}
 			return prev;
 		});
 	};
 
 	const updateFieldName = (fieldIndex: number, value: string) => {
-		setScoreCard((prev) => {
+	setScoreCard((prev) => {
 			const fields = [...prev.fields];
 			const target = fields[fieldIndex];
 			if (!target) return prev;
@@ -376,50 +354,7 @@ function ScorecardSetupComponent() {
 					</label>
 				</div>
 
-				<div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
-					<label className="flex flex-col gap-1 text-sm">
-						<span>Bureau provider</span>
-						<input
-							type="text"
-							name="bureauProvider"
-							value={scoreCard.bureauProvider ?? ""}
-							onChange={handleCardInfoChange}
-							className="border px-2 py-1 rounded"
-							placeholder="e.g., Experian"
-						/>
-					</label>
-					<label className="flex flex-col gap-1 text-sm">
-						<span>Bureau purpose</span>
-						<input
-							type="text"
-							name="bureauPurpose"
-							value={scoreCard.bureauPurpose ?? ""}
-							onChange={handleCardInfoChange}
-							className="border px-2 py-1 rounded"
-							placeholder="e.g., Credit assessment"
-						/>
-					</label>
-					<label className="flex flex-col gap-2 text-sm">
-						<span>Bureau consent required</span>
-						<div className="flex items-center gap-2">
-							<input
-								type="checkbox"
-								className="h-4 w-4"
-								checked={Boolean(scoreCard.bureauConsentRequired)}
-								onChange={(e) =>
-									setScoreCard((prev) => ({
-										...prev,
-										bureauConsentRequired: e.target.checked,
-									}))
-								}
-							/>
-							<span className="text-xs text-gray-700">
-								Indicates whether beneficiary consent must be captured before
-								bureau pulls.
-							</span>
-						</div>
-					</label>
-				</div>
+
 			</section>
 
 			{/* Rules Editor */}
