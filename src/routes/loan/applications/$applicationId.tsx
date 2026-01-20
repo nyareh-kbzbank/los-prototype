@@ -177,7 +177,7 @@ function RouteComponent() {
 				</div>
 				<div className="grid grid-cols-1 md:grid-cols-2 gap-3">
 					<Field label="Application #" value={application.applicationNo} />
-					<Field label="Applicant" value={application.applicantName} />
+					<Field label="Beneficiary" value={application.beneficiaryName} />
 					<Field label="National ID" value={application.nationalId} />
 					<Field label="Age" value={application.age ?? "—"} />
 					<Field label="Phone" value={application.phone} />

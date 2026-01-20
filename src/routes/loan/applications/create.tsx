@@ -80,18 +80,15 @@ function RouteComponent() {
 
 	const configuredFields = useMemo(() => {
 		return activeScoreCard
-			? Array.from(new Set(activeScoreCard.rules.map((r) => r.field))).sort(
-					(a, b) => a.localeCompare(b),
-				)
+			? [...activeScoreCard.fields.map((f) => f.field)].sort((a, b) => a.localeCompare(b))
 			: [];
 	}, [activeScoreCard]);
 
 	const rulesByField = useMemo<Record<string, Rule[]>>(() => {
 		if (!activeScoreCard) return {};
 		const acc: Record<string, Rule[]> = {};
-		for (const rule of activeScoreCard.rules) {
-			const current = acc[rule.field];
-			acc[rule.field] = current ? [...current, rule] : [rule];
+		for (const field of activeScoreCard.fields) {
+			acc[field.field] = [...(field.rules ?? [])];
 		}
 		return acc;
 	}, [activeScoreCard]);
@@ -102,7 +99,7 @@ function RouteComponent() {
 		);
 	}, [configuredFields]);
 
-	const [applicantName, setApplicantName] = useState("");
+	const [beneficiaryName, setBeneficiaryName] = useState("");
 	const [nationalId, setNationalId] = useState("");
 	const [phone, setPhone] = useState("");
 	const [ageInput, setAgeInput] = useState("");
@@ -189,8 +186,8 @@ function RouteComponent() {
 	const handleSubmit = () => {
 		if (disabled || !activeSetup) return;
 
-		if (!applicantName.trim()) {
-			setFormError("Applicant name is required.");
+		if (!beneficiaryName.trim()) {
+			setFormError("Beneficiary name is required.");
 			return;
 		}
 		if (!nationalId.trim()) {
@@ -245,7 +242,7 @@ function RouteComponent() {
 		}
 
 		if (!bureauConsent) {
-			setFormError("Applicant consent is required before checking the bureau.");
+			setFormError("Beneficiary consent is required before checking the bureau.");
 			return;
 		}
 
@@ -264,7 +261,7 @@ function RouteComponent() {
 			scoreResult?.maxScore ?? activeScoreCard?.maxScore ?? null;
 
 		addApplication({
-			applicantName,
+			beneficiaryName,
 			nationalId,
 			phone,
 			age: parsedAge,
@@ -343,12 +340,12 @@ function RouteComponent() {
 
 						<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 							<label className="flex flex-col gap-1 text-sm">
-								<span>Applicant name</span>
+								<span>Beneficiary name</span>
 								<input
 									type="text"
 									className="border px-2 py-2 rounded"
-									value={applicantName}
-									onChange={(e) => setApplicantName(e.target.value)}
+									value={beneficiaryName}
+									onChange={(e) => setBeneficiaryName(e.target.value)}
 									disabled={disabled}
 								/>
 							</label>
@@ -511,7 +508,7 @@ function RouteComponent() {
 							) : (
 								<p className="text-sm text-gray-700">
 									Link a scorecard in Loan Setup to calculate credit scores per
-									applicant.
+									beneficiary.
 								</p>
 							)}
 						</div>
@@ -582,7 +579,7 @@ function RouteComponent() {
 											onChange={(e) => setBureauConsent(e.target.checked)}
 											disabled={disabled}
 										/>
-										<span>Applicant consent captured</span>
+										<span>Beneficiary consent captured</span>
 									</div>
 									<span className="text-xs text-gray-600">
 										Consent must be obtained before requesting a bureau report.

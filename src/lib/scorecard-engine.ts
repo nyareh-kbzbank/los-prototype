@@ -4,6 +4,7 @@ export type FieldKind = "number" | "boolean" | "string";
 export type Scalar = string | number | boolean;
 
 export type TestBreakdownItem = Rule & {
+	fieldDescription: string;
 	matched: boolean;
 	actual: Scalar | undefined;
 	skippedBecauseMissingInput: boolean;
@@ -146,17 +147,27 @@ export const evaluateScoreCard = (
 	scoreCard: ScoreCard,
 	inputs: Record<string, string>,
 ): ScoreEngineResult => {
-	const perFieldKind: Record<string, FieldKind> = scoreCard.rules.reduce(
-		(acc, rule) => {
-			if (!acc[rule.field]) {
-				acc[rule.field] = inferFieldKind(scoreCard.rules.filter((r) => r.field === rule.field));
+	const fields = scoreCard.fields ?? [];
+
+	const perFieldKind: Record<string, FieldKind> = fields.reduce(
+		(acc, field) => {
+			if (!acc[field.field]) {
+				acc[field.field] = inferFieldKind(field.rules ?? []);
 			}
 			return acc;
 		},
 		{} as Record<string, FieldKind>,
 	);
 
-	const breakdown: TestBreakdownItem[] = scoreCard.rules.map((rule) => {
+	const flatRules = fields.flatMap((field) =>
+		(field.rules ?? []).map((rule) => ({
+			...rule,
+			field: field.field,
+			fieldDescription: field.description,
+		})),
+	);
+
+	const breakdown: TestBreakdownItem[] = flatRules.map((rule) => {
 		const actualRaw = inputs[rule.field] ?? "";
 		const kind = perFieldKind[rule.field] ?? "string";
 		const actual = parseActualValue(actualRaw, kind);

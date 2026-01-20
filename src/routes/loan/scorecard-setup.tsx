@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { Plus, Save, Trash2, X } from "lucide-react";
+import { Plus, Trash2, X } from "lucide-react";
 import { type ChangeEvent, useEffect, useMemo, useState } from "react";
 import {
 	evaluateScoreCard,
@@ -11,6 +11,7 @@ import {
 	operatorOptions,
 	type Rule,
 	type ScoreCard,
+	type ScoreCardField,
 	useScoreCardStore,
 } from "../../lib/scorecard-store";
 
@@ -18,13 +19,26 @@ export const Route = createFileRoute("/loan/scorecard-setup")({
 	component: ScorecardSetupComponent,
 });
 
-type GroupedRules = Record<string, Array<{ rule: Rule; ruleIndex: number }>>;
+const humanizeFieldName = (field: string): string => {
+	return field
+		.replace(/[_-]+/g, " ")
+		.replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+		.replace(/\s+/g, " ")
+		.trim()
+		.replace(/^./, (c) => c.toUpperCase());
+};
 
 const createRuleForField = (field: string): Rule => ({
 	field,
 	operator: ">=",
 	value: "",
 	score: 0,
+});
+
+const createFieldGroup = (field: string): ScoreCardField => ({
+	field,
+	description: humanizeFieldName(field),
+	rules: [createRuleForField(field)],
 });
 
 const generateScoreCardId = () =>
@@ -34,11 +48,39 @@ const createEmptyScoreCard = (): ScoreCard => ({
 	scoreCardId: generateScoreCardId(),
 	name: "New Scorecard",
 	maxScore: 100,
-	rules: [],
+	fields: [],
 	bureauProvider: "Experian",
 	bureauPurpose: "Credit assessment",
 	bureauConsentRequired: true,
 });
+
+const operatorPlaceholder = (op: Operator): string => {
+	switch (op) {
+		case "between":
+			return "min,max (e.g. 18,60)";
+		case "in":
+			return "Comma list (e.g. gold,silver)";
+		case "notin":
+			return "Comma list (e.g. denied,blocked)";
+		case "contains":
+			return "Substring (case-sensitive)";
+		default:
+			return "Value";
+	}
+};
+
+const rulesPlaceholder = (rules: Rule[] | undefined): string => {
+	if (rules?.some((r) => r.operator === "between")) {
+		return "For between: min,max (e.g. 25,45)";
+	}
+	if (rules?.some((r) => r.operator === "in" || r.operator === "notin")) {
+		return "For in/notin: comma list (e.g. gold,silver)";
+	}
+	if (rules?.some((r) => r.operator === "contains")) {
+		return "Substring to match";
+	}
+	return "";
+};
 
 const withBureauDefaults = (card: ScoreCard): ScoreCard => ({
 	...card,
@@ -60,7 +102,7 @@ function ScorecardSetupComponent() {
 		selectedFromStore
 			? withBureauDefaults({
 					...selectedFromStore,
-					rules: selectedFromStore.rules,
+					fields: selectedFromStore.fields ?? [],
 				})
 			: createEmptyScoreCard(),
 	);
@@ -69,23 +111,16 @@ function ScorecardSetupComponent() {
 	const [testInputs, setTestInputs] = useState<Record<string, string>>({});
 	const [testResult, setTestResult] = useState<ScoreEngineResult | null>(null);
 
-	const groupedRules = useMemo<GroupedRules>(() => {
-		return scoreCard.rules.reduce<GroupedRules>((acc, rule, ruleIndex) => {
-			const field = rule.field;
-			if (!acc[field]) {
-				acc[field] = [];
-			}
-			acc[field].push({ rule, ruleIndex });
-			return acc;
-		}, {});
-	}, [scoreCard.rules]);
+	const allRules = useMemo(() => {
+		return scoreCard.fields.flatMap((f) => f.rules ?? []);
+	}, [scoreCard.fields]);
 
 	useEffect(() => {
 		if (!selectedFromStore) return;
 		setScoreCard(
 			withBureauDefaults({
 				...selectedFromStore,
-				rules: selectedFromStore.rules,
+				fields: selectedFromStore.fields ?? [],
 			}),
 		);
 	}, [selectedFromStore]);
@@ -112,44 +147,87 @@ function ScorecardSetupComponent() {
 		});
 	};
 
-	const updateRuleAtIndex = (ruleIndex: number, next: Rule) => {
+	const updateFieldName = (fieldIndex: number, value: string) => {
 		setScoreCard((prev) => {
-			const rules = [...prev.rules];
-			rules[ruleIndex] = next;
-			return { ...prev, rules };
+			const fields = [...prev.fields];
+			const target = fields[fieldIndex];
+			if (!target) return prev;
+			const nextField = value.trim();
+			const updatedRules = (target.rules ?? []).map((rule) => ({
+				...rule,
+				field: nextField,
+			}));
+			fields[fieldIndex] = { ...target, field: nextField, rules: updatedRules };
+			return { ...prev, fields };
 		});
 	};
 
-	const removeRuleAtIndex = (ruleIndex: number) => {
-		setScoreCard((prev) => ({
-			...prev,
-			rules: prev.rules.filter((_, i) => i !== ruleIndex),
-		}));
+	const updateFieldDescription = (fieldIndex: number, value: string) => {
+		setScoreCard((prev) => {
+			const fields = [...prev.fields];
+			const target = fields[fieldIndex];
+			if (!target) return prev;
+			fields[fieldIndex] = { ...target, description: value };
+			return { ...prev, fields };
+		});
 	};
 
-	const addConditionToField = (field: string) => {
-		setScoreCard((prev) => ({
-			...prev,
-			rules: [...prev.rules, createRuleForField(field)],
-		}));
+	const updateRuleAt = (fieldIndex: number, ruleIndex: number, next: Rule) => {
+		setScoreCard((prev) => {
+			const fields = [...prev.fields];
+			const target = fields[fieldIndex];
+			if (!target) return prev;
+			const rules = [...(target.rules ?? [])];
+			rules[ruleIndex] = { ...next, field: target.field };
+			fields[fieldIndex] = { ...target, rules };
+			return { ...prev, fields };
+		});
+	};
+
+	const removeRuleAt = (fieldIndex: number, ruleIndex: number) => {
+		setScoreCard((prev) => {
+			const fields = [...prev.fields];
+			const target = fields[fieldIndex];
+			if (!target) return prev;
+			const rules = (target.rules ?? []).filter((_, i) => i !== ruleIndex);
+			fields[fieldIndex] = { ...target, rules };
+			return { ...prev, fields };
+		});
+	};
+
+	const addConditionToField = (fieldIndex: number) => {
+		setScoreCard((prev) => {
+			const fields = [...prev.fields];
+			const target = fields[fieldIndex];
+			if (!target) return prev;
+			const rules = [...(target.rules ?? []), createRuleForField(target.field)];
+			fields[fieldIndex] = { ...target, rules };
+			return { ...prev, fields };
+		});
 	};
 
 	const addField = () => {
 		const field = newFieldName.trim();
 		if (!field) return;
 		setScoreCard((prev) => {
-			if (prev.rules.some((r) => r.field === field)) return prev;
-			return { ...prev, rules: [...prev.rules, createRuleForField(field)] };
+			if (prev.fields.some((f) => f.field === field)) return prev;
+			return { ...prev, fields: [...prev.fields, createFieldGroup(field)] };
 		});
 		setNewFieldName("");
 	};
 
+	const removeFieldAt = (fieldIndex: number) => {
+		setScoreCard((prev) => {
+			const fields = prev.fields.filter((_, idx) => idx !== fieldIndex);
+			return { ...prev, fields };
+		});
+	};
+
 	const openTestModal = () => {
-		const fields = Object.keys(groupedRules);
 		setTestInputs((prev) => {
 			const next: Record<string, string> = { ...prev };
-			for (const f of fields) {
-				next[f] ??= "";
+			for (const f of scoreCard.fields) {
+				next[f.field] ??= "";
 			}
 			return next;
 		});
@@ -175,12 +253,10 @@ function ScorecardSetupComponent() {
 		const next: ScoreCard = {
 			...scoreCard,
 			scoreCardId: generateScoreCardId(),
-			name: scoreCard.name.trim()
-				? `${scoreCard.name} (copy)`
-				: "New Scorecard",
+			name: scoreCard.name.trim() ? `${scoreCard.name} (copy)` : "New Scorecard",
 		};
-		upsertScoreCard(next, { select: true });
 		setScoreCard(next);
+		upsertScoreCard(next, { select: true });
 	};
 
 	const onNewScoreCard = () => {
@@ -338,7 +414,7 @@ function ScorecardSetupComponent() {
 								}
 							/>
 							<span className="text-xs text-gray-700">
-								Indicates whether applicant consent must be captured before
+								Indicates whether beneficiary consent must be captured before
 								bureau pulls.
 							</span>
 						</div>
@@ -353,7 +429,8 @@ function ScorecardSetupComponent() {
 						<h2 className="font-semibold text-lg">Rules</h2>
 						<div className="text-xs text-gray-600">
 							Rules are grouped by field; each field can have multiple
-							conditions.
+							conditions. For operators <em>between</em>, use two values separated by a
+							comma (min,max). For <em>in</em>/<em>notin</em>, provide a comma-separated list.
 						</div>
 					</div>
 					<div className="flex gap-2">
@@ -377,30 +454,68 @@ function ScorecardSetupComponent() {
 				</div>
 
 				<div className="space-y-4">
-					{Object.entries(groupedRules).map(([field, items]) => (
-						<div key={field} className="border rounded p-3">
-							<div className="flex items-center justify-between mb-2">
-								<div className="font-semibold">{field}</div>
-								<button
-									onClick={() => addConditionToField(field)}
-									type="button"
-									className="flex items-center gap-1 text-sm border px-2 py-1 rounded hover:bg-gray-50"
-								>
-									<Plus className="w-4 h-4" />
-									Add Condition
-								</button>
+					{scoreCard.fields.map((fieldGroup, fieldIndex) => (
+						<div key={`${fieldGroup.field}-${fieldIndex}`} className="border rounded p-3">
+							<div className="flex items-center justify-between mb-2 gap-3">
+								<div className="flex flex-col">
+									<span className="font-semibold">{fieldGroup.description || humanizeFieldName(fieldGroup.field)}</span>
+									<span className="text-xs text-gray-600">{fieldGroup.field}</span>
+								</div>
+								<div className="flex gap-2">
+									<button
+										onClick={() => addConditionToField(fieldIndex)}
+										type="button"
+										className="flex items-center gap-1 text-sm border px-2 py-1 rounded hover:bg-gray-50"
+									>
+										<Plus className="w-4 h-4" />
+										Add Condition
+									</button>
+									<button
+										onClick={() => removeFieldAt(fieldIndex)}
+										type="button"
+										className="flex items-center gap-1 text-sm border px-2 py-1 rounded text-red-600 hover:bg-red-50"
+									>
+										<Trash2 className="w-4 h-4" />
+										Remove Field
+									</button>
+								</div>
+							</div>
+
+							<div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3 text-sm">
+								<label className="flex flex-col gap-1">
+									<span>Field name</span>
+									<input
+										type="text"
+										value={fieldGroup.field}
+										onChange={(e: ChangeEvent<HTMLInputElement>) =>
+											updateFieldName(fieldIndex, e.target.value)
+										}
+										className="border px-2 py-1 rounded"
+									/>
+								</label>
+								<label className="flex flex-col gap-1">
+									<span>Field description</span>
+									<input
+										type="text"
+										value={fieldGroup.description}
+										onChange={(e: ChangeEvent<HTMLInputElement>) =>
+											updateFieldDescription(fieldIndex, e.target.value)
+										}
+										className="border px-2 py-1 rounded"
+									/>
+								</label>
 							</div>
 
 							<div className="space-y-2">
-								{items.map(({ rule, ruleIndex }) => (
+								{(fieldGroup.rules ?? []).map((rule, ruleIndex) => (
 									<div
-										key={`${field}-${ruleIndex}`}
+										key={`${fieldGroup.field}-${ruleIndex}`}
 										className="grid grid-cols-1 md:grid-cols-4 gap-2 items-center"
 									>
 										<select
 											value={rule.operator}
 											onChange={(e: ChangeEvent<HTMLSelectElement>) =>
-												updateRuleAtIndex(ruleIndex, {
+												updateRuleAt(fieldIndex, ruleIndex, {
 													...rule,
 													operator: e.target.value as Operator,
 												})
@@ -415,10 +530,10 @@ function ScorecardSetupComponent() {
 										</select>
 										<input
 											type="text"
-											placeholder="Value"
+											placeholder={operatorPlaceholder(rule.operator)}
 											value={rule.value}
 											onChange={(e: ChangeEvent<HTMLInputElement>) =>
-												updateRuleAtIndex(ruleIndex, {
+												updateRuleAt(fieldIndex, ruleIndex, {
 													...rule,
 													value: e.target.value,
 												})
@@ -430,7 +545,7 @@ function ScorecardSetupComponent() {
 											placeholder="Score"
 											value={rule.score}
 											onChange={(e: ChangeEvent<HTMLInputElement>) =>
-												updateRuleAtIndex(ruleIndex, {
+												updateRuleAt(fieldIndex, ruleIndex, {
 													...rule,
 													score: Number(e.target.value),
 												})
@@ -438,12 +553,21 @@ function ScorecardSetupComponent() {
 											className="border px-2 py-1 rounded text-sm"
 										/>
 										<button
-											onClick={() => removeRuleAtIndex(ruleIndex)}
+											onClick={() => removeRuleAt(fieldIndex, ruleIndex)}
 											type="button"
 											className="text-red-500 hover:text-red-700 justify-self-end"
 										>
 											<Trash2 className="w-4 h-4" />
 										</button>
+										{["between", "in", "notin"].includes(rule.operator) ? (
+											<div className="text-xs text-gray-600 md:col-span-4">
+												{rule.operator === "between" && "Use two values separated by a comma: min,max (numbers)."}
+												{rule.operator === "in" &&
+													"Comma-separated list of allowed values (trim spaces)."}
+												{rule.operator === "notin" &&
+													"Comma-separated list of blocked values (trim spaces)."}
+											</div>
+										) : null}
 									</div>
 								))}
 							</div>
@@ -507,22 +631,23 @@ function ScorecardSetupComponent() {
 
 						<div className="p-4 space-y-4">
 							<div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-								{Object.entries(groupedRules).map(([field, items]) => {
-									const kind = inferFieldKind(items.map((i) => i.rule));
-									const inputId = `test-${field}`;
+								{scoreCard.fields.map((fieldGroup) => {
+									const kind = inferFieldKind(fieldGroup.rules ?? []);
+									const inputId = `test-${fieldGroup.field}`;
+									const label = fieldGroup.description || humanizeFieldName(fieldGroup.field);
 									return (
-										<div key={field} className="flex flex-col gap-1 text-sm">
+										<div key={fieldGroup.field} className="flex flex-col gap-1 text-sm">
 											<label htmlFor={inputId} className="font-medium">
-												{field}
+												{label}
 											</label>
 											{kind === "boolean" ? (
 												<select
 													id={inputId}
-													value={testInputs[field] ?? ""}
+													value={testInputs[fieldGroup.field] ?? ""}
 													onChange={(e: ChangeEvent<HTMLSelectElement>) =>
 														setTestInputs((prev) => ({
 															...prev,
-															[field]: e.target.value,
+															[fieldGroup.field]: e.target.value,
 														}))
 													}
 													className="border px-2 py-1 rounded"
@@ -535,16 +660,16 @@ function ScorecardSetupComponent() {
 												<input
 													type={kind === "number" ? "number" : "text"}
 													id={inputId}
-													value={testInputs[field] ?? ""}
+													value={testInputs[fieldGroup.field] ?? ""}
 													onChange={(e: ChangeEvent<HTMLInputElement>) =>
 														setTestInputs((prev) => ({
 															...prev,
-															[field]: e.target.value,
+															[fieldGroup.field]: e.target.value,
 														}))
 													}
 													className="border px-2 py-1 rounded"
 													placeholder={
-														items.some((i) => i.rule.operator === "between")
+														(fieldGroup.rules ?? []).some((rule) => rule.operator === "between")
 															? "For between: e.g. 25,45"
 															: ""
 													}
@@ -585,7 +710,7 @@ function ScorecardSetupComponent() {
 										</div>
 										<div>
 											<span className="font-semibold">Matched rules:</span>{" "}
-											{testResult.matchedRules} / {scoreCard.rules.length}
+											{testResult.matchedRules} / {allRules.length}
 										</div>
 									</div>
 
@@ -597,13 +722,14 @@ function ScorecardSetupComponent() {
 											} else if (b.matched) {
 												rowClass = "text-green-700";
 											}
+											const label = b.fieldDescription || humanizeFieldName(b.field);
 											return (
 												<div
 													key={`${b.field}-${idx}`}
 													className={`flex justify-between gap-3 text-sm ${rowClass}`}
 												>
 													<span>
-														{b.field} {b.operator} {b.value}
+														{label} {b.operator} {b.value}
 														{b.skippedBecauseMissingInput
 															? " (skipped: no input)"
 															: ""}

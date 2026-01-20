@@ -18,7 +18,7 @@ export type LoanApplication = {
   createdAt: number;
   updatedAt: number;
   status: LoanApplicationStatus;
-  applicantName: string;
+  beneficiaryName: string;
   nationalId: string;
   phone: string;
   age: number | null;
@@ -45,7 +45,7 @@ export type LoanApplication = {
 };
 
 export type LoanApplicationInput = {
-  applicantName: string;
+  beneficiaryName: string;
   nationalId: string;
   phone: string;
   age?: number | null;
@@ -90,7 +90,7 @@ export const useLoanApplicationStore = create<LoanApplicationState>()(
           createdAt: now,
           updatedAt: now,
           status: "DRAFT",
-          applicantName: input.applicantName.trim(),
+          beneficiaryName: input.beneficiaryName.trim(),
           nationalId: input.nationalId.trim(),
           phone: input.phone.trim(),
           age:

@@ -53,7 +53,7 @@ function LoanApplicationList() {
             <thead className="bg-gray-100 text-left">
               <tr>
                 <th className="px-3 py-2 font-semibold">Application #</th>
-                <th className="px-3 py-2 font-semibold">Applicant</th>
+                <th className="px-3 py-2 font-semibold">Beneficiary</th>
                 <th className="px-3 py-2 font-semibold">Product</th>
                 <th className="px-3 py-2 font-semibold">Amount</th>
                 <th className="px-3 py-2 font-semibold">Credit score</th>
@@ -73,7 +73,7 @@ function LoanApplicationList() {
                       {row.applicationNo}
                     </td>
                     <td className="px-3 py-2">
-                      <div className="font-medium">{row.applicantName}</div>
+                      <div className="font-medium">{row.beneficiaryName}</div>
                       <div className="text-xs text-gray-600">{row.nationalId}</div>
                     </td>
                     <td className="px-3 py-2">

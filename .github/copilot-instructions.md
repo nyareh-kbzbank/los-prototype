@@ -1,6 +1,7 @@
 # Copilot Instructions
 
 - **Stack**: TanStack Start + Vite + React 19 + TypeScript; file-based routing via TanStack Router with generated route tree; Tailwind CSS (v4 plugin) for styling; Zustand for client state; React Flow (@xyflow) for workflow canvas.
+- **Working rules**: Do not change formatting manually (no auto-formatting in responses); do not reorder/sort imports or remove unused code—leave that to Biome; do not run Biome commands—user handles formatting/linting.
 - **Run/Build/Test**: `npm run dev` (Vite, port 3000), `npm run build`/`preview`, `npm run test` (vitest run), lint/format/check with Biome (`npm run lint|format|check`).
 - **Env**: Anthropic key expected (`ANTHROPIC_API_KEY`) per README.
 - **Routing shell**: [src/routes/__root.tsx](src/routes/__root.tsx) sets document head, global CSS, header, and mounts TanStack Devtools plugins (router, query, store, AI). Do not edit `routeTree.gen.ts`; add routes in [src/routes](src/routes).

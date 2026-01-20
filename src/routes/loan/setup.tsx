@@ -122,19 +122,15 @@ function RouteComponent() {
 
 	const configuredFields = useMemo(() => {
 		return activeScoreCard
-			? Array.from(new Set(activeScoreCard.rules.map((r) => r.field))).sort(
-					(a, b) => a.localeCompare(b),
-				)
+			? [...activeScoreCard.fields.map((f) => f.field)].sort((a, b) => a.localeCompare(b))
 			: [];
 	}, [activeScoreCard]);
 
 	const rulesByField = useMemo<Record<string, Rule[]>>(() => {
 		if (!activeScoreCard) return {};
 		const acc: Record<string, Rule[]> = {};
-		for (const rule of activeScoreCard.rules) {
-			const existing = acc[rule.field];
-			if (existing) existing.push(rule);
-			else acc[rule.field] = [rule];
+		for (const field of activeScoreCard.fields) {
+			acc[field.field] = [...(field.rules ?? [])];
 		}
 		return acc;
 	}, [activeScoreCard]);
@@ -481,7 +477,7 @@ function RouteComponent() {
 							<div className="font-semibold">Score Breakdown</div>
 							<div className="text-gray-700 mb-2">
 								Matched {riskResult.matchedRules} of{" "}
-								{activeScoreCard?.rules.length ?? 0} rules
+								{riskResult.breakdown.length} rules
 							</div>
 							<ul className="space-y-1">
 								{riskResult.breakdown.map((item, idx) => (
@@ -492,7 +488,7 @@ function RouteComponent() {
 										}`}
 									>
 										<span>
-											{item.field} {item.operator} {item.value}
+											{item.fieldDescription} ({item.field}) {item.operator} {item.value}
 										</span>
 										<span>{item.matched ? `+${item.score}` : "0"}</span>
 									</li>

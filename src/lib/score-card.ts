@@ -182,7 +182,11 @@ const ruleMatches = (rule: ScoreRule, applicant: ApplicantData): boolean => {
 };
 
 export const evaluateScore = (applicant: ApplicantData): ScoreResult => {
-  const breakdown = scoreCard.rules.map((rule) => ({
+  const flatRules = (scoreCard.fields ?? []).flatMap((field) =>
+    (field.rules ?? []).map((rule) => ({ ...rule, field: field.field, fieldDescription: field.description })),
+  );
+
+  const breakdown = flatRules.map((rule) => ({
     ...rule,
     matched: ruleMatches(rule, applicant),
     applicantValue: applicant[rule.field],

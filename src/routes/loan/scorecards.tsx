@@ -46,7 +46,7 @@ function ScorecardListPage() {
 				</div>
 			</div>
 
-			{rows.length === 0 ? (
+			{rows?.length === 0 ? (
 				<div className="border rounded p-4 bg-gray-50 text-gray-700 text-sm">
 					No scorecards saved yet. Create one to see it listed here.
 				</div>
@@ -57,14 +57,14 @@ function ScorecardListPage() {
 							<tr>
 								<th className="px-3 py-2 font-semibold">Name</th>
 								<th className="px-3 py-2 font-semibold">Max Score</th>
-								<th className="px-3 py-2 font-semibold">Rules</th>
+								{/* <th className="px-3 py-2 font-semibold">Rules</th> */}
 								<th className="px-3 py-2 font-semibold">Bureau</th>
 								<th className="px-3 py-2 font-semibold">Actions</th>
 							</tr>
 						</thead>
 						<tbody>
 							{rows.map((card) => {
-								const uniqueFields = new Set(card.rules.map((r) => r.field));
+								// const uniqueFields = new Set(card.rules.map((r) => r.field));
 								return (
 									<tr key={card.scoreCardId} className="border-t hover:bg-gray-50">
 										<td className="px-3 py-2">
@@ -72,10 +72,10 @@ function ScorecardListPage() {
 											<div className="text-xs text-gray-600">{card.scoreCardId}</div>
 										</td>
 										<td className="px-3 py-2">{card.maxScore}</td>
-										<td className="px-3 py-2 text-xs text-gray-700">
-											<div className="font-semibold text-sm">{card.rules.length} rules</div>
-											<div>{uniqueFields.size} fields</div>
-										</td>
+										{/* <td className="px-3 py-2 text-xs text-gray-700"> */}
+											{/* <div className="font-semibold text-sm">{card.rules.length} rules</div> */}
+											{/* <div>{uniqueFields.size} fields</div> */}
+										{/* </td> */}
 										<td className="px-3 py-2 text-xs text-gray-700">
 											<div className="font-medium text-sm">{card.bureauProvider ?? "—"}</div>
 											<div>{card.bureauPurpose ?? ""}</div>

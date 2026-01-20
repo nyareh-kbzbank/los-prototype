@@ -75,7 +75,7 @@ function App() {
 	const actionCards = [
 		{
 			title: "New Application",
-			description: "Capture applicant info, calculate scores, and submit.",
+			description: "Capture beneficiary info, calculate scores, and submit.",
 			to: "/loan/applications/create",
 			icon: FilePlus2,
 			accent: "bg-lime-500/15 text-lime-300",
@@ -94,55 +94,50 @@ function App() {
 			<Link
 				key={card.to}
 				to={card.to}
-				className="group flex items-start gap-3 rounded-xl border border-slate-800 bg-slate-900/60 p-4 hover:border-cyan-500/60 hover:bg-slate-900 transition-colors"
+				className="group flex items-start gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:border-cyan-200 hover:shadow-md"
 			>
 				<span className={`rounded-lg p-2 ${card.accent}`}>
 					<Icon className="w-5 h-5" />
 				</span>
 				<div>
-					<h2 className="text-xl font-semibold">{card.title}</h2>
-					<p className="text-slate-400 text-sm">{card.description}</p>
+					<h2 className="text-lg font-semibold text-slate-900 group-hover:text-cyan-700">
+						{card.title}
+					</h2>
+					<p className="text-slate-600 text-sm">{card.description}</p>
 				</div>
 			</Link>
 		);
 	};
 
 	return (
-		<div className="min-h-screen bg-slate-950 text-white">
-			<section className="px-6 py-16 max-w-5xl mx-auto">
-				<div className="bg-slate-900 border border-slate-800 rounded-2xl p-10 shadow-xl shadow-cyan-900/40">
-					<p className="text-cyan-300 text-sm font-semibold mb-2 tracking-wide">
+		<div className="p-6 font-sans text-slate-900">
+			<section className="max-w-5xl mx-auto space-y-8">
+				<div className="bg-white border border-slate-200 rounded-2xl p-8 shadow-sm">
+					<p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-700 mb-2">
 						LOS
 					</p>
-					<h1 className="text-4xl font-black mb-3">Welcome back</h1>
-					<p className="text-slate-300 text-lg leading-relaxed mb-8">
-						Set up loan products, tune scorecards, and manage applications from
-						one spot. Choose where you want to start below.
+					<h1 className="text-3xl font-bold mb-2">Welcome back</h1>
+					<p className="text-slate-600 text-base leading-relaxed mb-8">
+						Set up loan products, tune scorecards, and manage applications from one spot.
 					</p>
 
 					<div className="space-y-8">
-						<div>
-							<h2 className="text-lg font-semibold text-slate-200 mb-3">
-								Configure
-							</h2>
+						<div className="space-y-3">
+							<h2 className="text-sm font-semibold text-slate-700">Configure</h2>
 							<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 								{configureCards.map(renderCard)}
 							</div>
 						</div>
 
-						<div>
-							<h2 className="text-lg font-semibold text-slate-200 mb-3">
-								Libraries & Lists
-							</h2>
+						<div className="space-y-3">
+							<h2 className="text-sm font-semibold text-slate-700">Libraries & Lists</h2>
 							<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 								{libraryCards.map(renderCard)}
 							</div>
 						</div>
 
-						<div>
-							<h2 className="text-lg font-semibold text-slate-200 mb-3">
-								Actions
-							</h2>
+						<div className="space-y-3">
+							<h2 className="text-sm font-semibold text-slate-700">Actions</h2>
 							<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 								{actionCards.map(renderCard)}
 							</div>
