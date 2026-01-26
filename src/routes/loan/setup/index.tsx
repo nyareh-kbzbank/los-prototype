@@ -18,12 +18,8 @@ import {
 	type ScoreEngineResult,
 } from "../../../lib/scorecard-engine";
 import { type Rule, useScoreCardStore } from "../../../lib/scorecard-store";
-import { requireAdmin } from "@/lib/user-store";
 
 export const Route = createFileRoute("/loan/setup/")({
-	beforeLoad: () => {
-		requireAdmin();
-	},
 	component: RouteComponent,
 });
 

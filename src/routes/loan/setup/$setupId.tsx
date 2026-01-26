@@ -18,12 +18,8 @@ import {
 } from "@/lib/scorecard-engine";
 import { type Rule, useScoreCardStore } from "@/lib/scorecard-store";
 import { getWorkflowList, useWorkflowStore } from "@/lib/workflow-store";
-import { requireAdmin } from "@/lib/user-store";
 
 export const Route = createFileRoute("/loan/setup/$setupId")({
-	beforeLoad: () => {
-		requireAdmin();
-	},
 	component: RouteComponent,
 });
 
