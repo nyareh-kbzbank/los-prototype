@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate, redirect } from "@tanstack/react-router";
 import { type ChangeEvent, useEffect, useMemo, useState } from "react";
 import {
 	type ChannelConfig,
@@ -18,8 +18,20 @@ import {
 	type ScoreEngineResult,
 } from "../../../lib/scorecard-engine";
 import { type Rule, useScoreCardStore } from "../../../lib/scorecard-store";
+import { useUserStore } from "@/lib/user-store";
 
 export const Route = createFileRoute("/loan/setup/")({
+	beforeLoad: () => {
+		const isAdmin = useUserStore.getState().isAdmin();
+		if (!isAdmin) {
+			throw redirect({
+				to: "/loan",
+				search: {
+					error: "admin-required",
+				},
+			});
+		}
+	},
 	component: RouteComponent,
 });
 

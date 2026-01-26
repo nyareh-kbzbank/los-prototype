@@ -1,17 +1,42 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMemo } from "react";
+import { createFileRoute, Link, useSearch } from "@tanstack/react-router";
+import { useMemo, useState, useEffect } from "react";
 import { getLoanSetupList, useLoanSetupStore } from "@/lib/loan-setup-store";
 
+type LoanSearch = {
+	error?: string;
+};
+
 export const Route = createFileRoute("/loan/")({
+	validateSearch: (search: Record<string, unknown>): LoanSearch => {
+		return {
+			error: search.error as string | undefined,
+		};
+	},
 	component: LoanWorkflowList,
 });
 
 function LoanWorkflowList() {
 	const setups = useLoanSetupStore((s) => s.setups);
 	const rows = useMemo(() => getLoanSetupList(setups), [setups]);
+	const search = useSearch({ from: "/loan/" });
+	const [showError, setShowError] = useState(false);
+
+	useEffect(() => {
+		if (search.error === "admin-required") {
+			setShowError(true);
+			const timer = setTimeout(() => setShowError(false), 5000);
+			return () => clearTimeout(timer);
+		}
+	}, [search.error]);
 
 	return (
 		<div className="p-6 font-sans max-w-5xl mx-auto">
+			{showError && (
+				<div className="mb-4 p-4 bg-red-100 border border-red-300 text-red-800 rounded">
+					<strong>Access Denied:</strong> You need administrator privileges to
+					access the Loan Setup page.
+				</div>
+			)}
 			<div className="flex items-center justify-between mb-4">
 				<div>
 					<h1 className="text-2xl font-bold">Saved Loan Setup</h1>

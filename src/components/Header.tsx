@@ -8,12 +8,22 @@ import {
 	SquareFunction,
 	Table,
 	X,
+	Shield,
+	User,
 } from "lucide-react";
 
 import { useState } from "react";
+import { useUserStore } from "@/lib/user-store";
 
 export default function Header() {
 	const [isOpen, setIsOpen] = useState(false);
+	const currentUser = useUserStore((s) => s.currentUser);
+	const setRole = useUserStore((s) => s.setRole);
+	const isAdmin = currentUser?.role === "admin";
+
+	const toggleRole = () => {
+		setRole(isAdmin ? "user" : "admin");
+	};
 
 	return (
 		<>
@@ -31,6 +41,19 @@ export default function Header() {
 						LOS
 					</Link>
 				</h1>
+				<div className="ml-auto flex items-center gap-2 text-sm">
+					{isAdmin ? (
+						<div className="flex items-center gap-1 px-2 py-1 bg-cyan-600 rounded">
+							<Shield size={16} />
+							<span>Admin</span>
+						</div>
+					) : (
+						<div className="flex items-center gap-1 px-2 py-1 bg-gray-700 rounded">
+							<User size={16} />
+							<span>User</span>
+						</div>
+					)}
+				</div>
 			</header>
 
 			<aside
@@ -142,9 +165,29 @@ export default function Header() {
 					</Link>
 				</nav>
 
-				{/* <div className="p-4 border-t border-gray-700 bg-gray-800 flex flex-col gap-2">
-          <TanChatAIAssistant />
-        </div> */}
+				<div className="p-4 border-t border-gray-700 bg-gray-800">
+					<div className="mb-2 text-xs text-gray-400">Current Role</div>
+					<button
+						onClick={toggleRole}
+						type="button"
+						className={`w-full flex items-center justify-between gap-2 p-3 rounded-lg transition-colors ${
+							isAdmin
+								? "bg-cyan-600 hover:bg-cyan-700"
+								: "bg-gray-700 hover:bg-gray-600"
+						}`}
+					>
+						<div className="flex items-center gap-2">
+							{isAdmin ? <Shield size={18} /> : <User size={18} />}
+							<span className="font-medium">
+								{isAdmin ? "Administrator" : "User"}
+							</span>
+						</div>
+						<span className="text-xs text-gray-300">Click to toggle</span>
+					</button>
+					<div className="mt-2 text-xs text-gray-400">
+						{currentUser?.name} ({currentUser?.email})
+					</div>
+				</div>
 			</aside>
 		</>
 	);
