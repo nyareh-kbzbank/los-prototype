@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { redirect } from "@tanstack/react-router";
 
 export type UserRole = "user" | "admin";
 
@@ -18,18 +19,22 @@ interface UserState {
 	isAdmin: () => boolean;
 }
 
-// Default user for demo purposes
-const defaultUser: User = {
-	id: "demo-user-1",
-	name: "Demo User",
-	email: "user@demo.com",
-	role: "user",
+// Default user for demo purposes only
+// In production, this should be replaced with actual authentication
+const getDefaultUser = (): User => {
+	const isDevelopment = process.env.NODE_ENV === "development";
+	return {
+		id: "demo-user-1",
+		name: isDevelopment ? "Demo User" : "Guest",
+		email: isDevelopment ? "user@demo.com" : "guest@example.com",
+		role: "user",
+	};
 };
 
 export const useUserStore = create<UserState>()(
 	persist(
 		(set, get) => ({
-			currentUser: defaultUser,
+			currentUser: getDefaultUser(),
 			setUser: (user) => set({ currentUser: user }),
 			setRole: (role) =>
 				set((state) => ({
@@ -45,3 +50,19 @@ export const useUserStore = create<UserState>()(
 		},
 	),
 );
+
+/**
+ * Route guard that requires admin role
+ * Use this in TanStack Router's beforeLoad to protect admin-only routes
+ */
+export function requireAdmin() {
+	const isAdmin = useUserStore.getState().isAdmin();
+	if (!isAdmin) {
+		throw redirect({
+			to: "/loan",
+			search: {
+				error: "admin-required",
+			},
+		});
+	}
+}

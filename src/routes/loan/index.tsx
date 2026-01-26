@@ -6,6 +6,8 @@ type LoanSearch = {
 	error?: string;
 };
 
+const ERROR_DISPLAY_DURATION = 5000;
+
 export const Route = createFileRoute("/loan/")({
 	validateSearch: (search: Record<string, unknown>): LoanSearch => {
 		return {
@@ -24,7 +26,7 @@ function LoanWorkflowList() {
 	useEffect(() => {
 		if (search.error === "admin-required") {
 			setShowError(true);
-			const timer = setTimeout(() => setShowError(false), 5000);
+			const timer = setTimeout(() => setShowError(false), ERROR_DISPLAY_DURATION);
 			return () => clearTimeout(timer);
 		}
 	}, [search.error]);
