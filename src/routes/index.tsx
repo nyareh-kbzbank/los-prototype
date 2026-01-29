@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import {
 	Archive,
+	Calculator,
 	ClipboardList,
 	FilePlus2,
 	LayoutTemplate,
@@ -88,6 +89,16 @@ function App() {
 		},
 	];
 
+	const toolCards = [
+		{
+			title: "EMI Calculator",
+			description: "Quickly calculate monthly payments and total interest.",
+			to: "/loan/emi-calculator",
+			icon: Calculator,
+			accent: "bg-rose-500/15 text-rose-300",
+		},
+	];
+
 	const renderCard = (card: {
 		title: string;
 		description: string;
@@ -151,6 +162,13 @@ function App() {
 							<h2 className="text-sm font-semibold text-slate-700">Applications</h2>
 							<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 								{actionCards.map(renderCard)}
+							</div>
+						</div>
+
+						<div className="space-y-3">
+							<h2 className="text-sm font-semibold text-slate-700">Tools</h2>
+							<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+								{toolCards.map(renderCard)}
 							</div>
 						</div>
 					</div>
