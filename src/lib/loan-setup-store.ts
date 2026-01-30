@@ -6,8 +6,8 @@ import type { ScoreEngineResult } from "./scorecard-engine";
 
 export enum TenorUnit {
 	MONTH = "Month",
-	YEAR = "YEAR",
-	DAY = "DAY",
+	YEAR = "Year",
+	DAY = "Day",
 }
 
 export interface LoanTenor {

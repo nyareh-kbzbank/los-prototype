@@ -629,7 +629,9 @@ function RouteComponent() {
 
 						<div className="grid grid-cols-1 md:grid-cols-3 gap-4">
 							<label className="flex flex-col gap-1 text-sm">
-								<span>Tenure (months)</span>
+								<span>
+									Tenure
+								</span>
 								<select
 									className="border px-2 py-2 rounded"
 									value={tenureValue ?? ""}
@@ -640,11 +642,19 @@ function RouteComponent() {
 									}
 									disabled={disabled || tenureOptions.length === 0}
 								>
-									{tenureOptions.map((months) => (
-										<option key={months} value={months}>
-											{months}
-										</option>
-									))}
+									{tenureOptions.map((months) => {
+										const baseUnit =
+											activeSetup?.product.loanTenor?.TenorUnit ?? "month";
+										const unit =
+											baseUnit.endsWith("s") || months === 1
+												? baseUnit
+												: `${baseUnit}s`;
+										return (
+											<option key={months} value={months}>
+												{months} {unit}
+											</option>
+										);
+									})}
 								</select>
 							</label>
 
