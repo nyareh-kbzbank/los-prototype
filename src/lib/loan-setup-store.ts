@@ -4,12 +4,24 @@ import { persist } from "zustand/middleware";
 import type { RepaymentPlan } from "./repayment-setup-store.ts";
 import type { ScoreEngineResult } from "./scorecard-engine";
 
+export enum TenorUnit {
+	MONTH = "Month",
+	YEAR = "YEAR",
+	DAY = "DAY",
+}
+
+export interface LoanTenor {
+	id: string;
+	TenorValue: number[];
+	TenorUnit: TenorUnit;
+}
+
 export type LoanProduct = {
 	productCode: string;
 	productName: string;
 	minAmount: number;
 	maxAmount: number;
-	tenureMonths: number[];
+	loanTenor: LoanTenor;
 	baseInterestRate: number;
 };
 
@@ -88,7 +100,10 @@ export const useLoanSetupStore = create<LoanWorkflowState>()(
 					createdAt: Date.now(),
 					product: {
 						...input.product,
-						tenureMonths: [...input.product.tenureMonths],
+						loanTenor: {
+							...input.product.loanTenor,
+							TenorValue: [...input.product.loanTenor.TenorValue],
+						},
 					},
 					channels,
 					scorecardId: input.scorecardId ?? null,
@@ -138,7 +153,10 @@ export const useLoanSetupStore = create<LoanWorkflowState>()(
 					...current,
 					product: {
 						...input.product,
-						tenureMonths: [...input.product.tenureMonths],
+						loanTenor: {
+							...input.product.loanTenor,
+							TenorValue: [...input.product.loanTenor.TenorValue],
+						},
 					},
 					channels,
 					scorecardId: input.scorecardId ?? null,

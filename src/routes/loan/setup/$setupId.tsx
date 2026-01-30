@@ -1,10 +1,12 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { Trash2 } from "lucide-react";
 import { type ChangeEvent, useEffect, useMemo, useState } from "react";
 import {
 	type ChannelConfig,
 	type DisbursementDestination,
 	type DisbursementDestinationType,
 	type LoanProduct,
+	TenorUnit,
 	useLoanSetupStore,
 } from "@/lib/loan-setup-store";
 import {
@@ -31,7 +33,11 @@ const loanProductSetup: LoanProduct = {
 	productName: "Personal Loan Standard",
 	minAmount: 500000,
 	maxAmount: 10000000,
-	tenureMonths: [6, 12, 18, 24],
+	loanTenor: {
+		id: "default-tenor",
+		TenorUnit: TenorUnit.MONTH,
+		TenorValue: [6, 12, 18, 24],
+	},
 	baseInterestRate: 18.5,
 };
 
@@ -100,9 +106,7 @@ function RouteComponent() {
 		}
 		return repaymentPlanList[0];
 	}, [repaymentPlanList, repaymentPlans, selectedRepaymentPlanId]);
-	const [tenureInput, setTenureInput] = useState(
-		loanProductSetup.tenureMonths.join(", "),
-	);
+
 	const [bureauRequired, setBureauRequired] = useState(false);
 	const [bureauProvider, setBureauProvider] = useState("MMCB");
 	const [bureauPurpose, setBureauPurpose] = useState("Credit assessment");
@@ -111,7 +115,6 @@ function RouteComponent() {
 	useEffect(() => {
 		if (setup) {
 			setProduct(setup.product);
-			setTenureInput(setup.product.tenureMonths.join(", "));
 			if (setup.scorecardId) {
 				selectScoreCard(setup.scorecardId);
 			}
@@ -185,19 +188,58 @@ function RouteComponent() {
 		setRiskResult(null);
 	}, [configuredFields]);
 
-	const handleTenureChange = (e: ChangeEvent<HTMLInputElement>) => {
-		const value = e.target.value;
-		setTenureInput(value);
-		const months = value
-			.split(",")
-			.map((item) => Number(item.trim()))
-			.filter((n) => Number.isFinite(n) && n > 0);
-		setProduct((prev) => ({ ...prev, tenureMonths: months }));
+	const updateTenureUnit = (e: ChangeEvent<HTMLSelectElement>) => {
+		const unit = e.target.value as TenorUnit;
+		setProduct((prev) => ({
+			...prev,
+			loanTenor: {
+				...prev.loanTenor,
+				TenorUnit: unit,
+			},
+		}));
+	};
+
+	const addTenureValue = () => {
+		setProduct((prev) => ({
+			...prev,
+			loanTenor: {
+				...prev.loanTenor,
+				TenorValue: [...prev.loanTenor.TenorValue, 0],
+			},
+		}));
+	};
+
+	const updateTenureValue =
+		(index: number) => (e: ChangeEvent<HTMLInputElement>) => {
+			const val = Number(e.target.value);
+			setProduct((prev) => {
+				const nextValues = [...prev.loanTenor.TenorValue];
+				nextValues[index] = Number.isFinite(val) ? val : nextValues[index];
+				return {
+					...prev,
+					loanTenor: {
+						...prev.loanTenor,
+						TenorValue: nextValues,
+					},
+				};
+			});
+		};
+
+	const removeTenureValue = (index: number) => {
+		setProduct((prev) => {
+			const nextValues = prev.loanTenor.TenorValue.filter((_, i) => i !== index);
+			return {
+				...prev,
+				loanTenor: {
+					...prev.loanTenor,
+					TenorValue: nextValues,
+				},
+			};
+		});
 	};
 
 	const resetProduct = () => {
 		setProduct(loanProductSetup);
-		setTenureInput(loanProductSetup.tenureMonths.join(", "));
 	};
 
 	const addChannelRow = () => {
@@ -344,16 +386,56 @@ function RouteComponent() {
 							className="border px-2 py-1 rounded"
 						/>
 					</label>
-					<label className="flex flex-col gap-1 text-sm">
-						<span>Tenure Months (comma separated)</span>
-						<input
-							type="text"
-							value={tenureInput}
-							onChange={handleTenureChange}
-							className="border px-2 py-1 rounded"
-							placeholder="6, 12, 18, 24"
-						/>
-					</label>
+					<div className="flex flex-col gap-1 text-sm md:col-span-2">
+						<div className="flex items-center justify-between">
+							<span>Tenor Configuration</span>
+							<button
+								type="button"
+								onClick={addTenureValue}
+								className="text-sm border px-2 py-1 rounded hover:bg-gray-100"
+							>
+								Add Value
+							</button>
+						</div>
+						<div className="flex flex-col gap-2 border rounded p-3 bg-gray-50">
+							<div className="flex flex-col gap-1">
+								<span className="text-xs text-gray-600">Unit</span>
+								<select
+									value={product.loanTenor.TenorUnit}
+									onChange={updateTenureUnit}
+									className="border px-2 py-1 rounded w-full md:w-1/2"
+								>
+									{Object.values(TenorUnit).map((u) => (
+										<option key={u} value={u}>
+											{u}
+										</option>
+									))}
+								</select>
+							</div>
+							<div className="grid grid-cols-2 gap-3">
+								{product.loanTenor.TenorValue.map((val, idx) => (
+									// biome-ignore lint/suspicious/noArrayIndexKey: simple list
+									<div key={idx} className="flex items-center gap-2">
+										<input
+											type="number"
+											value={val}
+											onChange={updateTenureValue(idx)}
+											className="border px-2 py-1 rounded w-full"
+											min="0"
+										/>
+										<button
+											onClick={() => removeTenureValue(idx)}
+											className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-md transition-colors"
+											type="button"
+											title="Remove"
+										>
+											<Trash2 className="w-4 h-4" />
+										</button>
+									</div>
+								))}
+							</div>
+						</div>
+					</div>
 					<label className="flex flex-col gap-1 text-sm">
 						<span>Base Interest Rate (%)</span>
 						<input
@@ -386,10 +468,10 @@ function RouteComponent() {
 							</dd>
 						</div>
 						<div>
-							<dt className="text-gray-600">Tenure Months</dt>
+							<dt className="text-gray-600">Tenure</dt>
 							<dd className="font-mono">
-								{product.tenureMonths.length
-									? product.tenureMonths.join(", ")
+								{product.loanTenor.TenorValue.length
+									? `${product.loanTenor.TenorValue.join(", ")} ${product.loanTenor.TenorUnit}`
 									: "None"}
 							</dd>
 						</div>
@@ -891,15 +973,6 @@ function RouteComponent() {
 					>
 						{setupId ? "Update" : "Save"} Product Setup
 					</button>
-					<div className="flex flex-col gap-1 text-sm text-gray-700 md:flex-row md:items-center md:justify-between">
-						<span>
-							Saved locally via Zustand. {setupId ? "Updating" : "Creating new"}{" "}
-							snapshot.
-						</span>
-						<Link to="/loan" className="text-blue-600 hover:underline">
-							View saved loan setups
-						</Link>
-					</div>
 				</div>
 			</section>
 		</div>

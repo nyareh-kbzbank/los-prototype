@@ -195,8 +195,12 @@ function RouteComponent() {
 						value={application.requestedAmount.toLocaleString()}
 					/>
 					<Field
-						label="Tenure (months)"
-						value={application.tenureMonths ?? "—"}
+						label="Tenure"
+						value={
+							application.tenureValue
+								? `${application.tenureValue} ${application.tenureUnit || ""}`
+								: "—"
+						}
 					/>
 					<Field label="Destination" value={application.destinationType} />
 					<Field label="Setup ID" value={application.setupId} />

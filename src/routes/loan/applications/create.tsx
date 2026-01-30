@@ -44,7 +44,7 @@ function RouteComponent() {
 		}
 	}, [activeSetup, setupList]);
 
-	const tenureOptions = activeSetup?.product.tenureMonths ?? [];
+	const tenureOptions = activeSetup?.product.loanTenor?.TenorValue ?? [];
 	const channelOptions = activeSetup?.channels ?? [];
 	const destinationChoices: DisbursementDestinationType[] = (
 		activeSetup?.disbursementDestinations ?? []
@@ -275,7 +275,8 @@ function RouteComponent() {
 			age: parsedAge,
 			monthlyIncome: parsedMonthlyIncome,
 			requestedAmount: parsedAmount,
-			tenureMonths: tenureValue,
+			tenureValue: tenureValue,
+			tenureUnit: activeSetup?.product.loanTenor?.TenorUnit ?? null,
 			channelCode,
 			destinationType,
 			bureauProvider,

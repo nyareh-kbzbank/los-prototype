@@ -1,7 +1,7 @@
 import { v4 as uuidV4 } from "uuid";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { DisbursementDestinationType } from "./loan-setup-store";
+import type { DisbursementDestinationType, TenorUnit } from "./loan-setup-store";
 
 export type LoanApplicationStatus = "DRAFT" | "SUBMITTED" | "APPROVED" | "REJECTED";
 
@@ -24,7 +24,8 @@ export type LoanApplication = {
   age: number | null;
   monthlyIncome: number | null;
   requestedAmount: number;
-  tenureMonths: number | null;
+  tenureValue: number | null;
+  tenureUnit: TenorUnit | null;
   channelCode: string;
   destinationType: DisbursementDestinationType;
   notes: string;
@@ -51,7 +52,8 @@ export type LoanApplicationInput = {
   age?: number | null;
   monthlyIncome?: number | null;
   requestedAmount: number;
-  tenureMonths: number | null;
+  tenureValue: number | null;
+  tenureUnit?: TenorUnit | null;
   channelCode: string;
   destinationType: DisbursementDestinationType;
   notes?: string;
@@ -104,9 +106,10 @@ export const useLoanApplicationStore = create<LoanApplicationState>()(
           requestedAmount: Number.isFinite(input.requestedAmount)
             ? Math.max(0, input.requestedAmount)
             : 0,
-          tenureMonths: Number.isFinite(input.tenureMonths || NaN)
-            ? input.tenureMonths
+          tenureValue: Number.isFinite(input.tenureValue || NaN)
+            ? input.tenureValue
             : null,
+          tenureUnit: input.tenureUnit || null,
           channelCode: input.channelCode.trim(),
           destinationType: input.destinationType,
           notes: input.notes?.trim() ?? "",
