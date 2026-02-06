@@ -2,7 +2,7 @@ import { v4 as uuidV4 } from "uuid";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { RepaymentPlan } from "./repayment-setup-store.ts";
-import type { ScoreEngineResult } from "./scorecard-engine";
+import type { RiskGrade, ScoreEngineResult } from "./scorecard-engine";
 
 export enum TenorUnit {
 	MONTH = "Month",
@@ -51,6 +51,53 @@ export type LoanProduct = {
 	loanTenor: LoanTenor;
 	baseInterestRate?: number;
 	interestRatePlans?: InterestRatePlan[];
+};
+
+export const DEFAULT_REQUIRED_DOCUMENTS = ["NRC", "PAYSLIP"];
+
+const sanitizeDocuments = (docs?: string[]): string[] => {
+	const seen = new Set<string>();
+	return (docs ?? [])
+		.map((doc) => doc.trim())
+		.filter((doc) => {
+			if (!doc) return false;
+			const key = doc.toLowerCase();
+			if (seen.has(key)) return false;
+			seen.add(key);
+			return true;
+		});
+};
+
+export type DocumentRequirement = {
+	grade: RiskGrade;
+	documents: string[];
+};
+
+const sanitizeDocumentRequirement = (
+	requirement?: DocumentRequirement,
+): DocumentRequirement | null => {
+	if (!requirement) return null;
+	const documents = sanitizeDocuments(requirement.documents);
+	if (documents.length === 0) return null;
+	const grade = requirement.grade ?? "LOW";
+	return { grade, documents };
+};
+
+const normalizeDocumentRequirements = (
+	requirements?: DocumentRequirement[],
+): DocumentRequirement[] => {
+	const sanitized = (requirements ?? [])
+		.map((requirement) => sanitizeDocumentRequirement(requirement))
+		.filter((requirement): requirement is DocumentRequirement => Boolean(requirement));
+	if (sanitized.length === 0) {
+		return [
+			{
+				grade: "LOW",
+				documents: [...DEFAULT_REQUIRED_DOCUMENTS],
+			},
+		];
+	}
+	return sanitized;
 };
 
 const cloneInterestRatePlan = (plan: InterestRatePlan): InterestRatePlan => ({
@@ -121,7 +168,8 @@ export type LoanWorkflowSnapshot = {
 	scorecardName: string | null;
 	workflowId: string | null;
 	workflowName: string | null;
-	riskGrade: string | null;
+	riskGrade: RiskGrade | null;
+	documentRequirements: DocumentRequirement[];
 	totalScore: number | null;
 	disbursementType: DisbursementType;
 	partialInterestRate: number | null;
@@ -143,6 +191,7 @@ type LoanWorkflowInput = {
 	workflowId?: string | null;
 	workflowName?: string | null;
 	riskResult?: ScoreEngineResult | null;
+	documentRequirements?: DocumentRequirement[];
 	disbursementType?: DisbursementType;
 	partialInterestRate?: number | null;
 	disbursementDestinations?: DisbursementDestination[];
@@ -171,6 +220,9 @@ export const useLoanSetupStore = create<LoanWorkflowState>()(
 						code: c.code.trim(),
 					}))
 					.filter((c) => c.name || c.code);
+				const documentRequirements = normalizeDocumentRequirements(
+					input.documentRequirements,
+				);
 				const entry: LoanWorkflowSnapshot = {
 					id: uuidV4(),
 					createdAt: Date.now(),
@@ -181,6 +233,7 @@ export const useLoanSetupStore = create<LoanWorkflowState>()(
 					workflowId: input.workflowId ?? null,
 					workflowName: input.workflowName ?? null,
 					riskGrade: input.riskResult?.riskGrade ?? null,
+					documentRequirements,
 					totalScore: input.riskResult?.totalScore ?? null,
 					disbursementType: input.disbursementType ?? "FULL",
 					partialInterestRate:
@@ -218,6 +271,13 @@ export const useLoanSetupStore = create<LoanWorkflowState>()(
 						code: c.code.trim(),
 					}))
 					.filter((c) => c.name || c.code);
+				const nextDocumentRequirements =
+					input.documentRequirements !== undefined
+						? normalizeDocumentRequirements(input.documentRequirements)
+						: current.documentRequirements.map((requirement) => ({
+							grade: requirement.grade,
+							documents: [...requirement.documents],
+						}));
 
 				const updated: LoanWorkflowSnapshot = {
 					...current,
@@ -228,6 +288,7 @@ export const useLoanSetupStore = create<LoanWorkflowState>()(
 					workflowId: input.workflowId ?? null,
 					workflowName: input.workflowName ?? null,
 					riskGrade: input.riskResult?.riskGrade ?? current.riskGrade,
+					documentRequirements: nextDocumentRequirements,
 					totalScore: input.riskResult?.totalScore ?? current.totalScore,
 					disbursementType: input.disbursementType ?? "FULL",
 					partialInterestRate:
@@ -258,30 +319,73 @@ export const useLoanSetupStore = create<LoanWorkflowState>()(
 		}),
 		{
 			name: "loan-workflow-setups",
-			version: 2,
+			version: 4,
 			migrate: (persistedState: any, version) => {
 				if (!persistedState) return { setups: {} };
-				if (version >= 2) return persistedState;
-				const storedSetups = (persistedState.setups ?? {}) as Record<
-					string,
-					LoanWorkflowSnapshot
-				>;
-				const upgradedEntries = Object.entries(storedSetups).map(
-					([id, snapshot]) => {
-						if (!snapshot?.product) return [id, snapshot];
-						return [
-							id,
-							{
-								...snapshot,
-								product: cloneLoanProduct(snapshot.product),
-							},
-						];
-					},
-				);
-				return {
-					...persistedState,
-					setups: Object.fromEntries(upgradedEntries),
-				};
+				let nextState = persistedState;
+				if (version < 2) {
+					const storedSetups = (nextState.setups ?? {}) as Record<
+						string,
+						LoanWorkflowSnapshot
+					>;
+					const upgradedEntries = Object.entries(storedSetups).map(
+						([id, snapshot]) => {
+							if (!snapshot?.product) return [id, snapshot];
+							return [
+								id,
+								{
+									...snapshot,
+									product: cloneLoanProduct(snapshot.product),
+								},
+							];
+						},
+					);
+					nextState = {
+						...nextState,
+						setups: Object.fromEntries(upgradedEntries),
+					};
+				}
+				if (version < 4) {
+					const storedSetups = (nextState.setups ?? {}) as Record<
+						string,
+						LoanWorkflowSnapshot & {
+							documentRequirements?: DocumentRequirement[];
+							documentRiskGrade?: RiskGrade | null;
+							requiredDocuments?: string[];
+						}
+					>;
+					const upgradedEntries = Object.entries(storedSetups).map(
+						([id, snapshot]) => {
+							if (!snapshot) return [id, snapshot];
+							const normalizedRequirements = normalizeDocumentRequirements(
+								snapshot.documentRequirements ??
+									(snapshot.requiredDocuments
+										? [
+												{
+													grade:
+														snapshot.documentRiskGrade ??
+														snapshot.riskGrade ??
+														"LOW",
+													documents: snapshot.requiredDocuments,
+												},
+										]
+									: undefined),
+							);
+							return [
+								id,
+								{
+									...snapshot,
+									documentRequirements: normalizedRequirements,
+								},
+							];
+						},
+					);
+					nextState = {
+						...nextState,
+						setups: Object.fromEntries(upgradedEntries),
+					};
+				}
+				return nextState;
 			},
 			partialize: (state) => ({ setups: state.setups }),
 		},

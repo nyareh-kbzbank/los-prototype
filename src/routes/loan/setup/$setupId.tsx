@@ -1,14 +1,19 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { Trash2 } from "lucide-react";
 import { type ChangeEvent, useEffect, useMemo, useState } from "react";
+import DocumentRequirementsSection, {
+	createDocumentRequirementItem,
+	type DocumentRequirementItem,
+} from "@/components/loan/DocumentRequirementsSection";
+import TenorInterestSection from "@/components/loan/TenorInterestSection";
 import {
 	type ChannelConfig,
+	cloneLoanProduct,
+	DEFAULT_REQUIRED_DOCUMENTS,
 	type DisbursementDestination,
 	type DisbursementDestinationType,
 	type InterestRatePlan,
 	type LoanProduct,
 	TenorUnit,
-	cloneLoanProduct,
 	useLoanSetupStore,
 } from "@/lib/loan-setup-store";
 import {
@@ -22,7 +27,6 @@ import {
 } from "@/lib/scorecard-engine";
 import { type Rule, useScoreCardStore } from "@/lib/scorecard-store";
 import { getWorkflowList, useWorkflowStore } from "@/lib/workflow-store";
-import TenorInterestSection from "@/components/loan/TenorInterestSection";
 
 export const Route = createFileRoute("/loan/setup/$setupId")({
 	component: RouteComponent,
@@ -53,9 +57,7 @@ const loanProductSetup: LoanProduct = {
 					{ name: "DOWN_PAYMENT", value: 40, interestRate: 12 },
 				],
 			},
-			policies: [
-				{ interestCategory: "OUTSTANDING", interestRate: 1.9 },
-			],
+			policies: [{ interestCategory: "OUTSTANDING", interestRate: 1.9 }],
 		},
 	],
 };
@@ -94,6 +96,9 @@ function RouteComponent() {
 	);
 	const [scoreInputs, setScoreInputs] = useState<Record<string, string>>({});
 	const [riskResult, setRiskResult] = useState<ScoreEngineResult | null>(null);
+	const [documentRequirements, setDocumentRequirements] = useState<
+		DocumentRequirementItem[]
+	>(() => [createDocumentRequirementItem("LOW", DEFAULT_REQUIRED_DOCUMENTS)]);
 	const [channels, setChannels] = useState<ChannelConfig[]>([
 		{ name: "", code: "" },
 	]);
@@ -150,10 +155,24 @@ function RouteComponent() {
 			setRiskResult(
 				setup.riskResult ? { ...setup.riskResult, inputs: {} } : null,
 			);
+			setDocumentRequirements(
+				setup.documentRequirements.length
+					? setup.documentRequirements.map((requirement) =>
+							createDocumentRequirementItem(
+								requirement.grade,
+								requirement.documents,
+							),
+						)
+					: [createDocumentRequirementItem("LOW", DEFAULT_REQUIRED_DOCUMENTS)],
+			);
 			setBureauRequired(Boolean(setup.bureauProvider));
 			setBureauProvider(setup.bureauProvider ?? "MMCB");
 			setBureauPurpose(setup.bureauPurpose ?? "Credit assessment");
 			setBureauConsentRequired(setup.bureauConsentRequired ?? true);
+		} else {
+			setDocumentRequirements([
+				createDocumentRequirementItem("LOW", DEFAULT_REQUIRED_DOCUMENTS),
+			]);
 		}
 	}, [setup, selectScoreCard, selectWorkflow, selectRepaymentPlan]);
 
@@ -248,7 +267,9 @@ function RouteComponent() {
 
 	const removeTenureValue = (index: number) => {
 		setProduct((prev) => {
-			const nextValues = prev.loanTenor.TenorValue.filter((_, i) => i !== index);
+			const nextValues = prev.loanTenor.TenorValue.filter(
+				(_, i) => i !== index,
+			);
 			return {
 				...prev,
 				loanTenor: {
@@ -316,6 +337,11 @@ function RouteComponent() {
 				: ({ type: "WALLET" } satisfies DisbursementDestination),
 		);
 
+		const normalizedRequirements = documentRequirements.map((requirement) => ({
+			grade: requirement.grade,
+			documents: [...requirement.documents],
+		}));
+
 		const payload = {
 			product,
 			channels,
@@ -326,6 +352,7 @@ function RouteComponent() {
 				? (workflows[selectedWorkflowId]?.name ?? "(unnamed workflow)")
 				: null,
 			riskResult,
+			documentRequirements: normalizedRequirements,
 			disbursementType: "FULL" as const,
 			partialInterestRate: null,
 			disbursementDestinations: mappedDestinations,
@@ -641,20 +668,11 @@ function RouteComponent() {
 				)}
 			</section>
 
-			{/* Document Setup */}
-			{riskResult && (
-				<section className="border p-4 rounded mb-6">
-					<h2 className="font-semibold mb-2">Required Documents</h2>
-					<div className="text-sm text-gray-700 mb-2">
-						Risk Grade: {riskResult.riskGrade}
-					</div>
-					<ul className="list-disc ml-6">
-						{riskResult.minDocs.map((doc) => (
-							<li key={doc}>{doc}</li>
-						))}
-					</ul>
-				</section>
-			)}
+			<DocumentRequirementsSection
+				riskResult={riskResult}
+				requirements={documentRequirements}
+				onChangeRequirements={setDocumentRequirements}
+			/>
 
 			{/* Bureau */}
 			<section className="border p-4 rounded mb-6">

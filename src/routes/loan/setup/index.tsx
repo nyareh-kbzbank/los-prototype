@@ -1,9 +1,14 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { type ChangeEvent, useEffect, useMemo, useState } from "react";
+import DocumentRequirementsSection, {
+	createDocumentRequirementItem,
+	type DocumentRequirementItem,
+} from "@/components/loan/DocumentRequirementsSection";
 import TenorInterestSection from "@/components/loan/TenorInterestSection";
 import {
 	type ChannelConfig,
 	cloneLoanProduct,
+	DEFAULT_REQUIRED_DOCUMENTS,
 	type DisbursementDestination,
 	type DisbursementDestinationType,
 	type InterestRatePlan,
@@ -24,7 +29,7 @@ import {
 import { type Rule, useScoreCardStore } from "../../../lib/scorecard-store";
 
 export const Route = createFileRoute("/loan/setup/")({
-	component: RouteComponent,
+	component: LoanSetup,
 });
 
 // --------------------
@@ -57,7 +62,7 @@ const loanProductSetup: LoanProduct = {
 	],
 };
 
-function RouteComponent() {
+function LoanSetup() {
 	const navigate = useNavigate();
 
 	const scoreCards = useScoreCardStore((s) => s.scoreCards);
@@ -83,6 +88,9 @@ function RouteComponent() {
 	);
 	const [scoreInputs, setScoreInputs] = useState<Record<string, string>>({});
 	const [riskResult, setRiskResult] = useState<ScoreEngineResult | null>(null);
+	const [documentRequirements, setDocumentRequirements] = useState<
+		DocumentRequirementItem[]
+	>(() => [createDocumentRequirementItem("LOW", DEFAULT_REQUIRED_DOCUMENTS)]);
 	const [channels, setChannels] = useState<ChannelConfig[]>([
 		{ name: "", code: "" },
 	]);
@@ -283,6 +291,11 @@ function RouteComponent() {
 				: ({ type: "WALLET" } satisfies DisbursementDestination),
 		);
 
+		const normalizedRequirements = documentRequirements.map((requirement) => ({
+			grade: requirement.grade,
+			documents: [...requirement.documents],
+		}));
+
 		addLoanSetup({
 			product,
 			channels,
@@ -293,6 +306,7 @@ function RouteComponent() {
 				? (workflows[selectedWorkflowId]?.name ?? "(unnamed workflow)")
 				: null,
 			riskResult,
+			documentRequirements: normalizedRequirements,
 			disbursementType: "FULL",
 			partialInterestRate: null,
 			disbursementDestinations: mappedDestinations,
@@ -602,20 +616,11 @@ function RouteComponent() {
 				)}
 			</section>
 
-			{/* Document Setup */}
-			{riskResult && (
-				<section className="border p-4 rounded mb-6">
-					<h2 className="font-semibold mb-2">Required Documents</h2>
-					<div className="text-sm text-gray-700 mb-2">
-						Risk Grade: {riskResult.riskGrade}
-					</div>
-					<ul className="list-disc ml-6">
-						{riskResult.minDocs.map((doc) => (
-							<li key={doc}>{doc}</li>
-						))}
-					</ul>
-				</section>
-			)}
+			<DocumentRequirementsSection
+				riskResult={riskResult}
+				requirements={documentRequirements}
+				onChangeRequirements={setDocumentRequirements}
+			/>
 
 			{/* Bureau */}
 			<section className="border p-4 rounded mb-6">

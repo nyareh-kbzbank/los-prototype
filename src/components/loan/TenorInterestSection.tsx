@@ -1,9 +1,9 @@
-import { type ChangeEvent, useState } from "react";
 import { ChevronRight, Trash2 } from "lucide-react";
+import { type ChangeEvent, useState } from "react";
 import {
-	TenorUnit,
 	type InterestRatePlan,
 	type LoanProduct,
+	TenorUnit,
 } from "@/lib/loan-setup-store";
 
 interface TenorInterestSectionProps {
@@ -62,16 +62,14 @@ function TenorInterestSection(props: TenorInterestSectionProps) {
 		onInterestPlansChange(interestPlans.filter((_, idx) => idx !== index));
 	};
 
-	const handlePlanTypeChange = (
-		index: number,
-		field: "interestType" | "rateType",
-	) =>
+	const handlePlanTypeChange =
+		(index: number, field: "interestType" | "rateType") =>
 		(e: ChangeEvent<HTMLSelectElement>) => {
 			updatePlan(index, (plan) => ({ ...plan, [field]: e.target.value }));
 		};
 
-	const handleBaseRateChange = (index: number) =>
-		(e: ChangeEvent<HTMLInputElement>) => {
+	const handleBaseRateChange =
+		(index: number) => (e: ChangeEvent<HTMLInputElement>) => {
 			const parsed = Number(e.target.value);
 			updatePlan(index, (plan) => ({
 				...plan,
@@ -91,11 +89,12 @@ function TenorInterestSection(props: TenorInterestSectionProps) {
 		}));
 	};
 
-	const updateParameter = (
-		planIndex: number,
-		paramIndex: number,
-		field: "name" | "value" | "interestRate",
-	) =>
+	const updateParameter =
+		(
+			planIndex: number,
+			paramIndex: number,
+			field: "name" | "value" | "interestRate",
+		) =>
 		(e: ChangeEvent<HTMLInputElement>) => {
 			const rawValue =
 				field === "name" ? e.target.value : Number(e.target.value);
@@ -145,16 +144,15 @@ function TenorInterestSection(props: TenorInterestSectionProps) {
 		}));
 	};
 
-	const updatePolicy = (
-		planIndex: number,
-		policyIndex: number,
-		field: "interestCategory" | "interestRate",
-	) =>
+	const updatePolicy =
+		(
+			planIndex: number,
+			policyIndex: number,
+			field: "interestCategory" | "interestRate",
+		) =>
 		(e: ChangeEvent<HTMLInputElement>) => {
 			const rawValue =
-				field === "interestCategory"
-					? e.target.value
-					: Number(e.target.value);
+				field === "interestCategory" ? e.target.value : Number(e.target.value);
 			updatePlan(planIndex, (plan) => {
 				const nextPolicies = [...(plan.policies ?? [])];
 				const target = nextPolicies[policyIndex];
@@ -269,8 +267,8 @@ function TenorInterestSection(props: TenorInterestSectionProps) {
 						<div className="border-t p-3 bg-white text-sm space-y-3">
 							<div className="flex items-center justify-between">
 								<p className="text-xs text-gray-600">
-									Configure base rate, parameter overrides, and policies to match
-									`interestRatePlans`.
+									Configure base rate, parameter overrides, and policies to
+									match `interestRatePlans`.
 								</p>
 								<button
 									type="button"
@@ -286,192 +284,255 @@ function TenorInterestSection(props: TenorInterestSectionProps) {
 								</div>
 							) : (
 								<div className="flex flex-col gap-3">
-									{interestPlans.map((plan, planIdx) => (
-										// biome-ignore lint/suspicious/noArrayIndexKey: ordered list managed by user actions
-										<div key={planIdx} className="border rounded-md p-3 space-y-3">
-											<div className="flex items-center justify-between">
-												<div>
-													<div className="text-sm font-semibold">
-														Plan {planIdx + 1}
-													</div>
-													<div className="text-xs text-gray-500">
-														{plan.interestType} - {plan.rateType}
-													</div>
-												</div>
-												{interestPlans.length > 1 && (
-													<button
-														type="button"
-														onClick={() => removeInterestPlan(planIdx)}
-														className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-md transition-colors"
-														title="Remove plan"
-													>
-														<Trash2 className="w-4 h-4" />
-													</button>
-												)}
-											</div>
-											<div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-												<label className="flex flex-col gap-1">
-													<span className="text-xs text-gray-600">Interest Type</span>
-													<select
-														value={plan.interestType}
-														onChange={handlePlanTypeChange(planIdx, "interestType")}
-														className="border px-2 py-1 rounded"
-													>
-														{["REDUCING", "FLAT"].map((option) => (
-															<option key={option} value={option}>
-																{option}
-															</option>
-														))}
-													</select>
-												</label>
-												<label className="flex flex-col gap-1">
-													<span className="text-xs text-gray-600">Rate Type</span>
-													<select
-														value={plan.rateType}
-														onChange={handlePlanTypeChange(planIdx, "rateType")}
-														className="border px-2 py-1 rounded"
-													>
-														{["FIXED", "FLOATING"].map((option) => (
-															<option key={option} value={option}>
-																{option}
-															</option>
-														))}
-													</select>
-												</label>
-												<label className="flex flex-col gap-1">
-													<span className="text-xs text-gray-600">Base Rate (%)</span>
-													<input
-														type="number"
-														step="0.1"
-														min={0}
-														value={plan.baseRate}
-														onChange={handleBaseRateChange(planIdx)}
-														className="border px-2 py-1 rounded"
-													/>
-												</label>
-											</div>
-											<div className="space-y-2">
+									{interestPlans.map((plan, planIdx) => {
+										const baseRateLabel =
+											plan.rateType === "FLOATING"
+												? "Base Rate (%)"
+												: "Interest Rate";
+										return (
+											// biome-ignore lint/suspicious/noArrayIndexKey: ordered list managed by user actions
+											<div
+												key={planIdx}
+												className="border rounded-md p-3 space-y-3"
+											>
 												<div className="flex items-center justify-between">
-													<span className="text-xs text-gray-600">Parameters</span>
-													<button
-														type="button"
-														onClick={() => addParameter(planIdx)}
-														className="text-xs border px-2 py-1 rounded hover:bg-gray-50"
-													>
-														Add Parameter
-													</button>
+													<div>
+														<div className="text-sm font-semibold">
+															Plan {planIdx + 1}
+														</div>
+														<div className="text-xs text-gray-500">
+															{plan.interestType} - {plan.rateType}
+														</div>
+													</div>
+													{interestPlans.length > 1 && (
+														<button
+															type="button"
+															onClick={() => removeInterestPlan(planIdx)}
+															className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-md transition-colors"
+															title="Remove plan"
+														>
+															<Trash2 className="w-4 h-4" />
+														</button>
+													)}
 												</div>
-												{(plan.config?.parameters ?? []).length === 0 ? (
-													<div className="text-xs text-gray-500 border border-dashed rounded p-2">
-														No parameter overrides. Will use base rate.
-													</div>
-												) : (
-													<div className="space-y-2">
-														{(plan.config?.parameters ?? []).map((parameter, paramIdx) => (
-															// biome-ignore lint/suspicious/noArrayIndexKey: ordered list managed by user actions
-															<div
-																key={paramIdx}
-																className="grid grid-cols-1 md:grid-cols-4 gap-2 items-end"
-															>
-																<label className="flex flex-col gap-1">
-																	<span className="text-xs text-gray-600">Name</span>
-																	<input
-																		type="text"
-																		value={parameter.name}
-																		onChange={updateParameter(planIdx, paramIdx, "name")}
-																		className="border px-2 py-1 rounded"
-																	/>
-																</label>
-																<label className="flex flex-col gap-1">
-																	<span className="text-xs text-gray-600">Value</span>
-																	<input
-																		type="number"
-																		value={parameter.value}
-																		min={0}
-																		onChange={updateParameter(planIdx, paramIdx, "value")}
-																		className="border px-2 py-1 rounded"
-																	/>
-																</label>
-																<label className="flex flex-col gap-1">
-																	<span className="text-xs text-gray-600">Interest Rate (%)</span>
-																	<input
-																		type="number"
-																		step="0.1"
-																		value={parameter.interestRate}
-																		onChange={updateParameter(planIdx, paramIdx, "interestRate")}
-																		className="border px-2 py-1 rounded"
-																	/>
-																</label>
-																<button
-																	type="button"
-																	onClick={() => removeParameter(planIdx, paramIdx)}
-																	className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-md transition-colors"
-																	title="Remove parameter"
-																>
-																	<Trash2 className="w-4 h-4" />
-																</button>
-															</div>
-														))}
-													</div>
-												)}
-											</div>
-											<div className="space-y-2">
-												<div className="flex items-center justify-between">
-													<span className="text-xs text-gray-600">Policies</span>
-													<button
-														type="button"
-														onClick={() => addPolicy(planIdx)}
-														className="text-xs border px-2 py-1 rounded hover:bg-gray-50"
-													>
-														Add Policy
-													</button>
+												<div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+													<label className="flex flex-col gap-1">
+														<span className="text-xs text-gray-600">
+															Interest Type
+														</span>
+														<select
+															value={plan.interestType}
+															onChange={handlePlanTypeChange(
+																planIdx,
+																"interestType",
+															)}
+															className="border px-2 py-1 rounded"
+														>
+															{["REDUCING", "FLAT"].map((option) => (
+																<option key={option} value={option}>
+																	{option}
+																</option>
+															))}
+														</select>
+													</label>
+													<label className="flex flex-col gap-1">
+														<span className="text-xs text-gray-600">
+															Rate Type
+														</span>
+														<select
+															value={plan.rateType}
+															onChange={handlePlanTypeChange(
+																planIdx,
+																"rateType",
+															)}
+															className="border px-2 py-1 rounded"
+														>
+															{["FIXED", "FLOATING"].map((option) => (
+																<option key={option} value={option}>
+																	{option}
+																</option>
+															))}
+														</select>
+													</label>
+													<label className="flex flex-col gap-1">
+														<span className="text-xs text-gray-600">
+															{baseRateLabel}
+														</span>
+														<input
+															type="number"
+															step="0.1"
+															min={0}
+															value={plan.baseRate}
+															onChange={handleBaseRateChange(planIdx)}
+															className="border px-2 py-1 rounded"
+														/>
+													</label>
 												</div>
-												{(plan.policies ?? []).length === 0 ? (
-													<div className="text-xs text-gray-500 border border-dashed rounded p-2">
-														No policies attached.
+												<div className="space-y-2">
+													<div className="flex items-center justify-between">
+														<span className="text-xs text-gray-600">
+															Parameters
+														</span>
+														<button
+															type="button"
+															onClick={() => addParameter(planIdx)}
+															className="text-xs border px-2 py-1 rounded hover:bg-gray-50"
+														>
+															Add Parameter
+														</button>
 													</div>
-												) : (
-													<div className="space-y-2">
-														{(plan.policies ?? []).map((policy, policyIdx) => (
-															// biome-ignore lint/suspicious/noArrayIndexKey: ordered list managed by user actions
-															<div
-																key={policyIdx}
-																className="grid grid-cols-1 md:grid-cols-3 gap-2 items-end"
-															>
-																<label className="flex flex-col gap-1">
-																	<span className="text-xs text-gray-600">Category</span>
-																	<input
-																		type="text"
-																		value={policy.interestCategory}
-																		onChange={updatePolicy(planIdx, policyIdx, "interestCategory")}
-																		className="border px-2 py-1 rounded"
-																	/>
-																</label>
-																<label className="flex flex-col gap-1">
-																	<span className="text-xs text-gray-600">Interest Rate (%)</span>
-																	<input
-																		type="number"
-																		step="0.1"
-																		value={policy.interestRate}
-																		onChange={updatePolicy(planIdx, policyIdx, "interestRate")}
-																		className="border px-2 py-1 rounded"
-																	/>
-																</label>
-																<button
-																	type="button"
-																	onClick={() => removePolicy(planIdx, policyIdx)}
-																	className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-md transition-colors"
-																	title="Remove policy"
-																>
-																	<Trash2 className="w-4 h-4" />
-																</button>
-															</div>
-														))}
+													{(plan.config?.parameters ?? []).length === 0 ? (
+														<div className="text-xs text-gray-500 border border-dashed rounded p-2">
+															No parameter overrides. Will use base rate.
+														</div>
+													) : (
+														<div className="space-y-2">
+															{(plan.config?.parameters ?? []).map(
+																(parameter, paramIdx) => (
+																	// biome-ignore lint/suspicious/noArrayIndexKey: ordered list managed by user actions
+																	<div
+																		key={paramIdx}
+																		className="grid grid-cols-1 md:grid-cols-4 gap-2 items-end"
+																	>
+																		<label className="flex flex-col gap-1">
+																			<span className="text-xs text-gray-600">
+																				Name
+																			</span>
+																			<input
+																				type="text"
+																				value={parameter.name}
+																				onChange={updateParameter(
+																					planIdx,
+																					paramIdx,
+																					"name",
+																				)}
+																				className="border px-2 py-1 rounded"
+																			/>
+																		</label>
+																		<label className="flex flex-col gap-1">
+																			<span className="text-xs text-gray-600">
+																				Value
+																			</span>
+																			<input
+																				type="number"
+																				value={parameter.value}
+																				min={0}
+																				onChange={updateParameter(
+																					planIdx,
+																					paramIdx,
+																					"value",
+																				)}
+																				className="border px-2 py-1 rounded"
+																			/>
+																		</label>
+																		<label className="flex flex-col gap-1">
+																			<span className="text-xs text-gray-600">
+																				Interest Rate (%)
+																			</span>
+																			<input
+																				type="number"
+																				step="0.1"
+																				value={parameter.interestRate}
+																				onChange={updateParameter(
+																					planIdx,
+																					paramIdx,
+																					"interestRate",
+																				)}
+																				className="border px-2 py-1 rounded"
+																			/>
+																		</label>
+																		<button
+																			type="button"
+																			onClick={() =>
+																				removeParameter(planIdx, paramIdx)
+																			}
+																			className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-md transition-colors"
+																			title="Remove parameter"
+																		>
+																			<Trash2 className="w-4 h-4" />
+																		</button>
+																	</div>
+																),
+															)}
+														</div>
+													)}
+												</div>
+												<div className="space-y-2">
+													<div className="flex items-center justify-between">
+														<span className="text-xs text-gray-600">
+															Policies
+														</span>
+														<button
+															type="button"
+															onClick={() => addPolicy(planIdx)}
+															className="text-xs border px-2 py-1 rounded hover:bg-gray-50"
+														>
+															Add Policy
+														</button>
 													</div>
-												)}
+													{(plan.policies ?? []).length === 0 ? (
+														<div className="text-xs text-gray-500 border border-dashed rounded p-2">
+															No policies attached.
+														</div>
+													) : (
+														<div className="space-y-2">
+															{(plan.policies ?? []).map(
+																(policy, policyIdx) => (
+																	// biome-ignore lint/suspicious/noArrayIndexKey: ordered list managed by user actions
+																	<div
+																		key={policyIdx}
+																		className="grid grid-cols-1 md:grid-cols-3 gap-2 items-end"
+																	>
+																		<label className="flex flex-col gap-1">
+																			<span className="text-xs text-gray-600">
+																				Category
+																			</span>
+																			<input
+																				type="text"
+																				value={policy.interestCategory}
+																				onChange={updatePolicy(
+																					planIdx,
+																					policyIdx,
+																					"interestCategory",
+																				)}
+																				className="border px-2 py-1 rounded"
+																			/>
+																		</label>
+																		<label className="flex flex-col gap-1">
+																			<span className="text-xs text-gray-600">
+																				Interest Rate (%)
+																			</span>
+																			<input
+																				type="number"
+																				step="0.1"
+																				value={policy.interestRate}
+																				onChange={updatePolicy(
+																					planIdx,
+																					policyIdx,
+																					"interestRate",
+																				)}
+																				className="border px-2 py-1 rounded"
+																			/>
+																		</label>
+																		<button
+																			type="button"
+																			onClick={() =>
+																				removePolicy(planIdx, policyIdx)
+																			}
+																			className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-md transition-colors"
+																			title="Remove policy"
+																		>
+																			<Trash2 className="w-4 h-4" />
+																		</button>
+																	</div>
+																),
+															)}
+														</div>
+													)}
+												</div>
 											</div>
-										</div>
-									))}
+										);
+									})}
 								</div>
 							)}
 						</div>

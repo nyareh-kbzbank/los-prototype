@@ -2,6 +2,8 @@ import type { Operator, Rule, ScoreCard } from "./scorecard-store";
 
 export type FieldKind = "number" | "boolean" | "string";
 export type Scalar = string | number | boolean;
+export type RiskGrade = "LOW" | "MEDIUM" | "HIGH";
+export const RISK_GRADES: RiskGrade[] = ["LOW", "MEDIUM", "HIGH"];
 
 export type TestBreakdownItem = Rule & {
 	fieldDescription: string;
@@ -14,8 +16,7 @@ export type ScoreEngineResult = {
 	maxScore: number;
 	totalScore: number;
 	matchedRules: number;
-	riskGrade: "LOW" | "MEDIUM" | "HIGH";
-	minDocs: string[];
+	riskGrade: RiskGrade;
 	breakdown: TestBreakdownItem[];
 };
 
@@ -191,18 +192,11 @@ export const evaluateScoreCard = (
 	// Keep the same UX as the loan page: map score -> grade/docs.
 	const lowCutoff = scoreCard.maxScore * 0.6;
 	const mediumCutoff = scoreCard.maxScore * 0.4;
-	let riskGrade: "LOW" | "MEDIUM" | "HIGH" = "HIGH";
+	let riskGrade: RiskGrade = "HIGH";
 	if (totalScore >= lowCutoff) {
 		riskGrade = "LOW";
 	} else if (totalScore >= mediumCutoff) {
 		riskGrade = "MEDIUM";
-	}
-
-	let minDocs: string[] = ["NRC", "PAYSLIP", "BANK_STATEMENT", "GUARANTOR"];
-	if (riskGrade === "LOW") {
-		minDocs = ["NRC", "PAYSLIP"];
-	} else if (riskGrade === "MEDIUM") {
-		minDocs = ["NRC", "PAYSLIP", "BANK_STATEMENT"];
 	}
 
 	return {
@@ -210,7 +204,6 @@ export const evaluateScoreCard = (
 		totalScore,
 		matchedRules,
 		riskGrade,
-		minDocs,
 		breakdown,
 	};
 };

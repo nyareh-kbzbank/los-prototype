@@ -7,15 +7,37 @@
 	"settings": {
 		"[tsx]": { "editor.defaultFormatter": "biomejs.biome" },
 		"editor.codeActionsOnSave": { "source.organizeImports": "never" }
-	},"launch": {
-    "version": "0.2.0",
-    "configurations": [{
-      "name": "Launch Chrome",
-      "request": "launch",
-      "type": "chrome",
-      "url": "http://localhost:3000",
-      "webRoot": "${workspaceFolder}"
-    }],
-    "compounds": []
-  }
+	},
+	"launch": {
+		"version": "0.2.0",
+		"configurations": [
+			{
+				"name": "Launch Chrome",
+				"request": "launch",
+				"type": "chrome",
+				"url": "http://localhost:3000",
+				"webRoot": "${workspaceFolder}"
+			}
+		],
+		"compounds": []
+	},
+	"tasks": {
+		"version": "2.0.0",
+		"tasks": [
+			{
+				"label": "Run App Server",
+				"command": "npm run dev",
+				"type": "shell",
+				"args": [],
+				"problemMatcher": ["$tsc"],
+				"runOptions": {
+					"runOn": "folderOpen"
+				},
+				"presentation": {
+					"reveal": "silent"
+				},
+				"group": "build"
+			}
+		]
+	}
 }
