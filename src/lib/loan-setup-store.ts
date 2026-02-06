@@ -16,14 +16,90 @@ export interface LoanTenor {
 	TenorUnit: TenorUnit;
 }
 
+export const INTEREST_TYPES = ["REDUCING", "FLAT"] as const;
+export type InterestType = (typeof INTEREST_TYPES)[number];
+
+export const RATE_TYPES = ["FIXED", "FLOATING"] as const;
+export type RateType = (typeof RATE_TYPES)[number];
+
+export type InterestRateParameter = {
+	name: string;
+	value: number;
+	interestRate: number;
+};
+
+export type InterestRatePolicy = {
+	interestCategory: string;
+	interestRate: number;
+};
+
+export type InterestRatePlan = {
+	interestType: InterestType;
+	rateType: RateType;
+	baseRate: number;
+	config: {
+		parameters: InterestRateParameter[];
+	};
+	policies: InterestRatePolicy[];
+};
+
 export type LoanProduct = {
 	productCode: string;
 	productName: string;
 	minAmount: number;
 	maxAmount: number;
 	loanTenor: LoanTenor;
-	baseInterestRate: number;
+	baseInterestRate?: number;
+	interestRatePlans?: InterestRatePlan[];
 };
+
+const cloneInterestRatePlan = (plan: InterestRatePlan): InterestRatePlan => ({
+	interestType: plan.interestType,
+	rateType: plan.rateType,
+	baseRate: plan.baseRate,
+	config: {
+		parameters: (plan.config?.parameters ?? []).map((parameter) => ({
+			name: parameter.name,
+			value: parameter.value,
+			interestRate: parameter.interestRate,
+		})),
+	},
+	policies: (plan.policies ?? []).map((policy) => ({
+		interestCategory: policy.interestCategory,
+		interestRate: policy.interestRate,
+	})),
+});
+
+const createEmptyInterestRatePlan = (baseRate = 0): InterestRatePlan => ({
+	interestType: "REDUCING",
+	rateType: "FIXED",
+	baseRate,
+	config: { parameters: [] },
+	policies: [],
+});
+
+const normalizeInterestPlans = (product: LoanProduct): InterestRatePlan[] => {
+	const hasPlans = product.interestRatePlans && product.interestRatePlans.length > 0;
+	if (hasPlans) {
+		return (product.interestRatePlans ?? []).map(cloneInterestRatePlan);
+	}
+	const fallbackRate =
+		typeof product.baseInterestRate === "number" ? product.baseInterestRate : 0;
+	return [cloneInterestRatePlan(createEmptyInterestRatePlan(fallbackRate))];
+};
+
+export function cloneLoanProduct(product: LoanProduct): LoanProduct {
+	const normalizedPlans = normalizeInterestPlans(product);
+	return {
+		...product,
+		loanTenor: {
+			...product.loanTenor,
+			TenorValue: [...product.loanTenor.TenorValue],
+		},
+		interestRatePlans: normalizedPlans,
+		baseInterestRate: normalizedPlans[0]?.baseRate ?? product.baseInterestRate,
+	};
+}
 
 export type ChannelConfig = {
 	name: string;
@@ -98,13 +174,7 @@ export const useLoanSetupStore = create<LoanWorkflowState>()(
 				const entry: LoanWorkflowSnapshot = {
 					id: uuidV4(),
 					createdAt: Date.now(),
-					product: {
-						...input.product,
-						loanTenor: {
-							...input.product.loanTenor,
-							TenorValue: [...input.product.loanTenor.TenorValue],
-						},
-					},
+					product: cloneLoanProduct(input.product),
 					channels,
 					scorecardId: input.scorecardId ?? null,
 					scorecardName: input.scorecardName ?? null,
@@ -151,13 +221,7 @@ export const useLoanSetupStore = create<LoanWorkflowState>()(
 
 				const updated: LoanWorkflowSnapshot = {
 					...current,
-					product: {
-						...input.product,
-						loanTenor: {
-							...input.product.loanTenor,
-							TenorValue: [...input.product.loanTenor.TenorValue],
-						},
-					},
+					product: cloneLoanProduct(input.product),
 					channels,
 					scorecardId: input.scorecardId ?? null,
 					scorecardName: input.scorecardName ?? null,
@@ -194,7 +258,31 @@ export const useLoanSetupStore = create<LoanWorkflowState>()(
 		}),
 		{
 			name: "loan-workflow-setups",
-			version: 1,
+			version: 2,
+			migrate: (persistedState: any, version) => {
+				if (!persistedState) return { setups: {} };
+				if (version >= 2) return persistedState;
+				const storedSetups = (persistedState.setups ?? {}) as Record<
+					string,
+					LoanWorkflowSnapshot
+				>;
+				const upgradedEntries = Object.entries(storedSetups).map(
+					([id, snapshot]) => {
+						if (!snapshot?.product) return [id, snapshot];
+						return [
+							id,
+							{
+								...snapshot,
+								product: cloneLoanProduct(snapshot.product),
+							},
+						];
+					},
+				);
+				return {
+					...persistedState,
+					setups: Object.fromEntries(upgradedEntries),
+				};
+			},
 			partialize: (state) => ({ setups: state.setups }),
 		},
 	),

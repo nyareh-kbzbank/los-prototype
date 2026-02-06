@@ -5,8 +5,10 @@ import {
 	type ChannelConfig,
 	type DisbursementDestination,
 	type DisbursementDestinationType,
+	type InterestRatePlan,
 	type LoanProduct,
 	TenorUnit,
+	cloneLoanProduct,
 	useLoanSetupStore,
 } from "@/lib/loan-setup-store";
 import {
@@ -20,6 +22,7 @@ import {
 } from "@/lib/scorecard-engine";
 import { type Rule, useScoreCardStore } from "@/lib/scorecard-store";
 import { getWorkflowList, useWorkflowStore } from "@/lib/workflow-store";
+import TenorInterestSection from "@/components/loan/TenorInterestSection";
 
 export const Route = createFileRoute("/loan/setup/$setupId")({
 	component: RouteComponent,
@@ -39,6 +42,22 @@ const loanProductSetup: LoanProduct = {
 		TenorValue: [6, 12, 18, 24],
 	},
 	baseInterestRate: 18.5,
+	interestRatePlans: [
+		{
+			interestType: "REDUCING",
+			rateType: "FIXED",
+			baseRate: 18.5,
+			config: {
+				parameters: [
+					{ name: "DOWN_PAYMENT", value: 30, interestRate: 10 },
+					{ name: "DOWN_PAYMENT", value: 40, interestRate: 12 },
+				],
+			},
+			policies: [
+				{ interestCategory: "OUTSTANDING", interestRate: 1.9 },
+			],
+		},
+	],
 };
 
 function RouteComponent() {
@@ -70,7 +89,9 @@ function RouteComponent() {
 	}, [scoreCards]);
 	const activeScoreCard = configuredScoreCard ?? configuredScoreCardFallback;
 
-	const [product, setProduct] = useState(loanProductSetup);
+	const [product, setProduct] = useState<LoanProduct>(() =>
+		cloneLoanProduct(loanProductSetup),
+	);
 	const [scoreInputs, setScoreInputs] = useState<Record<string, string>>({});
 	const [riskResult, setRiskResult] = useState<ScoreEngineResult | null>(null);
 	const [channels, setChannels] = useState<ChannelConfig[]>([
@@ -114,7 +135,7 @@ function RouteComponent() {
 
 	useEffect(() => {
 		if (setup) {
-			setProduct(setup.product);
+			setProduct(cloneLoanProduct(setup.product));
 			if (setup.scorecardId) {
 				selectScoreCard(setup.scorecardId);
 			}
@@ -144,7 +165,7 @@ function RouteComponent() {
 		};
 
 	const handleNumberChange =
-		(field: "minAmount" | "maxAmount" | "baseInterestRate") =>
+		(field: "minAmount" | "maxAmount") =>
 		(e: ChangeEvent<HTMLInputElement>) => {
 			const { value } = e.target;
 			const parsed = Number(value);
@@ -238,8 +259,18 @@ function RouteComponent() {
 		});
 	};
 
+	const updateInterestPlans = (plans: InterestRatePlan[]) => {
+		setProduct((prev) => ({
+			...prev,
+			interestRatePlans: plans,
+			baseInterestRate: plans[0]?.baseRate ?? prev.baseInterestRate,
+		}));
+	};
+
+	const primaryInterestPlan = product.interestRatePlans?.[0];
+
 	const resetProduct = () => {
-		setProduct(loanProductSetup);
+		setProduct(cloneLoanProduct(loanProductSetup));
 	};
 
 	const addChannelRow = () => {
@@ -302,7 +333,7 @@ function RouteComponent() {
 			bureauProvider: bureauRequired ? bureauProvider : undefined,
 			bureauPurpose: bureauRequired ? bureauPurpose : undefined,
 			bureauConsentRequired: bureauRequired ? bureauConsentRequired : undefined,
-      bureauCheckRequired: bureauRequired
+			bureauCheckRequired: bureauRequired,
 		};
 
 		if (setupId) {
@@ -386,67 +417,14 @@ function RouteComponent() {
 							className="border px-2 py-1 rounded"
 						/>
 					</label>
-					<div className="flex flex-col gap-1 text-sm md:col-span-2">
-						<div className="flex items-center justify-between">
-							<span>Tenor Configuration</span>
-							<button
-								type="button"
-								onClick={addTenureValue}
-								className="text-sm border px-2 py-1 rounded hover:bg-gray-100"
-							>
-								Add Value
-							</button>
-						</div>
-						<div className="flex flex-col gap-2 border rounded p-3 bg-gray-50">
-							<div className="flex flex-col gap-1">
-								<span className="text-xs text-gray-600">Unit</span>
-								<select
-									value={product.loanTenor.TenorUnit}
-									onChange={updateTenureUnit}
-									className="border px-2 py-1 rounded w-full md:w-1/2"
-								>
-									{Object.values(TenorUnit).map((u) => (
-										<option key={u} value={u}>
-											{u}
-										</option>
-									))}
-								</select>
-							</div>
-							<div className="grid grid-cols-2 gap-3">
-								{product.loanTenor.TenorValue.map((val, idx) => (
-									// biome-ignore lint/suspicious/noArrayIndexKey: simple list
-									<div key={idx} className="flex items-center gap-2">
-										<input
-											type="number"
-											value={val}
-											onChange={updateTenureValue(idx)}
-											className="border px-2 py-1 rounded w-full"
-											min="0"
-										/>
-										<button
-											onClick={() => removeTenureValue(idx)}
-											className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-md transition-colors"
-											type="button"
-											title="Remove"
-										>
-											<Trash2 className="w-4 h-4" />
-										</button>
-									</div>
-								))}
-							</div>
-						</div>
-					</div>
-					<label className="flex flex-col gap-1 text-sm">
-						<span>Base Interest Rate (%)</span>
-						<input
-							type="number"
-							step="0.1"
-							min={0}
-							value={product.baseInterestRate}
-							onChange={handleNumberChange("baseInterestRate")}
-							className="border px-2 py-1 rounded"
-						/>
-					</label>
+					<TenorInterestSection
+						product={product}
+						onUpdateTenureUnit={updateTenureUnit}
+						onAddTenureValue={addTenureValue}
+						onUpdateTenureValue={updateTenureValue}
+						onRemoveTenureValue={removeTenureValue}
+						onInterestPlansChange={updateInterestPlans}
+					/>
 				</div>
 
 				<div className="bg-gray-50 border rounded p-3 text-sm mt-4">
@@ -477,7 +455,11 @@ function RouteComponent() {
 						</div>
 						<div>
 							<dt className="text-gray-600">Base Rate</dt>
-							<dd className="font-mono">{product.baseInterestRate}%</dd>
+							<dd className="font-mono">
+								{primaryInterestPlan
+									? `${primaryInterestPlan.baseRate}% (${primaryInterestPlan.interestType} - ${primaryInterestPlan.rateType})`
+									: "—"}
+							</dd>
 						</div>
 					</dl>
 				</div>
