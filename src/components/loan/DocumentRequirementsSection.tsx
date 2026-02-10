@@ -5,6 +5,8 @@ import {
 	useMemo,
 	useState,
 } from "react";
+import type { MultiValue } from "react-select";
+import CreatableSelect from "react-select/creatable";
 import { DEFAULT_REQUIRED_DOCUMENTS } from "@/lib/loan-setup-store";
 import {
 	RISK_GRADES,
@@ -24,10 +26,45 @@ const QUICK_DOC_OPTIONS = Array.from(
 	]),
 );
 
+const DEFAULT_MIN_AMOUNT = 0;
+const DEFAULT_MAX_AMOUNT = 50000000;
+
+const normalizeDocumentTypeId = (value: string) => {
+	const trimmed = value.trim();
+	if (!trimmed) return trimmed;
+	return trimmed.startsWith("DOC-") ? trimmed : `DOC-${trimmed}`;
+};
+
+const formatDocumentLabel = (value: string) =>
+	value.startsWith("DOC-") ? value.slice(4) : value;
+
+type DocumentOption = {
+	value: string;
+	label: string;
+};
+
+const DOCUMENT_OPTIONS: DocumentOption[] = QUICK_DOC_OPTIONS.map((doc) => {
+	const normalized = normalizeDocumentTypeId(doc);
+	return {
+		value: normalized,
+		label: formatDocumentLabel(normalized),
+	};
+});
+
 export type DocumentRequirementItem = {
 	id: string;
 	grade: RiskGrade;
-	documents: string[];
+	documents: DocumentRequirementDocument[];
+};
+
+export type DocumentRequirementDocument = {
+	id: string;
+	documentTypeId: string;
+	minAmount: number;
+	maxAmount: number;
+	employmentType: string | null;
+	collateralRequired: boolean;
+	isMandatory: boolean;
 };
 
 const generateRequirementId = () =>
@@ -35,13 +72,35 @@ const generateRequirementId = () =>
 		? crypto.randomUUID()
 		: Math.random().toString(36).slice(2);
 
+export const createDocumentRequirementDocument = (
+	documentTypeId: string,
+	overrides?: Partial<DocumentRequirementDocument>,
+): DocumentRequirementDocument => ({
+	id: generateRequirementId(),
+	documentTypeId: normalizeDocumentTypeId(documentTypeId),
+	minAmount: DEFAULT_MIN_AMOUNT,
+	maxAmount: DEFAULT_MAX_AMOUNT,
+	employmentType: null,
+	collateralRequired: false,
+	isMandatory: true,
+	...overrides,
+});
+
 export const createDocumentRequirementItem = (
 	grade: RiskGrade,
-	documents: string[],
+	documents: Array<string | DocumentRequirementDocument>,
 ): DocumentRequirementItem => ({
 	id: generateRequirementId(),
 	grade,
-	documents: [...documents],
+	documents: documents.map((document) =>
+		typeof document === "string"
+			? createDocumentRequirementDocument(document)
+			: {
+					...document,
+					id: document.id || generateRequirementId(),
+					documentTypeId: normalizeDocumentTypeId(document.documentTypeId),
+				},
+	),
 });
 
 interface DocumentRequirementsSectionProps {
@@ -50,13 +109,18 @@ interface DocumentRequirementsSectionProps {
 	onChangeRequirements: Dispatch<SetStateAction<DocumentRequirementItem[]>>;
 }
 
-function DocumentRequirementsSection(props: DocumentRequirementsSectionProps) {
+function DocumentRequirementsSection(
+	props: Readonly<DocumentRequirementsSectionProps>,
+) {
 	const { riskResult, requirements, onChangeRequirements } = props;
 	const [draftGrade, setDraftGrade] = useState<RiskGrade>("LOW");
-	const [draftDocuments, setDraftDocuments] = useState<string[]>([
-		...DEFAULT_REQUIRED_DOCUMENTS,
-	]);
-	const [customDocument, setCustomDocument] = useState("");
+	const [draftDocuments, setDraftDocuments] = useState<
+		DocumentRequirementDocument[]
+	>(() =>
+		DEFAULT_REQUIRED_DOCUMENTS.map((doc) =>
+			createDocumentRequirementDocument(doc),
+		),
+	);
 	const [editingId, setEditingId] = useState<string | null>(null);
 	const editingRequirement = editingId
 		? (requirements.find((requirement) => requirement.id === editingId) ?? null)
@@ -70,7 +134,7 @@ function DocumentRequirementsSection(props: DocumentRequirementsSectionProps) {
 	}, [requirements]);
 	const availableGrades = useMemo(() => {
 		return RISK_GRADES.filter((grade) => {
-			if (editingRequirement && editingRequirement.grade === grade) {
+			if (editingRequirement?.grade === grade) {
 				return true;
 			}
 			return !blockedGradeSet.has(grade);
@@ -91,51 +155,48 @@ function DocumentRequirementsSection(props: DocumentRequirementsSectionProps) {
 		setDraftGrade(availableGrades[0]);
 	}, [editingId, draftGrade, blockedGradeSet, availableGrades]);
 
-	const dedupeDocs = (docs: string[]) => {
-		const seen = new Set<string>();
-		return docs
-			.map((doc) => doc.trim())
-			.filter((doc) => {
-				if (!doc) return false;
-				const key = doc.toLowerCase();
-				if (seen.has(key)) return false;
-				seen.add(key);
-				return true;
-			});
-	};
+	const selectedOptions = useMemo<DocumentOption[]>(
+		() =>
+			draftDocuments.map((document) => ({
+				value: document.documentTypeId,
+				label: formatDocumentLabel(document.documentTypeId),
+			})),
+		[draftDocuments],
+	);
 
-	const toggleQuickPick = (doc: string) => {
-		const normalized = doc.trim();
-		if (!normalized) return;
-		setDraftDocuments((prev) => {
-			const exists = prev.some(
-				(item) => item.toLowerCase() === normalized.toLowerCase(),
-			);
-			if (exists) {
-				return prev.filter(
-					(item) => item.toLowerCase() !== normalized.toLowerCase(),
-				);
+	const availableOptions = useMemo<DocumentOption[]>(() => {
+		const optionMap = new Map<string, DocumentOption>();
+		for (const option of DOCUMENT_OPTIONS) {
+			optionMap.set(option.value, option);
+		}
+		for (const selected of selectedOptions) {
+			if (!optionMap.has(selected.value)) {
+				optionMap.set(selected.value, selected);
 			}
-			return [...prev, normalized];
+		}
+		return Array.from(optionMap.values());
+	}, [selectedOptions]);
+
+	const handleSelectChange = (next: MultiValue<DocumentOption>) => {
+		const nextValues = next ?? [];
+		const existingMap = new Map(
+			draftDocuments.map((document) => [document.documentTypeId, document]),
+		);
+		const nextDocuments = nextValues.map((option) => {
+			const existing = existingMap.get(option.value);
+			return existing ?? createDocumentRequirementDocument(option.value);
 		});
+		setDraftDocuments(nextDocuments);
 	};
 
-	const handleAddCustomDocument = () => {
-		const normalized = customDocument.trim();
-		if (!normalized) return;
-		setDraftDocuments((prev) => {
-			const exists = prev.some(
-				(item) => item.toLowerCase() === normalized.toLowerCase(),
-			);
-			if (exists) return prev;
-			return [...prev, normalized];
-		});
-		setCustomDocument("");
-	};
-
-	const removeDraftDocument = (doc: string) => {
+	const updateDraftDocument = (
+		id: string,
+		updates: Partial<DocumentRequirementDocument>,
+	) => {
 		setDraftDocuments((prev) =>
-			prev.filter((item) => item.toLowerCase() !== doc.toLowerCase()),
+			prev.map((document) =>
+				document.id === id ? { ...document, ...updates } : document,
+			),
 		);
 	};
 
@@ -145,27 +206,38 @@ function DocumentRequirementsSection(props: DocumentRequirementsSectionProps) {
 				? riskResult.riskGrade
 				: (availableGrades[0] ?? riskResult?.riskGrade ?? "LOW");
 		setDraftGrade(preferredGrade);
-		setDraftDocuments([...DEFAULT_REQUIRED_DOCUMENTS]);
-		setCustomDocument("");
+		setDraftDocuments(
+			DEFAULT_REQUIRED_DOCUMENTS.map((doc) =>
+				createDocumentRequirementDocument(doc),
+			),
+		);
 		setEditingId(null);
 	};
 
 	const handleSubmitRequirement = () => {
 		if (!editingId && blockedGradeSet.has(draftGrade)) return;
-		const cleanedDocs = dedupeDocs(draftDocuments);
-		if (cleanedDocs.length === 0) return;
+		if (draftDocuments.length === 0) return;
 		if (editingId) {
 			onChangeRequirements((prev) =>
 				prev.map((requirement) =>
 					requirement.id === editingId
-						? { ...requirement, grade: draftGrade, documents: cleanedDocs }
+						? {
+								...requirement,
+								grade: draftGrade,
+								documents: draftDocuments.map((document) => ({
+									...document,
+									documentTypeId: normalizeDocumentTypeId(
+										document.documentTypeId,
+									),
+								})),
+							}
 						: requirement,
 				),
 			);
 		} else {
 			const nextRequirement = createDocumentRequirementItem(
 				draftGrade,
-				cleanedDocs,
+				draftDocuments,
 			);
 			onChangeRequirements((prev) => [...prev, nextRequirement]);
 		}
@@ -177,7 +249,7 @@ function DocumentRequirementsSection(props: DocumentRequirementsSectionProps) {
 		if (!target) return;
 		setEditingId(id);
 		setDraftGrade(target.grade);
-		setDraftDocuments([...target.documents]);
+		setDraftDocuments(target.documents.map((document) => ({ ...document })));
 	};
 
 	const handleRemoveRequirement = (id: string) => {
@@ -237,52 +309,17 @@ function DocumentRequirementsSection(props: DocumentRequirementsSectionProps) {
 			) : null}
 
 			<div className="space-y-3 text-sm">
-				<div>
-					<div className="text-xs text-gray-600 mb-2">Quick picks</div>
-					<div className="flex flex-wrap gap-2">
-						{QUICK_DOC_OPTIONS.map((doc) => {
-							const active = draftDocuments.some(
-								(item) => item.toLowerCase() === doc.toLowerCase(),
-							);
-							return (
-								<button
-									key={doc}
-									type="button"
-									onClick={() => toggleQuickPick(doc)}
-									className={`px-3 py-1 rounded-full border text-xs transition ${active ? "bg-blue-600 text-white border-blue-600" : "border-gray-300 text-gray-700 hover:border-gray-500"}`}
-								>
-									{doc}
-								</button>
-							);
-						})}
-					</div>
+				<div className="flex flex-col gap-1 text-sm">
+					<span>Documents</span>
+					<CreatableSelect
+						isMulti
+						classNamePrefix="rs"
+						placeholder="Select or create document types"
+						options={availableOptions}
+						value={selectedOptions}
+						onChange={(next) => handleSelectChange(next)}
+					/>
 				</div>
-
-				<label className="flex flex-col gap-1 text-sm">
-					<span>Add custom document</span>
-					<div className="flex flex-col gap-2 md:flex-row">
-						<input
-							type="text"
-							value={customDocument}
-							onChange={(event) => setCustomDocument(event.target.value)}
-							onKeyDown={(event) => {
-								if (event.key === "Enter") {
-									event.preventDefault();
-									handleAddCustomDocument();
-								}
-							}}
-							className="border px-2 py-2 rounded flex-1"
-							placeholder="e.g., Employer letter"
-						/>
-						<button
-							type="button"
-							onClick={handleAddCustomDocument}
-							className="border px-3 py-2 rounded bg-gray-50 hover:bg-gray-100"
-						>
-							Add
-						</button>
-					</div>
-				</label>
 
 				<div>
 					<div className="text-xs text-gray-600 mb-2">
@@ -293,23 +330,88 @@ function DocumentRequirementsSection(props: DocumentRequirementsSectionProps) {
 							Add at least one supporting document before saving.
 						</p>
 					) : (
-						<ul className="flex flex-wrap gap-2">
+						<div className="space-y-3">
 							{draftDocuments.map((doc) => (
-								<li
-									key={doc}
-									className="flex items-center gap-2 border rounded-full px-3 py-1 text-xs"
-								>
-									<span>{doc}</span>
-									<button
-										type="button"
-										onClick={() => removeDraftDocument(doc)}
-										className="text-gray-500 hover:text-red-600"
-									>
-										Remove
-									</button>
-								</li>
+								<div key={doc.id} className="border rounded p-3">
+									<div className="flex items-center justify-between gap-2">
+										<div className="font-semibold">
+											{formatDocumentLabel(doc.documentTypeId)}
+										</div>
+										<div className="text-xs text-gray-500">
+											{doc.documentTypeId}
+										</div>
+									</div>
+									<div className="grid grid-cols-1 gap-3 mt-3 md:grid-cols-2">
+										<label className="flex flex-col gap-1 text-xs">
+											<span>Min amount</span>
+											<input
+												type="number"
+												value={doc.minAmount}
+												onChange={(event) =>
+													updateDraftDocument(doc.id, {
+														minAmount: Number(event.target.value),
+													})
+												}
+												className="border rounded px-2 py-1"
+											/>
+										</label>
+										<label className="flex flex-col gap-1 text-xs">
+											<span>Max amount</span>
+											<input
+												type="number"
+												value={doc.maxAmount}
+												onChange={(event) =>
+													updateDraftDocument(doc.id, {
+														maxAmount: Number(event.target.value),
+													})
+												}
+												className="border rounded px-2 py-1"
+											/>
+										</label>
+										<label className="flex flex-col gap-1 text-xs">
+											<span>Employment type</span>
+											<input
+												type="text"
+												value={doc.employmentType ?? ""}
+												onChange={(event) =>
+													updateDraftDocument(doc.id, {
+														employmentType: event.target.value.trim() || null,
+													})
+												}
+												className="border rounded px-2 py-1"
+												placeholder="Optional"
+											/>
+										</label>
+										<div className="flex flex-col gap-2 text-xs">
+											<label className="flex items-center gap-2">
+												<input
+													type="checkbox"
+													checked={doc.collateralRequired}
+													onChange={(event) =>
+														updateDraftDocument(doc.id, {
+															collateralRequired: event.target.checked,
+														})
+													}
+												/>
+												<span>Collateral required</span>
+											</label>
+											<label className="flex items-center gap-2">
+												<input
+													type="checkbox"
+													checked={doc.isMandatory}
+													onChange={(event) =>
+														updateDraftDocument(doc.id, {
+															isMandatory: event.target.checked,
+														})
+													}
+												/>
+												<span>Mandatory</span>
+											</label>
+										</div>
+									</div>
+								</div>
 							))}
-						</ul>
+						</div>
 					)}
 				</div>
 
@@ -375,16 +477,30 @@ function DocumentRequirementsSection(props: DocumentRequirementsSectionProps) {
 										</button>
 									</div>
 								</div>
-								<ul className="flex flex-wrap gap-2 mt-2 text-xs text-gray-700">
+								<div className="mt-2 space-y-2 text-xs text-gray-700">
 									{requirement.documents.map((doc) => (
-										<li
-											key={`${requirement.id}-${doc}`}
-											className="border rounded-full px-3 py-1"
+										<div
+											key={`${requirement.id}-${doc.id}`}
+											className="border rounded px-3 py-2"
 										>
-											{doc}
-										</li>
+											<div className="font-semibold">
+												{formatDocumentLabel(doc.documentTypeId)}
+											</div>
+											<div className="text-[11px] text-gray-500">
+												{doc.documentTypeId}
+											</div>
+											<div className="grid grid-cols-1 gap-2 mt-2 md:grid-cols-2">
+												<div>Min amount: {doc.minAmount}</div>
+												<div>Max amount: {doc.maxAmount}</div>
+												<div>Employment: {doc.employmentType ?? "—"}</div>
+												<div>
+													Collateral: {doc.collateralRequired ? "Yes" : "No"}
+												</div>
+												<div>Mandatory: {doc.isMandatory ? "Yes" : "No"}</div>
+											</div>
+										</div>
 									))}
-								</ul>
+								</div>
 							</div>
 						))}
 					</div>

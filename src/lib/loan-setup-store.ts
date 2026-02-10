@@ -69,18 +69,50 @@ const sanitizeDocuments = (docs?: string[]): string[] => {
 };
 
 export type DocumentRequirement = {
-	grade: RiskGrade;
-	documents: string[];
+	documentTypeId: string;
+	minAmount: number;
+	maxAmount: number;
+	employmentType: string | null;
+	collateralRequired: boolean;
+	riskGrade: RiskGrade | null;
+	isMandatory: boolean;
+};
+
+const DEFAULT_MIN_AMOUNT = 0;
+const DEFAULT_MAX_AMOUNT = 50000000;
+
+const normalizeDocumentTypeId = (value: string) => {
+	const trimmed = value.trim();
+	if (!trimmed) return trimmed;
+	return trimmed.startsWith("DOC-") ? trimmed : `DOC-${trimmed}`;
 };
 
 const sanitizeDocumentRequirement = (
 	requirement?: DocumentRequirement,
 ): DocumentRequirement | null => {
 	if (!requirement) return null;
-	const documents = sanitizeDocuments(requirement.documents);
-	if (documents.length === 0) return null;
-	const grade = requirement.grade ?? "LOW";
-	return { grade, documents };
+	const documentTypeId = normalizeDocumentTypeId(
+		requirement.documentTypeId ?? "",
+	);
+	if (!documentTypeId) return null;
+	const minAmount = Number.isFinite(requirement.minAmount)
+		? requirement.minAmount
+		: DEFAULT_MIN_AMOUNT;
+	const maxAmount = Number.isFinite(requirement.maxAmount)
+		? requirement.maxAmount
+		: DEFAULT_MAX_AMOUNT;
+	return {
+		documentTypeId,
+		minAmount,
+		maxAmount,
+		employmentType: requirement.employmentType ?? null,
+		collateralRequired: Boolean(requirement.collateralRequired),
+		riskGrade: requirement.riskGrade ?? null,
+		isMandatory:
+			requirement.isMandatory === undefined
+				? true
+				: Boolean(requirement.isMandatory),
+	};
 };
 
 const normalizeDocumentRequirements = (
@@ -88,14 +120,19 @@ const normalizeDocumentRequirements = (
 ): DocumentRequirement[] => {
 	const sanitized = (requirements ?? [])
 		.map((requirement) => sanitizeDocumentRequirement(requirement))
-		.filter((requirement): requirement is DocumentRequirement => Boolean(requirement));
+		.filter(
+			(requirement): requirement is DocumentRequirement => Boolean(requirement),
+		);
 	if (sanitized.length === 0) {
-		return [
-			{
-				grade: "LOW",
-				documents: [...DEFAULT_REQUIRED_DOCUMENTS],
-			},
-		];
+		return DEFAULT_REQUIRED_DOCUMENTS.map((doc) => ({
+			documentTypeId: normalizeDocumentTypeId(doc),
+			minAmount: DEFAULT_MIN_AMOUNT,
+			maxAmount: DEFAULT_MAX_AMOUNT,
+			employmentType: null,
+			collateralRequired: false,
+			riskGrade: "LOW",
+			isMandatory: true,
+		}));
 	}
 	return sanitized;
 };
@@ -275,8 +312,13 @@ export const useLoanSetupStore = create<LoanWorkflowState>()(
 					input.documentRequirements !== undefined
 						? normalizeDocumentRequirements(input.documentRequirements)
 						: current.documentRequirements.map((requirement) => ({
-							grade: requirement.grade,
-							documents: [...requirement.documents],
+							documentTypeId: requirement.documentTypeId,
+							minAmount: requirement.minAmount,
+							maxAmount: requirement.maxAmount,
+							employmentType: requirement.employmentType,
+							collateralRequired: requirement.collateralRequired,
+							riskGrade: requirement.riskGrade,
+							isMandatory: requirement.isMandatory,
 						}));
 
 				const updated: LoanWorkflowSnapshot = {
@@ -319,7 +361,7 @@ export const useLoanSetupStore = create<LoanWorkflowState>()(
 		}),
 		{
 			name: "loan-workflow-setups",
-			version: 4,
+			version: 5,
 			migrate: (persistedState: any, version) => {
 				if (!persistedState) return { setups: {} };
 				let nextState = persistedState;
@@ -357,25 +399,73 @@ export const useLoanSetupStore = create<LoanWorkflowState>()(
 					const upgradedEntries = Object.entries(storedSetups).map(
 						([id, snapshot]) => {
 							if (!snapshot) return [id, snapshot];
+							const legacyRequirements = snapshot.documentRequirements ??
+								(snapshot.requiredDocuments
+									? snapshot.requiredDocuments.map((doc) => ({
+											documentTypeId: normalizeDocumentTypeId(doc),
+											minAmount: DEFAULT_MIN_AMOUNT,
+											maxAmount: DEFAULT_MAX_AMOUNT,
+											employmentType: null,
+											collateralRequired: false,
+											riskGrade:
+												snapshot.documentRiskGrade ??
+												snapshot.riskGrade ??
+												"LOW",
+												isMandatory: true,
+										}))
+									: undefined);
 							const normalizedRequirements = normalizeDocumentRequirements(
-								snapshot.documentRequirements ??
-									(snapshot.requiredDocuments
-										? [
-												{
-													grade:
-														snapshot.documentRiskGrade ??
-														snapshot.riskGrade ??
-														"LOW",
-													documents: snapshot.requiredDocuments,
-												},
-										]
-									: undefined),
+								legacyRequirements,
 							);
 							return [
 								id,
 								{
 									...snapshot,
 									documentRequirements: normalizedRequirements,
+								},
+							];
+						},
+					);
+					nextState = {
+						...nextState,
+						setups: Object.fromEntries(upgradedEntries),
+					};
+				}
+				if (version < 5) {
+					const storedSetups = (nextState.setups ?? {}) as Record<
+						string,
+						LoanWorkflowSnapshot & {
+							documentRequirements?: unknown[];
+						}
+					>;
+					const upgradedEntries = Object.entries(storedSetups).map(
+						([id, snapshot]) => {
+							if (!snapshot) return [id, snapshot];
+							const legacy = snapshot.documentRequirements ?? [];
+							const converted = legacy.flatMap((entry) => {
+								if (entry && typeof entry === "object" && "documentTypeId" in entry) {
+									return [entry as DocumentRequirement];
+								}
+								const legacyEntry = entry as {
+									grade?: RiskGrade;
+									documents?: string[];
+								};
+								const grade = legacyEntry.grade ?? snapshot.riskGrade ?? "LOW";
+								return (legacyEntry.documents ?? []).map((doc: string) => ({
+									documentTypeId: normalizeDocumentTypeId(doc),
+									minAmount: DEFAULT_MIN_AMOUNT,
+									maxAmount: DEFAULT_MAX_AMOUNT,
+									employmentType: null,
+									collateralRequired: false,
+									riskGrade: grade,
+									isMandatory: true,
+								}));
+							});
+							return [
+								id,
+								{
+									...snapshot,
+									documentRequirements: normalizeDocumentRequirements(converted),
 								},
 							];
 						},

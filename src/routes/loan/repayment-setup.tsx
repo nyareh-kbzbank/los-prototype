@@ -74,7 +74,6 @@ function RouteComponent() {
 				<section className="border p-4 rounded">
 					<div className="flex items-center justify-between mb-3">
 						<h2 className="font-semibold">New repayment plan</h2>
-						<span className="text-xs text-gray-500">Persisted via Zustand</span>
 					</div>
 					<form className="space-y-3" onSubmit={handleSubmit}>
 						<div className="grid grid-cols-1 md:grid-cols-2 gap-3">

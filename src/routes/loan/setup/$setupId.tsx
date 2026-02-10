@@ -1,7 +1,9 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { type ChangeEvent, useEffect, useMemo, useState } from "react";
 import DocumentRequirementsSection, {
+	createDocumentRequirementDocument,
 	createDocumentRequirementItem,
+	type DocumentRequirementDocument,
 	type DocumentRequirementItem,
 } from "@/components/loan/DocumentRequirementsSection";
 import TenorInterestSection from "@/components/loan/TenorInterestSection";
@@ -11,6 +13,7 @@ import {
 	DEFAULT_REQUIRED_DOCUMENTS,
 	type DisbursementDestination,
 	type DisbursementDestinationType,
+	type DocumentRequirement,
 	type InterestRatePlan,
 	type LoanProduct,
 	TenorUnit,
@@ -23,6 +26,7 @@ import {
 import {
 	evaluateScoreCard,
 	inferFieldKind,
+	type RiskGrade,
 	type ScoreEngineResult,
 } from "@/lib/scorecard-engine";
 import { type Rule, useScoreCardStore } from "@/lib/scorecard-store";
@@ -138,6 +142,34 @@ function RouteComponent() {
 	const [bureauPurpose, setBureauPurpose] = useState("Credit assessment");
 	const [bureauConsentRequired, setBureauConsentRequired] = useState(true);
 
+	const groupDocumentRequirements = (
+		items: DocumentRequirement[],
+	): DocumentRequirementItem[] => {
+		const grouped = new Map<RiskGrade, DocumentRequirementDocument[]>();
+		for (const requirement of items) {
+			const grade = requirement.riskGrade ?? "LOW";
+			const nextDocument = createDocumentRequirementDocument(
+				requirement.documentTypeId,
+				{
+					minAmount: requirement.minAmount,
+					maxAmount: requirement.maxAmount,
+					employmentType: requirement.employmentType,
+					collateralRequired: requirement.collateralRequired,
+					isMandatory: requirement.isMandatory,
+				},
+			);
+			const existing = grouped.get(grade);
+			if (existing) {
+				existing.push(nextDocument);
+			} else {
+				grouped.set(grade, [nextDocument]);
+			}
+		}
+		return Array.from(grouped.entries()).map(([grade, docs]) =>
+			createDocumentRequirementItem(grade, docs),
+		);
+	};
+
 	useEffect(() => {
 		if (setup) {
 			setProduct(cloneLoanProduct(setup.product));
@@ -157,13 +189,13 @@ function RouteComponent() {
 			);
 			setDocumentRequirements(
 				setup.documentRequirements.length
-					? setup.documentRequirements.map((requirement) =>
-							createDocumentRequirementItem(
-								requirement.grade,
-								requirement.documents,
-							),
-						)
-					: [createDocumentRequirementItem("LOW", DEFAULT_REQUIRED_DOCUMENTS)],
+					? groupDocumentRequirements(setup.documentRequirements)
+					: [
+						createDocumentRequirementItem(
+							"LOW",
+							DEFAULT_REQUIRED_DOCUMENTS,
+						),
+					],
 			);
 			setBureauRequired(Boolean(setup.bureauProvider));
 			setBureauProvider(setup.bureauProvider ?? "MMCB");
@@ -174,7 +206,7 @@ function RouteComponent() {
 				createDocumentRequirementItem("LOW", DEFAULT_REQUIRED_DOCUMENTS),
 			]);
 		}
-	}, [setup, selectScoreCard, selectWorkflow, selectRepaymentPlan]);
+	}, [setup, selectScoreCard, selectWorkflow, selectRepaymentPlan, groupDocumentRequirements]);
 
 	const handleTextChange =
 		(field: "productCode" | "productName") =>
@@ -337,10 +369,17 @@ function RouteComponent() {
 				: ({ type: "WALLET" } satisfies DisbursementDestination),
 		);
 
-		const normalizedRequirements = documentRequirements.map((requirement) => ({
-			grade: requirement.grade,
-			documents: [...requirement.documents],
-		}));
+		const normalizedRequirements = documentRequirements.flatMap((requirement) =>
+			requirement.documents.map((document) => ({
+				documentTypeId: document.documentTypeId,
+				minAmount: document.minAmount,
+				maxAmount: document.maxAmount,
+				employmentType: document.employmentType,
+				collateralRequired: document.collateralRequired,
+				riskGrade: requirement.grade,
+				isMandatory: document.isMandatory,
+			})),
+		);
 
 		const payload = {
 			product,
