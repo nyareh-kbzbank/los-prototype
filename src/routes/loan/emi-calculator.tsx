@@ -10,6 +10,12 @@ function EmiCalculator() {
 	const [rate, setRate] = useState<number | undefined>(10); // Annual interest rate in %
 	const [tenure, setTenure] = useState<number | undefined>(12);
 	const [tenureType, setTenureType] = useState<"months" | "years">("months");
+	const [emiType, setEmiType] = useState<
+		"reducing" | "flat" | "step-up" | "step-down" | "balloon"
+	>("reducing");
+	const [stepPercent, setStepPercent] = useState<number | undefined>(5);
+	const [stepEveryMonths, setStepEveryMonths] = useState<number | undefined>(12);
+	const [balloonPercent, setBalloonPercent] = useState<number | undefined>(30);
 
 	const { emi, totalPayment, totalInterest, schedule } = useMemo(() => {
 		const p = amount ?? 0;
@@ -62,37 +68,125 @@ function EmiCalculator() {
 			};
 		}
 
-		const emiVal = (p * r * (1 + r) ** n) / ((1 + r) ** n - 1);
-		const total = emiVal * n;
-		const interestTotal = total - p;
+		const baseEmi = (p * r * (1 + r) ** n) / ((1 + r) ** n - 1);
 
-		for (let i = 1; i <= n; i++) {
-			const interest = remainingBalance * r;
-			const principal = emiVal - interest;
-			remainingBalance -= principal;
-			// Avoid negative zero or small floating point issues at the very end
-			if (i === n && remainingBalance < 1) remainingBalance = 0;
+		const buildSchedule = (paymentForPeriod: (period: number) => number) => {
+			let totalPaid = 0;
+			for (let i = 1; i <= n; i++) {
+				const payment = paymentForPeriod(i);
+				const interest = remainingBalance * r;
+				const principal = Math.max(0, payment - interest);
+				remainingBalance -= principal;
+				if (i === n && remainingBalance < 1) remainingBalance = 0;
 
-			const date = new Date(today);
-			date.setMonth(today.getMonth() + i);
+				const date = new Date(today);
+				date.setMonth(today.getMonth() + i);
 
-			currentSchedule.push({
-				period: i,
-				date: date,
-				payment: emiVal,
-				principal: principal,
-				interest: interest,
-				balance: Math.max(0, remainingBalance),
-			});
+				currentSchedule.push({
+					period: i,
+					date: date,
+					payment: payment,
+					principal: principal,
+					interest: interest,
+					balance: Math.max(0, remainingBalance),
+				});
+				totalPaid += payment;
+			}
+
+			return {
+				totalPaid,
+				interestTotal: totalPaid - p,
+			};
+		};
+
+		if (emiType === "flat") {
+			const annualRate = (rate ?? 0) / 100;
+			const totalInterest = p * annualRate * (n / 12);
+			const total = p + totalInterest;
+			const flatEmi = total / n;
+
+			for (let i = 1; i <= n; i++) {
+				const interest = totalInterest / n;
+				const principal = p / n;
+				remainingBalance -= principal;
+				const date = new Date(today);
+				date.setMonth(today.getMonth() + i);
+
+				currentSchedule.push({
+					period: i,
+					date: date,
+					payment: flatEmi,
+					principal: principal,
+					interest: interest,
+					balance: Math.max(0, remainingBalance),
+				});
+			}
+
+			return {
+				emi: flatEmi,
+				totalPayment: total,
+				totalInterest: totalInterest,
+				schedule: currentSchedule,
+			};
 		}
 
+		if (emiType === "step-up" || emiType === "step-down") {
+			const stepRate = (stepPercent ?? 0) / 100;
+			const stepEvery = Math.max(1, stepEveryMonths ?? 1);
+			const direction = emiType === "step-up" ? 1 : -1;
+			const stepSchedule = buildSchedule((period) => {
+				const stepIndex = Math.floor((period - 1) / stepEvery);
+				const multiplier = 1 + direction * stepRate * stepIndex;
+				return Math.max(0, baseEmi * multiplier);
+			});
+
+			return {
+				emi: baseEmi,
+				totalPayment: stepSchedule.totalPaid,
+				totalInterest: stepSchedule.interestTotal,
+				schedule: currentSchedule,
+			};
+		}
+
+		if (emiType === "balloon") {
+			const balloon = p * ((balloonPercent ?? 0) / 100);
+			const amortizedPrincipal = Math.max(0, p - balloon);
+			const emiVal =
+				amortizedPrincipal === 0
+					? 0
+					: (amortizedPrincipal * r * (1 + r) ** n) /
+						((1 + r) ** n - 1);
+
+			const balloonSchedule = buildSchedule((period) =>
+				period === n ? emiVal + balloon : emiVal,
+			);
+
+			return {
+				emi: emiVal,
+				totalPayment: balloonSchedule.totalPaid,
+				totalInterest: balloonSchedule.interestTotal,
+				schedule: currentSchedule,
+			};
+		}
+
+		const reducingSchedule = buildSchedule(() => baseEmi);
+
 		return {
-			emi: emiVal,
-			totalPayment: total,
-			totalInterest: interestTotal,
+			emi: baseEmi,
+			totalPayment: reducingSchedule.totalPaid,
+			totalInterest: reducingSchedule.interestTotal,
 			schedule: currentSchedule,
 		};
-	}, [amount, rate, tenure, tenureType]);
+	}, [
+		amount,
+		rate,
+		tenure,
+		tenureType,
+		emiType,
+		stepPercent,
+		stepEveryMonths,
+		balloonPercent,
+	]);
 
 	const formatCurrency = (val: number) =>
 		new Intl.NumberFormat("en-US", {
@@ -109,6 +203,32 @@ function EmiCalculator() {
 			<div className="grid gap-6 md:grid-cols-2">
 				<div className="space-y-4 border p-6 rounded-lg shadow-sm bg-white h-fit">
 					<h2 className="font-semibold text-lg mb-4">Loan Details</h2>
+
+					<div>
+						<label className="block text-sm font-medium mb-1 text-gray-700">
+							EMI Type
+						</label>
+						<select
+							value={emiType}
+							onChange={(e) =>
+								setEmiType(
+									e.target.value as
+										| "reducing"
+										| "flat"
+										| "step-up"
+										| "step-down"
+										| "balloon",
+								)
+							}
+							className="w-full border p-2 rounded bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+						>
+							<option value="reducing">Reducing Balance</option>
+							<option value="flat">Flat Rate</option>
+							<option value="step-up">Step-Up</option>
+							<option value="step-down">Step-Down</option>
+							<option value="balloon">Balloon</option>
+						</select>
+					</div>
 
 					<div>
 						<label className="block text-sm font-medium mb-1 text-gray-700">
@@ -203,6 +323,65 @@ function EmiCalculator() {
 						</div>
 					</div>
 				</div>
+
+				{(emiType === "step-up" || emiType === "step-down") && (
+					<div className="grid gap-4 md:grid-cols-2">
+						<div>
+							<label className="block text-sm font-medium mb-1 text-gray-700">
+								Step Change (%)
+							</label>
+							<input
+								type="number"
+								min="0"
+								step="0.1"
+								value={stepPercent ?? ""}
+								onChange={(e) =>
+									setStepPercent(
+										e.target.value ? Number(e.target.value) : undefined,
+									)
+								}
+								className="w-full border p-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+							/>
+						</div>
+						<div>
+							<label className="block text-sm font-medium mb-1 text-gray-700">
+								Step Every (Months)
+							</label>
+							<input
+								type="number"
+								min="1"
+								value={stepEveryMonths ?? ""}
+								onChange={(e) =>
+									setStepEveryMonths(
+										e.target.value ? Number(e.target.value) : undefined,
+									)
+								}
+								className="w-full border p-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+							/>
+						</div>
+					</div>
+				)}
+
+				{emiType === "balloon" && (
+					<div>
+						<label className="block text-sm font-medium mb-1 text-gray-700">
+							Balloon Amount (% of Principal)
+						</label>
+						<input
+							type="number"
+							min="0"
+							max="100"
+							step="1"
+							value={balloonPercent ?? ""}
+							onChange={(e) =>
+								setBalloonPercent(
+									e.target.value ? Number(e.target.value) : undefined,
+								)
+							}
+							className="w-full border p-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+						/>
+					</div>
+				)}
 			</div>
 
 			{schedule.length > 0 && (

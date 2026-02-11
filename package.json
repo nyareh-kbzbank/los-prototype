@@ -42,7 +42,7 @@
     "react-dom": "^19.2.0",
     "react-select": "^5.10.2",
     "reactflow": "^11.11.4",
-    "streamdown": "^1.6.5",
+    "streamdown": "^2.2.0",
     "tailwind-merge": "^3.0.2",
     "tailwindcss": "^4.0.6",
     "tw-animate-css": "^1.3.6",

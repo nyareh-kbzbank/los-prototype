@@ -1,7 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { type FormEvent, useMemo, useState } from "react";
+import { type FormEvent, useState } from "react";
 import {
-	getRepaymentPlanList,
 	type RepaymentPlanInput,
 	useRepaymentSetupStore,
 } from "@/lib/repayment-setup-store";
@@ -27,12 +26,7 @@ const emptyForm: RepaymentPlanInput = {
 };
 
 function RouteComponent() {
-	const plans = useRepaymentSetupStore((s) => s.plans);
-	const selectedPlanId = useRepaymentSetupStore((s) => s.selectedPlanId);
 	const addPlan = useRepaymentSetupStore((s) => s.addPlan);
-	const selectPlan = useRepaymentSetupStore((s) => s.selectPlan);
-	const removePlan = useRepaymentSetupStore((s) => s.removePlan);
-	const planList = useMemo(() => getRepaymentPlanList(plans), [plans]);
 
 	const [form, setForm] = useState<RepaymentPlanInput>(emptyForm);
 	const [error, setError] = useState<string | null>(null);
@@ -46,7 +40,6 @@ function RouteComponent() {
 				name: form.name.trim(),
 				description: form.description?.trim() || "",
 			});
-			selectPlan(created.planId);
 			setForm(emptyForm);
 		} catch (err) {
 			setError(err instanceof Error ? err.message : "Unable to save plan");
@@ -70,10 +63,16 @@ function RouteComponent() {
 				</Link>
 			</div>
 
-			<div className="grid gap-6 md:grid-cols-[1.4fr_1fr]">
+			<div className="grid gap-6">
 				<section className="border p-4 rounded">
 					<div className="flex items-center justify-between mb-3">
 						<h2 className="font-semibold">New repayment plan</h2>
+						<Link
+							to="/loan/repayment-plans"
+							className="text-sm border px-3 py-1 rounded hover:bg-gray-50"
+						>
+							View saved plans
+						</Link>
 					</div>
 					<form className="space-y-3" onSubmit={handleSubmit}>
 						<div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -292,77 +291,6 @@ function RouteComponent() {
 						</button>
 					</div>
 					</form>
-				</section>
-
-				<section className="border p-4 rounded">
-					<div className="flex items-center justify-between mb-3">
-						<h2 className="font-semibold">Saved plans</h2>
-						<span className="text-xs text-gray-500">Select to use in Loan Setup</span>
-					</div>
-					{planList.length === 0 ? (
-						<div className="text-sm text-gray-700">No plans yet.</div>
-					) : (
-						<div className="space-y-3">
-							{planList.map((plan) => (
-								<div
-									key={plan.planId}
-									className={`border rounded p-3 text-sm ${selectedPlanId === plan.planId ? "border-blue-500 bg-blue-50" : "border-gray-200"}`}
-								>
-									<div className="flex items-start justify-between gap-2">
-										<div>
-											<div className="font-semibold">{plan.name}</div>
-											<div className="text-xs text-gray-600">{plan.method} · {plan.frequency}</div>
-											{plan.description ? (
-												<div className="text-xs text-gray-700 mt-1">{plan.description}</div>
-											) : null}
-										</div>
-										<div className="flex gap-2">
-											<button
-												type="button"
-												onClick={() => selectPlan(plan.planId)}
-												className="text-sm border px-3 py-1 rounded hover:bg-gray-100"
-											>
-												Use
-											</button>
-											<button
-												type="button"
-												onClick={() => removePlan(plan.planId)}
-												className="text-sm border px-3 py-1 rounded hover:bg-gray-100"
-											>
-												Delete
-											</button>
-										</div>
-									</div>
-									<dl className="grid grid-cols-2 gap-x-4 gap-y-1 mt-2 text-xs text-gray-700">
-										<div>
-											<dt>Due day</dt>
-											<dd>{plan.dueDayOfMonth ?? "—"}</dd>
-										</div>
-										<div>
-											<dt>Grace period</dt>
-											<dd>{plan.gracePeriodDays} days</dd>
-										</div>
-										<div>
-											<dt>Late fee</dt>
-											<dd>{plan.lateFeeFlat.toLocaleString()} + {plan.lateFeePct}%</dd>
-										</div>
-										<div>
-											<dt>Prepayment</dt>
-											<dd>{plan.prepaymentPenaltyPct}%</dd>
-										</div>
-										<div>
-											<dt>Rounding</dt>
-											<dd>{plan.roundingStep}</dd>
-										</div>
-										<div>
-											<dt>Autopay</dt>
-											<dd>{plan.autopayRequired ? "Required" : "Optional"}</dd>
-										</div>
-									</dl>
-								</div>
-							))}
-						</div>
-					)}
 				</section>
 			</div>
 		</div>

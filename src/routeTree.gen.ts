@@ -17,6 +17,7 @@ import { Route as WorkflowWorkflowIdRouteImport } from './routes/workflow/$workf
 import { Route as LoanScorecardsRouteImport } from './routes/loan/scorecards'
 import { Route as LoanScorecardSetupRouteImport } from './routes/loan/scorecard-setup'
 import { Route as LoanRepaymentSetupRouteImport } from './routes/loan/repayment-setup'
+import { Route as LoanRepaymentPlansRouteImport } from './routes/loan/repayment-plans'
 import { Route as LoanEmiCalculatorRouteImport } from './routes/loan/emi-calculator'
 import { Route as LoanSetupIndexRouteImport } from './routes/loan/setup/index'
 import { Route as LoanApplicationsIndexRouteImport } from './routes/loan/applications/index'
@@ -64,6 +65,11 @@ const LoanRepaymentSetupRoute = LoanRepaymentSetupRouteImport.update({
   path: '/loan/repayment-setup',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LoanRepaymentPlansRoute = LoanRepaymentPlansRouteImport.update({
+  id: '/loan/repayment-plans',
+  path: '/loan/repayment-plans',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LoanEmiCalculatorRoute = LoanEmiCalculatorRouteImport.update({
   id: '/loan/emi-calculator',
   path: '/loan/emi-calculator',
@@ -99,6 +105,7 @@ const LoanApplicationsApplicationIdRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/loan/emi-calculator': typeof LoanEmiCalculatorRoute
+  '/loan/repayment-plans': typeof LoanRepaymentPlansRoute
   '/loan/repayment-setup': typeof LoanRepaymentSetupRoute
   '/loan/scorecard-setup': typeof LoanScorecardSetupRoute
   '/loan/scorecards': typeof LoanScorecardsRoute
@@ -115,6 +122,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/loan/emi-calculator': typeof LoanEmiCalculatorRoute
+  '/loan/repayment-plans': typeof LoanRepaymentPlansRoute
   '/loan/repayment-setup': typeof LoanRepaymentSetupRoute
   '/loan/scorecard-setup': typeof LoanScorecardSetupRoute
   '/loan/scorecards': typeof LoanScorecardsRoute
@@ -132,6 +140,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/loan/emi-calculator': typeof LoanEmiCalculatorRoute
+  '/loan/repayment-plans': typeof LoanRepaymentPlansRoute
   '/loan/repayment-setup': typeof LoanRepaymentSetupRoute
   '/loan/scorecard-setup': typeof LoanScorecardSetupRoute
   '/loan/scorecards': typeof LoanScorecardsRoute
@@ -150,6 +159,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/loan/emi-calculator'
+    | '/loan/repayment-plans'
     | '/loan/repayment-setup'
     | '/loan/scorecard-setup'
     | '/loan/scorecards'
@@ -166,6 +176,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/loan/emi-calculator'
+    | '/loan/repayment-plans'
     | '/loan/repayment-setup'
     | '/loan/scorecard-setup'
     | '/loan/scorecards'
@@ -182,6 +193,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/loan/emi-calculator'
+    | '/loan/repayment-plans'
     | '/loan/repayment-setup'
     | '/loan/scorecard-setup'
     | '/loan/scorecards'
@@ -199,6 +211,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   LoanEmiCalculatorRoute: typeof LoanEmiCalculatorRoute
+  LoanRepaymentPlansRoute: typeof LoanRepaymentPlansRoute
   LoanRepaymentSetupRoute: typeof LoanRepaymentSetupRoute
   LoanScorecardSetupRoute: typeof LoanScorecardSetupRoute
   LoanScorecardsRoute: typeof LoanScorecardsRoute
@@ -271,6 +284,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LoanRepaymentSetupRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/loan/repayment-plans': {
+      id: '/loan/repayment-plans'
+      path: '/loan/repayment-plans'
+      fullPath: '/loan/repayment-plans'
+      preLoaderRoute: typeof LoanRepaymentPlansRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/loan/emi-calculator': {
       id: '/loan/emi-calculator'
       path: '/loan/emi-calculator'
@@ -319,6 +339,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   LoanEmiCalculatorRoute: LoanEmiCalculatorRoute,
+  LoanRepaymentPlansRoute: LoanRepaymentPlansRoute,
   LoanRepaymentSetupRoute: LoanRepaymentSetupRoute,
   LoanScorecardSetupRoute: LoanScorecardSetupRoute,
   LoanScorecardsRoute: LoanScorecardsRoute,

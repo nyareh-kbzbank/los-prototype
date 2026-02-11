@@ -70,6 +70,13 @@ function App() {
 			icon: ListChecks,
 			accent: "bg-fuchsia-500/15 text-fuchsia-300",
 		},
+		{
+			title: "Repayment Library",
+			description: "View saved repayment plans and open them for editing or use.",
+			to: "/loan/repayment-plans",
+			icon: ListChecks,
+			accent: "bg-fuchsia-500/15 text-fuchsia-300",
+		},
 	];
 
 	const actionCards = [
