@@ -168,12 +168,18 @@ function EmiCalculator() {
 		const buildSchedule = (paymentForPeriod: (period: number) => number) => {
 			let totalPaid = 0;
 			for (let i = 1; i <= effectiveEmiMonths; i++) {
-				const payment = paymentForPeriod(i);
+				let payment = paymentForPeriod(i);
 				const interest = remainingBalance * r;
-				const principal = Math.max(0, payment - interest);
+				let principal = Math.max(0, payment - interest);
 				remainingBalance -= principal;
-				if (i === effectiveEmiMonths && remainingBalance < 1) {
-					remainingBalance = 0;
+				if (i === effectiveEmiMonths) {
+					if (remainingBalance > 0) {
+						payment += remainingBalance;
+						principal += remainingBalance;
+						remainingBalance = 0;
+					} else if (remainingBalance < 1) {
+						remainingBalance = 0;
+					}
 				}
 
 				const date = new Date(today);
@@ -213,15 +219,25 @@ function EmiCalculator() {
 
 			for (let i = 1; i <= effectiveEmiMonths; i++) {
 				const interest = monthlyInterest;
-				const principal = monthlyPrincipal;
+				let principal = monthlyPrincipal;
+				let payment = flatEmi;
 				remainingBalance -= principal;
+				if (i === effectiveEmiMonths) {
+					if (remainingBalance > 0) {
+						payment += remainingBalance;
+						principal += remainingBalance;
+						remainingBalance = 0;
+					} else if (remainingBalance < 1) {
+						remainingBalance = 0;
+					}
+				}
 				const date = new Date(today);
 				date.setMonth(today.getMonth() + moratorium + i);
 
 				pushScheduleRow({
 					period: moratorium + i,
 					date: date,
-					payment: flatEmi,
+					payment: payment,
 					principal: principal,
 					interest: interest,
 					balance: Math.max(0, remainingBalance),
