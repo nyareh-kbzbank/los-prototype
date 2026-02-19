@@ -10,19 +10,55 @@ function EmiCalculator() {
 	const [rate, setRate] = useState<number | undefined>(10); // Annual interest rate in %
 	const [tenure, setTenure] = useState<number | undefined>(12);
 	const [tenureType, setTenureType] = useState<"months" | "years">("months");
+	const [moratoriumMonths, setMoratoriumMonths] = useState<number | undefined>(6);
+	const [tenureIncludesMoratorium, setTenureIncludesMoratorium] =
+		useState<boolean>(false);
 	const [emiType, setEmiType] = useState<
-		"reducing" | "flat" | "step-up" | "step-down" | "balloon"
+		"reducing" | "flat" | "step-up" | "step-down" | "balloon" | "moratorium"
+	>("reducing");
+	const [moratoriumBaseType, setMoratoriumBaseType] = useState<
+		"reducing" | "flat"
 	>("reducing");
 	const [stepPercent, setStepPercent] = useState<number | undefined>(5);
 	const [stepEveryMonths, setStepEveryMonths] = useState<number | undefined>(12);
 	const [balloonPercent, setBalloonPercent] = useState<number | undefined>(30);
 
 	const { emi, totalPayment, totalInterest, schedule } = useMemo(() => {
+		/**
+		 * Core inputs for EMI math.
+		 * - p: principal amount
+		 * - r: monthly interest rate
+		 */
 		const p = amount ?? 0;
-		const r = (rate ?? 0) / 12 / 100;
-		const n = tenureType === "years" ? (tenure ?? 0) * 12 : (tenure ?? 0);
 
-		if (p <= 0 || n <= 0) {
+		/**
+		 * Interest rate per month.
+		 * Rate is given annually, so divide by 12 and convert to decimal.
+		 */
+		const r = (rate ?? 0) / 12 / 100;
+
+		/**
+		 * Tenor value in months.
+		 * We track base tenor, moratorium months, and effective EMI months
+		 * to support both include/exclude moratorium behaviors.
+		 */
+		const isMoratorium = emiType === "moratorium";
+		const baseTenorMonths =
+			tenureType === "years" ? (tenure ?? 0) * 12 : (tenure ?? 0);
+		const moratorium = isMoratorium ? Math.max(0, moratoriumMonths ?? 0) : 0;
+		/**
+		 * EMI months can exclude or include moratorium, based on user selection.
+		 * - Exclude: EMI starts after moratorium and keeps full base tenor.
+		 * - Include: EMI starts after moratorium and reduces remaining EMI months.
+		 */
+		const emiMonths = tenureIncludesMoratorium && isMoratorium
+			? Math.max(0, baseTenorMonths - moratorium)
+			: baseTenorMonths;
+		const totalMonths = tenureIncludesMoratorium && isMoratorium
+			? baseTenorMonths
+			: baseTenorMonths + moratorium;
+
+		if (p <= 0 || baseTenorMonths <= 0 || totalMonths <= 0) {
 			return {
 				emi: 0,
 				totalPayment: 0,
@@ -41,17 +77,60 @@ function EmiCalculator() {
 		}[] = [];
 		let remainingBalance = p;
 		const today = new Date();
+		let accruedMoratoriumInterest = 0;
 
-		// If rate is 0, just divide principal by months
-		if ((rate ?? 0) <= 0) {
-			const zeroInterestEmi = p / n;
-			for (let i = 1; i <= n; i++) {
-				remainingBalance -= zeroInterestEmi;
+		const pushScheduleRow = (entry: {
+			period: number;
+			date: Date;
+			payment: number;
+			principal: number;
+			interest: number;
+			balance: number;
+		}) => {
+			currentSchedule.push(entry);
+		};
+
+		/**
+		 * Moratorium schedule.
+		 * No payments are made during moratorium; interest accrues monthly
+		 * and is capitalized into the outstanding balance.
+		 */
+		const addMoratoriumSchedule = () => {
+			for (let i = 1; i <= moratorium; i++) {
+				const interest = remainingBalance * r;
+				accruedMoratoriumInterest += interest;
+				remainingBalance += interest;
 				const date = new Date(today);
 				date.setMonth(today.getMonth() + i);
 
-				currentSchedule.push({
+				pushScheduleRow({
 					period: i,
+					date: date,
+					payment: 0,
+					principal: 0,
+					interest: interest,
+					balance: Math.max(0, remainingBalance),
+				});
+			}
+		};
+
+		/**
+		 * Zero-interest case.
+		 * Moratorium still defers payments; EMI is a simple principal split.
+		 */
+		if ((rate ?? 0) <= 0) {
+			if (moratorium > 0) {
+				addMoratoriumSchedule();
+			}
+			const effectiveEmiMonths = Math.max(1, emiMonths);
+			const zeroInterestEmi = remainingBalance / effectiveEmiMonths;
+			for (let i = 1; i <= effectiveEmiMonths; i++) {
+				remainingBalance -= zeroInterestEmi;
+				const date = new Date(today);
+				date.setMonth(today.getMonth() + moratorium + i);
+
+				pushScheduleRow({
+					period: moratorium + i,
 					date: date,
 					payment: zeroInterestEmi,
 					principal: zeroInterestEmi,
@@ -62,28 +141,46 @@ function EmiCalculator() {
 
 			return {
 				emi: zeroInterestEmi,
-				totalPayment: p,
+				totalPayment: zeroInterestEmi * effectiveEmiMonths,
 				totalInterest: 0,
 				schedule: currentSchedule,
 			};
 		}
 
-		const baseEmi = (p * r * (1 + r) ** n) / ((1 + r) ** n - 1);
+		/**
+		 * Apply moratorium before EMI calculation to get the post-moratorium
+		 * principal used for reducing/step/balloon schedules.
+		 */
+		if (moratorium > 0) {
+			addMoratoriumSchedule();
+		}
 
+		const principalAfterMoratorium = remainingBalance;
+		const effectiveEmiMonths = Math.max(1, emiMonths);
+		const baseEmi =
+			(principalAfterMoratorium * r * (1 + r) ** effectiveEmiMonths) /
+			((1 + r) ** effectiveEmiMonths - 1);
+
+		/**
+		 * Builds EMI schedule using a per-period payment generator.
+		 * Used by reducing, step-up/down, and balloon variants.
+		 */
 		const buildSchedule = (paymentForPeriod: (period: number) => number) => {
 			let totalPaid = 0;
-			for (let i = 1; i <= n; i++) {
+			for (let i = 1; i <= effectiveEmiMonths; i++) {
 				const payment = paymentForPeriod(i);
 				const interest = remainingBalance * r;
 				const principal = Math.max(0, payment - interest);
 				remainingBalance -= principal;
-				if (i === n && remainingBalance < 1) remainingBalance = 0;
+				if (i === effectiveEmiMonths && remainingBalance < 1) {
+					remainingBalance = 0;
+				}
 
 				const date = new Date(today);
-				date.setMonth(today.getMonth() + i);
+				date.setMonth(today.getMonth() + moratorium + i);
 
-				currentSchedule.push({
-					period: i,
+				pushScheduleRow({
+					period: moratorium + i,
 					date: date,
 					payment: payment,
 					principal: principal,
@@ -99,21 +196,30 @@ function EmiCalculator() {
 			};
 		};
 
-		if (emiType === "flat") {
-			const annualRate = (rate ?? 0) / 100;
-			const totalInterest = p * annualRate * (n / 12);
-			const total = p + totalInterest;
-			const flatEmi = total / n;
+		/**
+		 * Flat rate:
+		 * - Interest is computed on the original principal for the EMI months.
+		 * - Principal is distributed evenly across EMI months.
+		 * - Moratorium interest is reported separately and capitalized already.
+		 */
+		const effectiveEmiType = isMoratorium ? moratoriumBaseType : emiType;
 
-			for (let i = 1; i <= n; i++) {
-				const interest = totalInterest / n;
-				const principal = p / n;
+		if (effectiveEmiType === "flat") {
+			const annualRate = (rate ?? 0) / 100;
+			const totalInterest = p * annualRate * (effectiveEmiMonths / 12);
+			const monthlyInterest = totalInterest / effectiveEmiMonths;
+			const monthlyPrincipal = principalAfterMoratorium / effectiveEmiMonths;
+			const flatEmi = monthlyPrincipal + monthlyInterest;
+
+			for (let i = 1; i <= effectiveEmiMonths; i++) {
+				const interest = monthlyInterest;
+				const principal = monthlyPrincipal;
 				remainingBalance -= principal;
 				const date = new Date(today);
-				date.setMonth(today.getMonth() + i);
+				date.setMonth(today.getMonth() + moratorium + i);
 
-				currentSchedule.push({
-					period: i,
+				pushScheduleRow({
+					period: moratorium + i,
 					date: date,
 					payment: flatEmi,
 					principal: principal,
@@ -124,16 +230,20 @@ function EmiCalculator() {
 
 			return {
 				emi: flatEmi,
-				totalPayment: total,
-				totalInterest: totalInterest,
+				totalPayment: flatEmi * effectiveEmiMonths,
+				totalInterest: totalInterest + accruedMoratoriumInterest,
 				schedule: currentSchedule,
 			};
 		}
 
-		if (emiType === "step-up" || emiType === "step-down") {
+		/**
+		 * Step schedules:
+		 * Apply a multiplier to the base reducing EMI every N months.
+		 */
+		if (effectiveEmiType === "step-up" || effectiveEmiType === "step-down") {
 			const stepRate = (stepPercent ?? 0) / 100;
 			const stepEvery = Math.max(1, stepEveryMonths ?? 1);
-			const direction = emiType === "step-up" ? 1 : -1;
+			const direction = effectiveEmiType === "step-up" ? 1 : -1;
 			const stepSchedule = buildSchedule((period) => {
 				const stepIndex = Math.floor((period - 1) / stepEvery);
 				const multiplier = 1 + direction * stepRate * stepIndex;
@@ -143,28 +253,37 @@ function EmiCalculator() {
 			return {
 				emi: baseEmi,
 				totalPayment: stepSchedule.totalPaid,
-				totalInterest: stepSchedule.interestTotal,
+				totalInterest:
+					stepSchedule.interestTotal + accruedMoratoriumInterest,
 				schedule: currentSchedule,
 			};
 		}
 
-		if (emiType === "balloon") {
+		/**
+		 * Balloon:
+		 * A lump sum is added to the final EMI, reducing the amortized principal.
+		 */
+		if (effectiveEmiType === "balloon") {
 			const balloon = p * ((balloonPercent ?? 0) / 100);
-			const amortizedPrincipal = Math.max(0, p - balloon);
+			const amortizedPrincipal = Math.max(
+				0,
+				principalAfterMoratorium - balloon,
+			);
 			const emiVal =
 				amortizedPrincipal === 0
 					? 0
-					: (amortizedPrincipal * r * (1 + r) ** n) /
-						((1 + r) ** n - 1);
+					: (amortizedPrincipal * r * (1 + r) ** effectiveEmiMonths) /
+						((1 + r) ** effectiveEmiMonths - 1);
 
 			const balloonSchedule = buildSchedule((period) =>
-				period === n ? emiVal + balloon : emiVal,
+				period === effectiveEmiMonths ? emiVal + balloon : emiVal,
 			);
 
 			return {
 				emi: emiVal,
 				totalPayment: balloonSchedule.totalPaid,
-				totalInterest: balloonSchedule.interestTotal,
+				totalInterest:
+					balloonSchedule.interestTotal + accruedMoratoriumInterest,
 				schedule: currentSchedule,
 			};
 		}
@@ -174,7 +293,8 @@ function EmiCalculator() {
 		return {
 			emi: baseEmi,
 			totalPayment: reducingSchedule.totalPaid,
-			totalInterest: reducingSchedule.interestTotal,
+			totalInterest:
+				reducingSchedule.interestTotal + accruedMoratoriumInterest,
 			schedule: currentSchedule,
 		};
 	}, [
@@ -182,7 +302,10 @@ function EmiCalculator() {
 		rate,
 		tenure,
 		tenureType,
+		moratoriumMonths,
+		tenureIncludesMoratorium,
 		emiType,
+		moratoriumBaseType,
 		stepPercent,
 		stepEveryMonths,
 		balloonPercent,
@@ -217,7 +340,8 @@ function EmiCalculator() {
 										| "flat"
 										| "step-up"
 										| "step-down"
-										| "balloon",
+										| "balloon"
+										| "moratorium",
 								)
 							}
 							className="w-full border p-2 rounded bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -227,6 +351,7 @@ function EmiCalculator() {
 							<option value="step-up">Step-Up</option>
 							<option value="step-down">Step-Down</option>
 							<option value="balloon">Balloon</option>
+								<option value="moratorium">Moratorium</option>
 						</select>
 					</div>
 
@@ -290,6 +415,68 @@ function EmiCalculator() {
 							</select>
 						</div>
 					</div>
+
+					{emiType === "moratorium" && (
+						<div className="space-y-4">
+							<div>
+								<label className="block text-sm font-medium mb-1 text-gray-700">
+									Moratorium Base
+								</label>
+								<select
+									value={moratoriumBaseType}
+									onChange={(e) =>
+										setMoratoriumBaseType(
+											e.target.value as "reducing" | "flat",
+										)
+									}
+									className="w-full border p-2 rounded bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+								>
+									<option value="reducing">Reducing Balance</option>
+									<option value="flat">Flat Rate</option>
+								</select>
+							</div>
+
+							<div>
+								<label className="block text-sm font-medium mb-1 text-gray-700">
+									Moratorium (Months)
+								</label>
+								<input
+									type="number"
+									min="0"
+									value={moratoriumMonths ?? ""}
+									onChange={(e) =>
+										setMoratoriumMonths(
+											e.target.value ? Number(e.target.value) : undefined,
+										)
+									}
+									className="w-full border p-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+								/>
+								<p className="text-xs text-gray-500 mt-1">
+									No EMI during moratorium; interest accrues and is capitalized.
+								</p>
+							</div>
+
+							<div>
+								<label className="block text-sm font-medium mb-1 text-gray-700">
+									Tenure Handling
+								</label>
+								<select
+									value={tenureIncludesMoratorium ? "include" : "exclude"}
+									onChange={(e) =>
+										setTenureIncludesMoratorium(e.target.value === "include")
+									}
+									className="w-full border p-2 rounded bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+								>
+									<option value="exclude">
+										Exclude moratorium from tenure (EMI starts after)
+									</option>
+									<option value="include">
+										Include moratorium in tenure (shorter EMI span)
+									</option>
+								</select>
+							</div>
+						</div>
+					)}
 				</div>
 
 				<div className="space-y-4 border p-6 rounded-lg shadow-sm bg-blue-50 h-fit">
