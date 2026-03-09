@@ -28,7 +28,7 @@ export default function Header() {
 				</button>
 				<h1 className="ml-4 text-xl font-semibold">
 					<Link to="/" className="text-4xl font-bold">
-						LOS
+						Smart Lending Solution
 					</Link>
 				</h1>
 			</header>

@@ -45,6 +45,12 @@ function LoanWorkflowList() {
 						Create Score Card
 					</Link>
 					<Link
+						to="/loan/emi-custom-calculator"
+						className="text-sm border px-3 rounded hover:bg-gray-50"
+					>
+						Custom EMI Calculator
+					</Link>
+					<Link
 						to="/loan/scorecards"
 						className="text-sm border px-3 rounded hover:bg-gray-50"
 					>

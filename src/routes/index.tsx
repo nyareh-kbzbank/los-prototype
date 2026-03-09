@@ -104,6 +104,13 @@ function App() {
 			icon: Calculator,
 			accent: "bg-rose-500/15 text-rose-300",
 		},
+    	{
+			title: "Custom EMI Calculator",
+			description: "Quickly calculate monthly payments and total interest with custom formulat",
+			to: "/loan/emi-custom-calculator",
+			icon: Calculator,
+			accent: "bg-rose-500/15 text-rose-300",
+		},
 	];
 
 	const renderCard = (card: {
@@ -138,7 +145,7 @@ function App() {
 			<section className="max-w-5xl mx-auto space-y-8">
 				<div className="bg-white border border-slate-200 rounded-2xl p-8 shadow-sm">
 					<p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-700 mb-2">
-						LOS
+            Smart Lending Solution
 					</p>
 					<h1 className="text-3xl font-bold mb-2">Welcome back</h1>
 					<p className="text-slate-600 text-base leading-relaxed mb-8">
