@@ -10,12 +10,7 @@ import {
 	type LoanWorkflowSnapshot,
 	useLoanSetupStore,
 } from "@/lib/loan-setup-store";
-import {
-	evaluateScoreCard,
-	inferFieldKind,
-	type ScoreEngineResult,
-} from "@/lib/scorecard-engine";
-import { type Rule, useScoreCardStore } from "@/lib/scorecard-store";
+import { useScoreCardStore } from "@/lib/scorecard-store";
 
 export const Route = createFileRoute("/loan/applications/create")({
 	component: RouteComponent,
@@ -78,28 +73,6 @@ function RouteComponent() {
 		return Array.from(set);
 	}, [activeSetup?.bureauPurpose]);
 
-	const configuredFields = useMemo(() => {
-		return activeScoreCard
-			? [...activeScoreCard.fields.map((f) => f.field)].sort((a, b) =>
-					a.localeCompare(b),
-				)
-			: [];
-	}, [activeScoreCard]);
-
-	const rulesByField = useMemo<Record<string, Rule[]>>(() => {
-		if (!activeScoreCard) return {};
-		const acc: Record<string, Rule[]> = {};
-		for (const field of activeScoreCard.fields) {
-			acc[field.field] = [...(field.rules ?? [])];
-		}
-		return acc;
-	}, [activeScoreCard]);
-
-	const scoreInputFields = useMemo(() => {
-		return configuredFields.filter(
-			(field) => field !== "age" && field !== "monthlyIncome",
-		);
-	}, [configuredFields]);
 
 	const [beneficiaryName, setBeneficiaryName] = useState("");
 	const [nationalId, setNationalId] = useState("");
@@ -120,11 +93,6 @@ function RouteComponent() {
 	const [bureauRequestedAt, setBureauRequestedAt] = useState("");
 	const [notes, setNotes] = useState("");
 	const [formError, setFormError] = useState<string | null>(null);
-	const [scoreInputs, setScoreInputs] = useState<Record<string, string>>({});
-	const [scoreResult, setScoreResult] = useState<ScoreEngineResult | null>(
-		null,
-	);
-
 	useEffect(() => {
 		setTenureValue(tenureOptions[0] ?? null);
 	}, [selectedSetupId, tenureOptions]);
@@ -136,17 +104,6 @@ function RouteComponent() {
 	useEffect(() => {
 		setDestinationType(destinationChoices[0] ?? "BANK");
 	}, [selectedSetupId, destinationChoices]);
-
-	useEffect(() => {
-		setScoreInputs((prev) => {
-			const next: Record<string, string> = {};
-			for (const field of scoreInputFields) {
-				next[field] = prev[field] ?? "";
-			}
-			return next;
-		});
-		setScoreResult(null);
-	}, [activeSetup?.id, scoreInputFields]);
 
 	useEffect(() => {
 		const nextProvider =
@@ -162,30 +119,6 @@ function RouteComponent() {
 
 	const disabled = setupList.length === 0;
 	const statusBadge: LoanApplicationStatus | "" = "DRAFT";
-
-	const handleCalculateScore = () => {
-		if (!activeScoreCard) {
-			setFormError("This loan setup is missing a linked scorecard.");
-			return;
-		}
-
-		const inputs: Record<string, string> = {};
-		for (const field of configuredFields) {
-			if (field === "age") {
-				inputs[field] = ageInput;
-				continue;
-			}
-			if (field === "monthlyIncome") {
-				inputs[field] = monthlyIncomeInput;
-				continue;
-			}
-			inputs[field] = scoreInputs[field] ?? "";
-		}
-
-		const result = evaluateScoreCard(activeScoreCard, inputs);
-		setScoreResult(result);
-		setFormError(null);
-	};
 
 	const handleSubmit = () => {
 		if (disabled || !activeSetup) return;
@@ -263,10 +196,8 @@ function RouteComponent() {
 		}
 
 		setFormError(null);
-		const creditScoreToSave =
-			scoreResult?.totalScore ?? activeSetup.totalScore ?? null;
-		const creditMaxToSave =
-			scoreResult?.maxScore ?? activeScoreCard?.maxScore ?? null;
+		const creditScoreToSave = activeSetup.totalScore ?? null;
+		const creditMaxToSave = activeScoreCard?.maxScore ?? null;
 
 		addApplication({
 			beneficiaryName,
@@ -417,109 +348,6 @@ function RouteComponent() {
 										: "Save a loan setup first."}
 								</span>
 							</label>
-						</div>
-
-						<div className="space-y-3 border rounded p-4">
-							<div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
-								<div>
-									<div className="text-sm text-gray-600">Credit score</div>
-									<div className="text-base font-semibold">
-										{activeScoreCard
-											? `${activeScoreCard.name} (Max ${activeScoreCard.maxScore})`
-											: "No scorecard attached"}
-									</div>
-								</div>
-								{scoreResult ? (
-									<div className="text-sm text-gray-700">
-										Score {scoreResult.totalScore} / {scoreResult.maxScore} —
-										{scoreResult.riskGrade}
-									</div>
-								) : null}
-							</div>
-
-							{activeScoreCard ? (
-								<>
-									<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-										{scoreInputFields.map((field) => {
-											const kind = inferFieldKind(rulesByField[field] ?? []);
-											const value = scoreInputs[field] ?? "";
-											const inputId = `score-${field}`;
-											return (
-												<label
-													key={field}
-													className="flex flex-col gap-1 text-sm"
-													htmlFor={inputId}
-												>
-													<span>{field}</span>
-													{kind === "boolean" ? (
-														<select
-															id={inputId}
-															value={value}
-															onChange={(e) => {
-																const nextValue = e.target.value;
-																setScoreInputs((prev) => ({
-																	...prev,
-																	[field]: nextValue,
-																}));
-															}}
-															className="border px-2 py-2 rounded"
-															disabled={disabled}
-														>
-															<option value="">(not set)</option>
-															<option value="true">true</option>
-															<option value="false">false</option>
-														</select>
-													) : (
-														<input
-															id={inputId}
-															type={kind === "number" ? "number" : "text"}
-															value={value}
-															onChange={(e) => {
-																const nextValue = e.target.value;
-																setScoreInputs((prev) => ({
-																	...prev,
-																	[field]: nextValue,
-																}));
-															}}
-															className="border px-2 py-2 rounded"
-															placeholder={
-																(rulesByField[field] ?? []).some(
-																	(r) => r.operator === "between",
-																)
-																	? "For between: e.g. 25,45"
-																	: ""
-															}
-															disabled={disabled}
-														/>
-													)}
-												</label>
-											);
-										})}
-									</div>
-
-									<div className="flex gap-2 items-center">
-										<button
-											type="button"
-											onClick={handleCalculateScore}
-											className="px-4 py-2 rounded bg-blue-600 text-white shadow hover:bg-blue-700"
-											disabled={disabled}
-										>
-											Calculate credit score
-										</button>
-										{scoreResult ? (
-											<span className="text-sm text-gray-700">
-												Result: {scoreResult.totalScore} /{" "}
-												{scoreResult.maxScore} — {scoreResult.riskGrade}
-											</span>
-										) : null}
-									</div>
-								</>
-							) : (
-								<p className="text-sm text-gray-700">
-									Link a scorecard in Loan Setup to calculate credit scores per
-									beneficiary.
-								</p>
-							)}
 						</div>
 
 						{activeSetup?.bureauCheckRequired ? (
