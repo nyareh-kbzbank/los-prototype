@@ -47,6 +47,8 @@ Source: src/lib/loan-setup-store.ts
   - Defaults to NRC and PAYSLIP if none provided.
 - Interest rate plans are cloned and normalized; default plan created if missing.
 - Captures scorecard/workflow IDs and names, repayment plan info, and bureau flags.
+- Stores loan security type; secured loans auto-add DOC-COLLATERAL to every risk grade and require it regardless of risk grade.
+- Persists selected custom EMI type details (id, name, formulas) and custom field values.
 - updateSetup re-normalizes inputs and preserves existing document requirements if none provided.
 
 ## Scorecards
@@ -94,6 +96,13 @@ Source: src/lib/loan-application-store.ts
   - src/routes/loan/applications/index.tsx
   - src/routes/loan/applications/$applicationId.tsx
 
+Loan application create flow details:
+
+- Step 1 prioritizes quick eligibility inputs first: beneficiary name, age, monthly income, and requested amount.
+- Step 1 shows a payment schedule preview using the loan setup's custom EMI formula (if configured).
+- Step 1 also shows an estimated eligible amount derived from an affordability rule (`50%` of monthly income as EMI capacity), then caps by product max amount.
+- Remaining fields (identity, channel/disbursement, bureau details, notes) are grouped under a separate Additional details section.
+
 ## Custom EMI Calculator
 
 Source: src/routes/loan/emi-custom-calculator.tsx
@@ -102,6 +111,7 @@ Source: src/routes/loan/emi-custom-calculator.tsx
 - Formula parser supports operators `+`, `-`, `*`, `/`, `^` and functions `min`, `max`, `abs`, `round`, `floor`, `ceil`, `pow`, `sqrt`, `log`, `exp`.
 - Calculation runs from an explicit snapshot (`calculationSnapshot`) to avoid partial edits affecting in-progress results.
 - Base EMI is computed with standard reducing-balance logic and exposed to formulas as `baseEmi`.
+- Loan setup can load saved custom EMI types, preview EMI totals, and persist the selected type + field values.
 
 Schedule behavior:
 

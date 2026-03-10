@@ -66,6 +66,56 @@ const loanProductSetup: LoanProduct = {
 	],
 };
 
+const collateralDocumentType = "COLLATERAL";
+const collateralDocumentTypeId = `DOC-${collateralDocumentType}`;
+
+const ensureSecuredCollateralDocuments = (
+	items: DocumentRequirementItem[],
+	isSecured: boolean,
+	isMandatory: boolean,
+) => {
+	if (!isSecured) return items;
+	let changed = false;
+	const nextItems = items.map((item) => {
+		const docIndex = item.documents.findIndex(
+			(doc) => doc.documentTypeId === collateralDocumentTypeId,
+		);
+		if (docIndex === -1) {
+			changed = true;
+			return {
+				...item,
+				documents: [
+					...item.documents,
+					createDocumentRequirementDocument(collateralDocumentType, {
+						collateralRequired: true,
+						isMandatory,
+					}),
+				],
+			};
+		}
+
+		const existing = item.documents[docIndex];
+		const needsUpdate =
+			existing.collateralRequired !== true ||
+			(isMandatory && !existing.isMandatory);
+		if (!needsUpdate) return item;
+		changed = true;
+		return {
+			...item,
+			documents: item.documents.map((doc, idx) =>
+				idx === docIndex
+					? {
+							...doc,
+							collateralRequired: true,
+							isMandatory: isMandatory ? true : doc.isMandatory,
+						}
+					: doc,
+			),
+		};
+	});
+	return changed ? nextItems : items;
+};
+
 function RouteComponent() {
 	const { setupId } = Route.useParams();
 	const navigate = useNavigate();
@@ -103,6 +153,7 @@ function RouteComponent() {
 	const [documentRequirements, setDocumentRequirements] = useState<
 		DocumentRequirementItem[]
 	>(() => [createDocumentRequirementItem("LOW", DEFAULT_REQUIRED_DOCUMENTS)]);
+	const [isSecuredLoan, setIsSecuredLoan] = useState(false);
 	const [channels, setChannels] = useState<ChannelConfig[]>([
 		{ name: "", code: "" },
 	]);
@@ -187,16 +238,22 @@ function RouteComponent() {
 			setRiskResult(
 				setup.riskResult ? { ...setup.riskResult, inputs: {} } : null,
 			);
-			setDocumentRequirements(
-				setup.documentRequirements.length
-					? groupDocumentRequirements(setup.documentRequirements)
-					: [
+			const groupedRequirements = setup.documentRequirements.length
+				? groupDocumentRequirements(setup.documentRequirements)
+				: [
 						createDocumentRequirementItem(
 							"LOW",
 							DEFAULT_REQUIRED_DOCUMENTS,
 						),
-					],
+					];
+			setDocumentRequirements(
+				ensureSecuredCollateralDocuments(
+					groupedRequirements,
+					setup.isSecuredLoan ?? false,
+					true,
+				),
 			);
+			setIsSecuredLoan(setup.isSecuredLoan ?? false);
 			setBureauRequired(Boolean(setup.bureauProvider));
 			setBureauProvider(setup.bureauProvider ?? "MMCB");
 			setBureauPurpose(setup.bureauPurpose ?? "Credit assessment");
@@ -259,6 +316,13 @@ function RouteComponent() {
 		});
 		setRiskResult(null);
 	}, [configuredFields]);
+
+	useEffect(() => {
+		if (!isSecuredLoan) return;
+		setDocumentRequirements((prev) =>
+			ensureSecuredCollateralDocuments(prev, isSecuredLoan, true),
+		);
+	}, [documentRequirements, isSecuredLoan]);
 
 	const updateTenureUnit = (e: ChangeEvent<HTMLSelectElement>) => {
 		const unit = e.target.value as TenorUnit;
@@ -369,7 +433,13 @@ function RouteComponent() {
 				: ({ type: "WALLET" } satisfies DisbursementDestination),
 		);
 
-		const normalizedRequirements = documentRequirements.flatMap((requirement) =>
+		const effectiveRequirements = ensureSecuredCollateralDocuments(
+			documentRequirements,
+			isSecuredLoan,
+			true,
+		);
+
+		const normalizedRequirements = effectiveRequirements.flatMap((requirement) =>
 			requirement.documents.map((document) => ({
 				documentTypeId: document.documentTypeId,
 				minAmount: document.minAmount,
@@ -384,6 +454,7 @@ function RouteComponent() {
 		const payload = {
 			product,
 			channels,
+			isSecuredLoan,
 			scorecardId: activeScoreCard?.scoreCardId ?? null,
 			scorecardName: activeScoreCard?.name ?? null,
 			workflowId: selectedWorkflowId,
@@ -712,6 +783,40 @@ function RouteComponent() {
 				requirements={documentRequirements}
 				onChangeRequirements={setDocumentRequirements}
 			/>
+
+			<section className="border p-4 rounded mb-6">
+				<div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between mb-3">
+					<div>
+						<h2 className="font-semibold">Loan Security</h2>
+						<div className="text-xs text-gray-600">
+							Choose whether the loan is secured by collateral.
+						</div>
+					</div>
+				</div>
+				<div className="flex flex-wrap gap-6 text-sm">
+					<label className="flex items-center gap-2">
+						<input
+							type="radio"
+							name="loan-security"
+							checked={isSecuredLoan}
+							onChange={() => setIsSecuredLoan(true)}
+						/>
+						<span>Secured</span>
+					</label>
+					<label className="flex items-center gap-2">
+						<input
+							type="radio"
+							name="loan-security"
+							checked={!isSecuredLoan}
+							onChange={() => setIsSecuredLoan(false)}
+						/>
+						<span>Unsecured</span>
+					</label>
+				</div>
+				<p className="text-xs text-gray-600 mt-2">
+					Secured loans require collateral document types for all risk grades.
+				</p>
+			</section>
 
 			{/* Bureau */}
 			<section className="border p-4 rounded mb-6">

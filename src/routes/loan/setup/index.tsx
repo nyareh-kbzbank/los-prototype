@@ -1,6 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { type ChangeEvent, useEffect, useMemo, useState } from "react";
 import DocumentRequirementsSection, {
+	createDocumentRequirementDocument,
 	createDocumentRequirementItem,
 	type DocumentRequirementItem,
 } from "@/components/loan/DocumentRequirementsSection";
@@ -62,6 +63,614 @@ const loanProductSetup: LoanProduct = {
 	],
 };
 
+const collateralDocumentType = "COLLATERAL";
+const collateralDocumentTypeId = `DOC-${collateralDocumentType}`;
+
+const ensureSecuredCollateralDocuments = (
+	items: DocumentRequirementItem[],
+	isSecured: boolean,
+	isMandatory: boolean,
+) => {
+	if (!isSecured) return items;
+	let changed = false;
+	const nextItems = items.map((item) => {
+		const docIndex = item.documents.findIndex(
+			(doc) => doc.documentTypeId === collateralDocumentTypeId,
+		);
+		if (docIndex === -1) {
+			changed = true;
+			return {
+				...item,
+				documents: [
+					...item.documents,
+					createDocumentRequirementDocument(collateralDocumentType, {
+						collateralRequired: true,
+						isMandatory,
+					}),
+				],
+			};
+		}
+
+		const existing = item.documents[docIndex];
+		const needsUpdate =
+			existing.collateralRequired !== true ||
+			(isMandatory && !existing.isMandatory);
+		if (!needsUpdate) return item;
+		changed = true;
+		return {
+			...item,
+			documents: item.documents.map((doc, idx) =>
+				idx === docIndex
+					? {
+							...doc,
+							collateralRequired: true,
+							isMandatory: isMandatory ? true : doc.isMandatory,
+						}
+					: doc,
+			),
+		};
+	});
+	return changed ? nextItems : items;
+};
+
+type FieldDefinition = {
+	id: string;
+	key: string;
+	label: string;
+	description: string;
+	defaultValue: number;
+};
+
+type CustomEmiType = {
+	id: string;
+	name: string;
+	principalFormula: string;
+	interestFormula: string;
+	fieldDefinitions: FieldDefinition[];
+};
+
+type Token =
+	| { type: "number"; value: number }
+	| { type: "identifier"; value: string }
+	| { type: "operator"; value: "+" | "-" | "*" | "/" | "^" }
+	| { type: "lparen" }
+	| { type: "rparen" }
+	| { type: "comma" };
+
+type ExpressionNode =
+	| { type: "number"; value: number }
+	| { type: "variable"; name: string }
+	| { type: "unary"; operator: "+" | "-"; operand: ExpressionNode }
+	| {
+			type: "binary";
+			operator: "+" | "-" | "*" | "/" | "^";
+			left: ExpressionNode;
+			right: ExpressionNode;
+	  }
+	| { type: "function"; name: string; args: ExpressionNode[] };
+
+type FormulaContext = Record<string, number>;
+
+type CustomEmiPreview = {
+	emi: number;
+	totalPayment: number;
+	totalInterest: number;
+	error: string | null;
+};
+
+type PaymentScheduleType = "fixed-day" | "month-end" | "daily-accrual";
+type MonthEndFirstPayment = "this-month-end" | "next-month-end";
+
+const customEmiTypesStorageKey = "loan-custom-emi-types";
+
+const formatCurrency = (val: number) =>
+	new Intl.NumberFormat("en-US", {
+		style: "currency",
+		currency: "MMK",
+		minimumFractionDigits: 2,
+		maximumFractionDigits: 2,
+	}).format(val);
+
+const isValidFieldKey = (key: string) => /^[A-Za-z_]\w*$/.test(key);
+
+const toTenureMonths = (unit: TenorUnit, value: number) => {
+	if (unit === TenorUnit.YEAR) return value * 12;
+	if (unit === TenorUnit.DAY) return Math.max(1, Math.round(value / 30));
+	return value;
+};
+
+const tokenizeFormula = (input: string): Token[] => {
+	const tokens: Token[] = [];
+	let i = 0;
+
+	while (i < input.length) {
+		const ch = input[i];
+		if (/\s/.test(ch)) {
+			i += 1;
+			continue;
+		}
+
+		if (/[0-9.]/.test(ch)) {
+			let value = ch;
+			i += 1;
+			while (i < input.length && /[0-9.]/.test(input[i])) {
+				value += input[i];
+				i += 1;
+			}
+			const parsed = Number(value);
+			if (Number.isNaN(parsed)) {
+				throw new TypeError(`Invalid number: ${value}`);
+			}
+			tokens.push({ type: "number", value: parsed });
+			continue;
+		}
+
+		if (/[A-Za-z_]/.test(ch)) {
+			let value = ch;
+			i += 1;
+			while (i < input.length && /\w/.test(input[i])) {
+				value += input[i];
+				i += 1;
+			}
+			tokens.push({ type: "identifier", value });
+			continue;
+		}
+
+		if (ch === "+" || ch === "-" || ch === "*" || ch === "/" || ch === "^") {
+			tokens.push({
+				type: "operator",
+				value: ch,
+			});
+			i += 1;
+			continue;
+		}
+
+		if (ch === "(") {
+			tokens.push({ type: "lparen" });
+			i += 1;
+			continue;
+		}
+		if (ch === ")") {
+			tokens.push({ type: "rparen" });
+			i += 1;
+			continue;
+		}
+		if (ch === ",") {
+			tokens.push({ type: "comma" });
+			i += 1;
+			continue;
+		}
+
+		throw new Error(`Unsupported token: ${ch}`);
+	}
+
+	return tokens;
+};
+
+const parseFormula = (input: string): ExpressionNode => {
+	const tokens = tokenizeFormula(input);
+	let cursor = 0;
+
+	const peek = () => tokens[cursor];
+	const consume = () => {
+		const token = tokens[cursor];
+		cursor += 1;
+		return token;
+	};
+
+	const parseExpression = (): ExpressionNode => parseAddSub();
+
+	const parseAddSub = (): ExpressionNode => {
+		let node = parseMulDiv();
+		while (true) {
+			const token = peek();
+			if (
+				token?.type === "operator" &&
+				(token.value === "+" || token.value === "-")
+			) {
+				consume();
+				const right = parseMulDiv();
+				node = {
+					type: "binary",
+					operator: token.value,
+					left: node,
+					right,
+				};
+				continue;
+			}
+			break;
+		}
+		return node;
+	};
+
+	const parseMulDiv = (): ExpressionNode => {
+		let node = parsePow();
+		while (true) {
+			const token = peek();
+			if (
+				token?.type === "operator" &&
+				(token.value === "*" || token.value === "/")
+			) {
+				consume();
+				const right = parsePow();
+				node = {
+					type: "binary",
+					operator: token.value,
+					left: node,
+					right,
+				};
+				continue;
+			}
+			break;
+		}
+		return node;
+	};
+
+	const parsePow = (): ExpressionNode => {
+		let node = parseUnary();
+		const token = peek();
+		if (token?.type === "operator" && token.value === "^") {
+			consume();
+			const right = parsePow();
+			node = {
+				type: "binary",
+				operator: "^",
+				left: node,
+				right,
+			};
+		}
+		return node;
+	};
+
+	const parseUnary = (): ExpressionNode => {
+		const token = peek();
+		if (
+			token?.type === "operator" &&
+			(token.value === "+" || token.value === "-")
+		) {
+			consume();
+			const operand = parseUnary();
+			return {
+				type: "unary",
+				operator: token.value,
+				operand,
+			};
+		}
+		return parsePrimary();
+	};
+
+	const parsePrimary = (): ExpressionNode => {
+		const token = peek();
+		if (!token) {
+			throw new Error("Unexpected end of formula");
+		}
+
+		if (token.type === "number") {
+			consume();
+			return { type: "number", value: token.value };
+		}
+
+		if (token.type === "identifier") {
+			consume();
+			if (peek()?.type === "lparen") {
+				consume();
+				const args: ExpressionNode[] = [];
+				if (peek()?.type !== "rparen") {
+					while (true) {
+						args.push(parseExpression());
+						if (peek()?.type === "comma") {
+							consume();
+							continue;
+						}
+						break;
+					}
+				}
+				if (peek()?.type !== "rparen") {
+					throw new Error("Expected closing parenthesis");
+				}
+				consume();
+				return {
+					type: "function",
+					name: token.value,
+					args,
+				};
+			}
+			return { type: "variable", name: token.value };
+		}
+
+		if (token.type === "lparen") {
+			consume();
+			const node = parseExpression();
+			if (peek()?.type !== "rparen") {
+				throw new Error("Expected closing parenthesis");
+			}
+			consume();
+			return node;
+		}
+
+		throw new Error("Invalid formula expression");
+	};
+
+	const root = parseExpression();
+	if (cursor < tokens.length) {
+		throw new Error("Invalid trailing expression");
+	}
+	return root;
+};
+
+const evalFormulaNode = (
+	node: ExpressionNode,
+	context: FormulaContext,
+): number => {
+	switch (node.type) {
+		case "number":
+			return node.value;
+		case "variable": {
+			if (Object.hasOwn(context, node.name)) {
+				return context[node.name] ?? 0;
+			}
+			throw new Error(`Unknown variable: ${node.name}`);
+		}
+		case "unary": {
+			const value = evalFormulaNode(node.operand, context);
+			return node.operator === "-" ? -value : value;
+		}
+		case "binary": {
+			const left = evalFormulaNode(node.left, context);
+			const right = evalFormulaNode(node.right, context);
+			switch (node.operator) {
+				case "+":
+					return left + right;
+				case "-":
+					return left - right;
+				case "*":
+					return left * right;
+				case "/":
+					return right === 0 ? 0 : left / right;
+				case "^":
+					return left ** right;
+				default:
+					return 0;
+			}
+		}
+		case "function": {
+			const args = node.args.map((arg) => evalFormulaNode(arg, context));
+			switch (node.name) {
+				case "min":
+					return Math.min(...args);
+				case "max":
+					return Math.max(...args);
+				case "abs":
+					return Math.abs(args[0] ?? 0);
+				case "round":
+					return Math.round(args[0] ?? 0);
+				case "floor":
+					return Math.floor(args[0] ?? 0);
+				case "ceil":
+					return Math.ceil(args[0] ?? 0);
+				case "pow":
+					return (args[0] ?? 0) ** (args[1] ?? 0);
+				case "sqrt":
+					return Math.sqrt(args[0] ?? 0);
+				case "log":
+					return Math.log(args[0] ?? 1);
+				case "exp":
+					return Math.exp(args[0] ?? 0);
+				default:
+					throw new Error(`Unsupported function: ${node.name}`);
+			}
+		}
+		default:
+			return 0;
+	}
+};
+
+const daysBetween = (start: Date, end: Date) => {
+	const msPerDay = 24 * 60 * 60 * 1000;
+	const utcStart = Date.UTC(
+		start.getFullYear(),
+		start.getMonth(),
+		start.getDate(),
+	);
+	const utcEnd = Date.UTC(end.getFullYear(), end.getMonth(), end.getDate());
+	return Math.max(1, Math.round((utcEnd - utcStart) / msPerDay));
+};
+
+const buildPaymentDate = (
+	startDate: Date,
+	period: number,
+	scheduleType: PaymentScheduleType,
+	monthEndFirstPayment: MonthEndFirstPayment,
+) => {
+	if (scheduleType === "month-end") {
+		const year = startDate.getFullYear();
+		const monthEndOffset =
+			startDate.getDate() > 15 && monthEndFirstPayment === "next-month-end"
+				? 1
+				: 0;
+		const month = startDate.getMonth() + monthEndOffset + (period - 1);
+		return new Date(year, month + 1, 0);
+	}
+
+	if (scheduleType === "daily-accrual") {
+		const targetYear = startDate.getFullYear();
+		const targetMonth = startDate.getMonth() + (period - 1);
+		const fixedDay = startDate.getDate();
+		const lastDayInMonth = new Date(targetYear, targetMonth + 1, 0).getDate();
+		return new Date(
+			targetYear,
+			targetMonth,
+			Math.min(fixedDay, lastDayInMonth),
+		);
+	}
+
+	const targetYear = startDate.getFullYear();
+	const targetMonth = startDate.getMonth() + period;
+	const fixedDay = startDate.getDate();
+	const lastDayInMonth = new Date(targetYear, targetMonth + 1, 0).getDate();
+	return new Date(targetYear, targetMonth, Math.min(fixedDay, lastDayInMonth));
+};
+
+const calculateCustomEmi = (
+	amount: number,
+	rateAnnual: number,
+	tenureMonths: number,
+	customType: CustomEmiType | null,
+	customFieldValues: Record<string, number>,
+	startDate: Date,
+	paymentScheduleType: PaymentScheduleType,
+	monthEndFirstPayment: MonthEndFirstPayment,
+): CustomEmiPreview => {
+	if (!customType) {
+		return {
+			emi: 0,
+			totalPayment: 0,
+			totalInterest: 0,
+			error: "Select a custom EMI type.",
+		};
+	}
+	if (amount <= 0 || tenureMonths <= 0) {
+		return {
+			emi: 0,
+			totalPayment: 0,
+			totalInterest: 0,
+			error: "Loan amount and tenure must be positive.",
+		};
+	}
+	if (!customType.principalFormula.trim()) {
+		return {
+			emi: 0,
+			totalPayment: 0,
+			totalInterest: 0,
+			error: "Principal formula is required.",
+		};
+	}
+	if (!customType.interestFormula.trim()) {
+		return {
+			emi: 0,
+			totalPayment: 0,
+			totalInterest: 0,
+			error: "Interest formula is required.",
+		};
+	}
+
+	let parsedFormulaNodes: {
+		principalNode: ExpressionNode;
+		interestNode: ExpressionNode;
+	};
+	try {
+		parsedFormulaNodes = {
+			principalNode: parseFormula(customType.principalFormula),
+			interestNode: parseFormula(customType.interestFormula),
+		};
+	} catch (error) {
+		return {
+			emi: 0,
+			totalPayment: 0,
+			totalInterest: 0,
+			error: error instanceof Error ? error.message : "Invalid formula.",
+		};
+	}
+
+	const rateMonthly = rateAnnual / 12 / 100;
+	const rateAnnualDecimal = rateAnnual / 100;
+	const rateDaily = rateAnnualDecimal / 365;
+	const baseEmi =
+		rateMonthly <= 0
+			? amount / tenureMonths
+			: (amount * rateMonthly * (1 + rateMonthly) ** tenureMonths) /
+				((1 + rateMonthly) ** tenureMonths - 1);
+
+	let remainingBalance = amount;
+	let totalPaid = 0;
+	let totalInterestPaid = 0;
+	let prevPayment = 0;
+	let prevPrincipal = 0;
+	let prevInterest = 0;
+	let previousDate = startDate;
+	let firstPayment = 0;
+
+	for (let i = 1; i <= tenureMonths; i++) {
+		const paymentDate = buildPaymentDate(
+			startDate,
+			i,
+			paymentScheduleType,
+			monthEndFirstPayment,
+		);
+		const periodDays = daysBetween(previousDate, paymentDate);
+		const scheduleRate =
+			paymentScheduleType === "daily-accrual"
+				? (rateAnnualDecimal * periodDays) / 365
+				: rateMonthly;
+
+		const context: FormulaContext = {
+			principal: amount,
+			balance: remainingBalance,
+			rateMonthly: scheduleRate,
+			rateAnnual: rateAnnualDecimal,
+			rateDaily,
+			ratePeriod: scheduleRate,
+			daysInPeriod: periodDays,
+			period: i,
+			tenureMonths,
+			remainingMonths: tenureMonths - i + 1,
+			baseEmi,
+			prevPayment,
+			prevPrincipal,
+			prevInterest,
+		};
+
+		for (const field of customType.fieldDefinitions) {
+			if (!isValidFieldKey(field.key)) {
+				continue;
+			}
+			context[field.key] = customFieldValues[field.key] ?? field.defaultValue;
+		}
+
+		let interest = evalFormulaNode(parsedFormulaNodes.interestNode, context);
+		if (!Number.isFinite(interest)) {
+			interest = 0;
+		}
+		interest = Math.max(0, interest);
+
+		let principal = evalFormulaNode(parsedFormulaNodes.principalNode, context);
+		if (!Number.isFinite(principal)) {
+			principal = 0;
+		}
+		principal = Math.max(0, principal);
+
+		let payment = principal + interest;
+		if (principal > remainingBalance) {
+			principal = remainingBalance;
+			payment = principal + interest;
+		}
+
+		if (i === tenureMonths && remainingBalance - principal > 0) {
+			const residual = remainingBalance - principal;
+			principal += residual;
+			payment += residual;
+		}
+
+		remainingBalance -= principal;
+		totalPaid += payment;
+		totalInterestPaid += interest;
+		prevPayment = payment;
+		prevPrincipal = principal;
+		prevInterest = interest;
+		previousDate = paymentDate;
+		if (i === 1) {
+			firstPayment = payment;
+		}
+	}
+
+	return {
+		emi: firstPayment,
+		totalPayment: totalPaid,
+		totalInterest: totalInterestPaid,
+		error: null,
+	};
+};
+
 function LoanSetup() {
 	const navigate = useNavigate();
 
@@ -91,6 +700,22 @@ function LoanSetup() {
 	const [documentRequirements, setDocumentRequirements] = useState<
 		DocumentRequirementItem[]
 	>(() => [createDocumentRequirementItem("LOW", DEFAULT_REQUIRED_DOCUMENTS)]);
+	const [isSecuredLoan, setIsSecuredLoan] = useState(false);
+	const [customEmiTypes, setCustomEmiTypes] = useState<CustomEmiType[]>([]);
+	const [selectedCustomEmiTypeId, setSelectedCustomEmiTypeId] =
+		useState<string>("");
+	const [customEmiFieldValues, setCustomEmiFieldValues] = useState<
+		Record<string, number>
+	>({});
+	const [customEmiAmount, setCustomEmiAmount] = useState<number>(
+		loanProductSetup.minAmount,
+	);
+	const [customEmiTenorValue, setCustomEmiTenorValue] = useState<number>(
+		loanProductSetup.loanTenor.TenorValue[0] ?? 0,
+	);
+	const [customEmiLoadError, setCustomEmiLoadError] = useState<string | null>(
+		null,
+	);
 	const [channels, setChannels] = useState<ChannelConfig[]>([
 		{ name: "", code: "" },
 	]);
@@ -234,6 +859,155 @@ function LoanSetup() {
 	}, [activeScoreCard]);
 
 	useEffect(() => {
+		try {
+			const stored = localStorage.getItem(customEmiTypesStorageKey);
+			if (!stored) {
+				return;
+			}
+			const parsed: unknown = JSON.parse(stored);
+			if (!Array.isArray(parsed) || parsed.length === 0) {
+				return;
+			}
+
+			const restoredTypes = parsed
+				.filter(
+					(item): item is Record<string, unknown> =>
+						!!item && typeof item === "object",
+				)
+				.map((item) => {
+					const rawFields = item.fieldDefinitions;
+					const fieldDefinitions = Array.isArray(rawFields)
+						? rawFields
+								.filter(
+									(field): field is Record<string, unknown> =>
+										!!field && typeof field === "object",
+								)
+								.map((field) => ({
+									id:
+										typeof field.id === "string" && field.id
+											? field.id
+											: `${Date.now().toString(36)}-${Math.random()
+													.toString(36)
+													.slice(2, 8)}`,
+									key: typeof field.key === "string" ? field.key : "",
+									label: typeof field.label === "string" ? field.label : "",
+									description:
+										typeof field.description === "string"
+											? field.description
+											: "",
+									defaultValue:
+										typeof field.defaultValue === "number"
+											? field.defaultValue
+											: Number(field.defaultValue) || 0,
+								}))
+						: [];
+
+					return {
+						id:
+							typeof item.id === "string" && item.id
+								? item.id
+								: `${Date.now().toString(36)}-${Math.random()
+										.toString(36)
+										.slice(2, 8)}`,
+						name: typeof item.name === "string" ? item.name : "Custom Type",
+						principalFormula:
+							typeof item.principalFormula === "string"
+								? item.principalFormula
+								: "0",
+						interestFormula:
+							typeof item.interestFormula === "string"
+								? item.interestFormula
+								: "0",
+						fieldDefinitions,
+					} as CustomEmiType;
+				});
+
+			if (restoredTypes.length > 0) {
+				setCustomEmiTypes(restoredTypes);
+			}
+		} catch {
+			setCustomEmiLoadError("Failed to load saved custom EMI types.");
+		}
+	}, []);
+
+	useEffect(() => {
+		if (customEmiTypes.length === 0) {
+			setSelectedCustomEmiTypeId("");
+			return;
+		}
+		if (
+			!selectedCustomEmiTypeId ||
+			!customEmiTypes.some((item) => item.id === selectedCustomEmiTypeId)
+		) {
+			setSelectedCustomEmiTypeId(customEmiTypes[0]?.id ?? "");
+		}
+	}, [customEmiTypes, selectedCustomEmiTypeId]);
+
+	const selectedCustomEmiType = useMemo(
+		() =>
+			customEmiTypes.find((item) => item.id === selectedCustomEmiTypeId) ??
+			null,
+		[customEmiTypes, selectedCustomEmiTypeId],
+	);
+
+	const customEmiStartDate = useMemo(() => new Date(), []);
+	const customEmiRate =
+		primaryInterestPlan?.baseRate ?? product.baseInterestRate ?? 0;
+	const customEmiPreview = useMemo(() => {
+		const tenureMonths = toTenureMonths(
+			product.loanTenor.TenorUnit,
+			customEmiTenorValue,
+		);
+		return calculateCustomEmi(
+			customEmiAmount,
+			customEmiRate,
+			tenureMonths,
+			selectedCustomEmiType,
+			customEmiFieldValues,
+			customEmiStartDate,
+			"fixed-day",
+			"this-month-end",
+		);
+	}, [
+		customEmiAmount,
+		customEmiFieldValues,
+		customEmiRate,
+		customEmiStartDate,
+		customEmiTenorValue,
+		product.loanTenor.TenorUnit,
+		selectedCustomEmiType,
+	]);
+
+	useEffect(() => {
+		if (!selectedCustomEmiType) {
+			setCustomEmiFieldValues({});
+			return;
+		}
+		setCustomEmiFieldValues((prev) => {
+			const next: Record<string, number> = {};
+			for (const def of selectedCustomEmiType.fieldDefinitions) {
+				next[def.key] = prev[def.key] ?? def.defaultValue;
+			}
+			return next;
+		});
+	}, [selectedCustomEmiType]);
+
+	useEffect(() => {
+		const values = product.loanTenor.TenorValue;
+		if (values.length === 0) {
+			setCustomEmiTenorValue(0);
+			return;
+		}
+		if (!values.includes(customEmiTenorValue)) {
+			setCustomEmiTenorValue(values[0] ?? 0);
+		}
+	}, [customEmiTenorValue, product.loanTenor.TenorValue]);
+
+	useEffect(() => {
+		setCustomEmiAmount((prev) => (prev > 0 ? prev : product.minAmount));
+	}, [product.minAmount]);
+
+	useEffect(() => {
 		setScoreInputs((prev) => {
 			const next: Record<string, string> = {};
 			for (const field of configuredFields) {
@@ -243,6 +1017,12 @@ function LoanSetup() {
 		});
 		setRiskResult(null);
 	}, [configuredFields]);
+
+	useEffect(() => {
+		setDocumentRequirements((prev) =>
+			ensureSecuredCollateralDocuments(prev, isSecuredLoan, true),
+		);
+	}, [documentRequirements, isSecuredLoan]);
 
 	const resetProduct = () => {
 		setProduct(cloneLoanProduct(loanProductSetup));
@@ -291,7 +1071,13 @@ function LoanSetup() {
 				: ({ type: "WALLET" } satisfies DisbursementDestination),
 		);
 
-		const normalizedRequirements = documentRequirements.flatMap((requirement) =>
+		const effectiveRequirements = ensureSecuredCollateralDocuments(
+			documentRequirements,
+			isSecuredLoan,
+			true,
+		);
+
+		const normalizedRequirements = effectiveRequirements.flatMap((requirement) =>
 			requirement.documents.map((document) => ({
 				documentTypeId: document.documentTypeId,
 				minAmount: document.minAmount,
@@ -306,11 +1092,20 @@ function LoanSetup() {
 		addLoanSetup({
 			product,
 			channels,
+			isSecuredLoan,
 			scorecardId: activeScoreCard?.scoreCardId ?? null,
 			scorecardName: activeScoreCard?.name ?? null,
 			workflowId: selectedWorkflowId,
 			workflowName: selectedWorkflowId
 				? (workflows[selectedWorkflowId]?.name ?? "(unnamed workflow)")
+				: null,
+			customEmiTypeId: selectedCustomEmiType?.id ?? null,
+			customEmiTypeName: selectedCustomEmiType?.name ?? null,
+			customEmiPrincipalFormula:
+				selectedCustomEmiType?.principalFormula ?? null,
+			customEmiInterestFormula: selectedCustomEmiType?.interestFormula ?? null,
+			customEmiFieldValues: selectedCustomEmiType
+				? { ...customEmiFieldValues }
 				: null,
 			riskResult,
 			documentRequirements: normalizedRequirements,
@@ -399,6 +1194,42 @@ function LoanSetup() {
 							className="border px-2 py-1 rounded"
 						/>
 					</label>
+
+					<section className="border p-4 rounded mb-6 col-span-2">
+						<div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between mb-3">
+							<div>
+								<h2 className="font-semibold">Loan Security</h2>
+								<div className="text-xs text-gray-600">
+									Choose whether the loan is secured by collateral.
+								</div>
+							</div>
+						</div>
+						<div className="flex flex-wrap gap-6 text-sm">
+							<label className="flex items-center gap-2">
+								<input
+									type="radio"
+									name="loan-security"
+									checked={isSecuredLoan}
+									onChange={() => setIsSecuredLoan(true)}
+								/>
+								<span>Secured</span>
+							</label>
+							<label className="flex items-center gap-2">
+								<input
+									type="radio"
+									name="loan-security"
+									checked={!isSecuredLoan}
+									onChange={() => setIsSecuredLoan(false)}
+								/>
+								<span>Unsecured</span>
+							</label>
+						</div>
+						<p className="text-xs text-gray-600 mt-2">
+							Secured loans require collateral document types for all risk
+							grades.
+						</p>
+					</section>
+
 					<TenorInterestSection
 						product={product}
 						onUpdateTenureUnit={updateTenureUnit}
@@ -445,6 +1276,155 @@ function LoanSetup() {
 						</div>
 					</dl>
 				</div>
+			</section>
+
+			<section className="border p-4 rounded mb-6">
+				<div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between mb-3">
+					<div>
+						<h2 className="font-semibold">Custom EMI Formula</h2>
+						<div className="text-xs text-gray-600">
+							Pick a saved formula to preview the EMI calculation here.
+						</div>
+					</div>
+					<Link
+						to="/loan/emi-custom-calculator"
+						className="text-sm border px-3 py-1 rounded hover:bg-gray-50"
+					>
+						Manage formulas
+					</Link>
+				</div>
+
+				{customEmiLoadError && (
+					<div className="text-sm text-red-700 border rounded p-3 bg-red-50">
+						{customEmiLoadError}
+					</div>
+				)}
+
+				{customEmiTypes.length === 0 ? (
+					<div className="text-sm text-gray-700 border rounded p-3 bg-gray-50">
+						No saved custom EMI types yet. Create one in the custom EMI
+						calculator to use it here.
+					</div>
+				) : (
+					<div className="space-y-4">
+						<label className="flex flex-col gap-1 text-sm">
+							<span>Custom EMI Type</span>
+							<select
+								value={selectedCustomEmiTypeId}
+								onChange={(e) => setSelectedCustomEmiTypeId(e.target.value)}
+								className="border px-2 py-2 rounded"
+							>
+								{customEmiTypes.map((type) => (
+									<option key={type.id} value={type.id}>
+										{type.name}
+									</option>
+								))}
+							</select>
+						</label>
+
+						<div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+							<label className="flex flex-col gap-1 text-sm">
+								<span>Sample Amount</span>
+								<input
+									type="number"
+									min={0}
+									value={customEmiAmount}
+									onChange={(e) =>
+										setCustomEmiAmount(Number(e.target.value) || 0)
+									}
+									className="border px-2 py-2 rounded"
+								/>
+							</label>
+							<label className="flex flex-col gap-1 text-sm">
+								<span>Tenure ({product.loanTenor.TenorUnit})</span>
+								<select
+									value={customEmiTenorValue}
+									onChange={(e) =>
+										setCustomEmiTenorValue(Number(e.target.value) || 0)
+									}
+									className="border px-2 py-2 rounded"
+									disabled={product.loanTenor.TenorValue.length === 0}
+								>
+									{product.loanTenor.TenorValue.length === 0 ? (
+										<option value={0}>No tenure options</option>
+									) : (
+										product.loanTenor.TenorValue.map((value) => (
+											<option key={value} value={value}>
+												{value}
+											</option>
+										))
+									)}
+								</select>
+							</label>
+							<div className="flex flex-col gap-1 text-sm">
+								<span>Base Rate</span>
+								<div className="border px-2 py-2 rounded bg-gray-50 text-gray-700">
+									{customEmiRate}%
+								</div>
+							</div>
+						</div>
+
+						{(selectedCustomEmiType?.fieldDefinitions.length ?? 0) > 0 && (
+							<div className="space-y-3">
+								<h3 className="font-medium text-sm text-gray-800">
+									Custom Field Values
+								</h3>
+								<div className="grid gap-3 sm:grid-cols-2">
+									{selectedCustomEmiType?.fieldDefinitions.map((field) => (
+										<div key={field.id}>
+											<label className="block text-sm font-medium mb-1 text-gray-700">
+												{field.label || field.key}
+											</label>
+											<input
+												type="number"
+												value={
+													customEmiFieldValues[field.key] ?? field.defaultValue
+												}
+												onChange={(e) =>
+													setCustomEmiFieldValues((prev) => ({
+														...prev,
+														[field.key]: Number(e.target.value) || 0,
+													}))
+												}
+												className="w-full border p-2 rounded"
+											/>
+											{field.description && (
+												<p className="text-xs text-gray-500 mt-1">
+													{field.description}
+												</p>
+											)}
+										</div>
+									))}
+								</div>
+							</div>
+						)}
+
+						<div className="bg-gray-50 border rounded p-3 text-sm">
+							<div className="font-semibold mb-2">Preview</div>
+							<dl className="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs text-gray-700">
+								<div>
+									<dt>First Period EMI</dt>
+									<dd className="font-semibold">
+										{formatCurrency(customEmiPreview.emi)}
+									</dd>
+								</div>
+								<div>
+									<dt>Total Interest</dt>
+									<dd>{formatCurrency(customEmiPreview.totalInterest)}</dd>
+								</div>
+								<div>
+									<dt>Total Payment</dt>
+									<dd>{formatCurrency(customEmiPreview.totalPayment)}</dd>
+								</div>
+							</dl>
+							{customEmiPreview.error && (
+								<div className="mt-2 text-xs text-red-700">
+									{customEmiPreview.error}
+								</div>
+							)}
+						</div>
+					</div>
+				)}
 			</section>
 
 			{/* Scorecard */}

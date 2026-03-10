@@ -201,10 +201,16 @@ export type LoanWorkflowSnapshot = {
 	createdAt: number;
 	product: LoanProduct;
 	channels: ChannelConfig[];
+	isSecuredLoan: boolean;
 	scorecardId: string | null;
 	scorecardName: string | null;
 	workflowId: string | null;
 	workflowName: string | null;
+	customEmiTypeId: string | null;
+	customEmiTypeName: string | null;
+	customEmiPrincipalFormula: string | null;
+	customEmiInterestFormula: string | null;
+	customEmiFieldValues: Record<string, number> | null;
 	riskGrade: RiskGrade | null;
 	documentRequirements: DocumentRequirement[];
 	totalScore: number | null;
@@ -223,10 +229,16 @@ export type LoanWorkflowSnapshot = {
 type LoanWorkflowInput = {
 	product: LoanProduct;
 	channels?: ChannelConfig[];
+	isSecuredLoan?: boolean;
 	scorecardId?: string | null;
 	scorecardName?: string | null;
 	workflowId?: string | null;
 	workflowName?: string | null;
+	customEmiTypeId?: string | null;
+	customEmiTypeName?: string | null;
+	customEmiPrincipalFormula?: string | null;
+	customEmiInterestFormula?: string | null;
+	customEmiFieldValues?: Record<string, number> | null;
 	riskResult?: ScoreEngineResult | null;
 	documentRequirements?: DocumentRequirement[];
 	disbursementType?: DisbursementType;
@@ -265,10 +277,16 @@ export const useLoanSetupStore = create<LoanWorkflowState>()(
 					createdAt: Date.now(),
 					product: cloneLoanProduct(input.product),
 					channels,
+					isSecuredLoan: input.isSecuredLoan ?? false,
 					scorecardId: input.scorecardId ?? null,
 					scorecardName: input.scorecardName ?? null,
 					workflowId: input.workflowId ?? null,
 					workflowName: input.workflowName ?? null,
+					customEmiTypeId: input.customEmiTypeId ?? null,
+					customEmiTypeName: input.customEmiTypeName ?? null,
+					customEmiPrincipalFormula: input.customEmiPrincipalFormula ?? null,
+					customEmiInterestFormula: input.customEmiInterestFormula ?? null,
+					customEmiFieldValues: input.customEmiFieldValues ?? null,
 					riskGrade: input.riskResult?.riskGrade ?? null,
 					documentRequirements,
 					totalScore: input.riskResult?.totalScore ?? null,
@@ -325,10 +343,19 @@ export const useLoanSetupStore = create<LoanWorkflowState>()(
 					...current,
 					product: cloneLoanProduct(input.product),
 					channels,
+					isSecuredLoan: input.isSecuredLoan ?? current.isSecuredLoan,
 					scorecardId: input.scorecardId ?? null,
 					scorecardName: input.scorecardName ?? null,
 					workflowId: input.workflowId ?? null,
 					workflowName: input.workflowName ?? null,
+					customEmiTypeId: input.customEmiTypeId ?? current.customEmiTypeId,
+					customEmiTypeName: input.customEmiTypeName ?? current.customEmiTypeName,
+					customEmiPrincipalFormula:
+						input.customEmiPrincipalFormula ?? current.customEmiPrincipalFormula,
+					customEmiInterestFormula:
+						input.customEmiInterestFormula ?? current.customEmiInterestFormula,
+					customEmiFieldValues:
+						input.customEmiFieldValues ?? current.customEmiFieldValues,
 					riskGrade: input.riskResult?.riskGrade ?? current.riskGrade,
 					documentRequirements: nextDocumentRequirements,
 					totalScore: input.riskResult?.totalScore ?? current.totalScore,
@@ -361,7 +388,7 @@ export const useLoanSetupStore = create<LoanWorkflowState>()(
 		}),
 		{
 			name: "loan-workflow-setups",
-			version: 5,
+			version: 6,
 			migrate: (persistedState: any, version) => {
 				if (!persistedState) return { setups: {} };
 				let nextState = persistedState;
@@ -466,6 +493,30 @@ export const useLoanSetupStore = create<LoanWorkflowState>()(
 								{
 									...snapshot,
 									documentRequirements: normalizeDocumentRequirements(converted),
+								},
+							];
+						},
+					);
+					nextState = {
+						...nextState,
+						setups: Object.fromEntries(upgradedEntries),
+					};
+				}
+				if (version < 6) {
+					const storedSetups = (nextState.setups ?? {}) as Record<
+						string,
+						LoanWorkflowSnapshot & {
+							isSecuredLoan?: boolean;
+						}
+					>;
+					const upgradedEntries = Object.entries(storedSetups).map(
+						([id, snapshot]) => {
+							if (!snapshot) return [id, snapshot];
+							return [
+								id,
+								{
+									...snapshot,
+									isSecuredLoan: snapshot.isSecuredLoan ?? false,
 								},
 							];
 						},
