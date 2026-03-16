@@ -2,9 +2,9 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo } from "react";
 import {
   getLoanApplicationList,
+  getLoanApplicationStatusLabel,
   useLoanApplicationStore,
 } from "@/lib/loan-application-store";
-import { useLoanSetupStore } from "@/lib/loan-setup-store";
 
 export const Route = createFileRoute("/loan/applications/")({
   component: LoanApplicationList,
@@ -12,7 +12,6 @@ export const Route = createFileRoute("/loan/applications/")({
 
 function LoanApplicationList() {
   const applications = useLoanApplicationStore((s) => s.applications);
-  const setups = useLoanSetupStore((s) => s.setups);
   const rows = useMemo(
     () => getLoanApplicationList(applications),
     [applications],
@@ -33,6 +32,18 @@ function LoanApplicationList() {
             className="text-sm border px-3 rounded hover:bg-gray-50"
           >
             New application
+          </Link>
+          <Link
+            to="/loan/maker-inbox"
+            className="text-sm border px-3 rounded hover:bg-gray-50"
+          >
+            Maker Inbox
+          </Link>
+          <Link
+            to="/loan/checker-inbox"
+            className="text-sm border px-3 rounded hover:bg-gray-50"
+          >
+            Checker Inbox
           </Link>
           <Link
             to="/loan/setup"
@@ -86,7 +97,9 @@ function LoanApplicationList() {
                     <td className="px-3 py-2 whitespace-nowrap">
                       {score === null ? "—" : max ? `${score} / ${max}` : `${score}`}
                     </td>
-                    <td className="px-3 py-2">{row.status}</td>
+                    <td className="px-3 py-2">
+                      {getLoanApplicationStatusLabel(row)}
+                    </td>
                     <td className="px-3 py-2 whitespace-nowrap">
                       {new Date(row.createdAt).toLocaleString()}
                     </td>

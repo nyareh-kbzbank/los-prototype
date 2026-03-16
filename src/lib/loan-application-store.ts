@@ -3,12 +3,27 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { DisbursementDestinationType, TenorUnit } from "./loan-setup-store";
 
-export type LoanApplicationStatus = "DRAFT" | "SUBMITTED" | "APPROVED" | "REJECTED";
+export type LoanApplicationStatus =
+  | "DRAFT"
+  | "SUBMITTED"
+  | "CHECKER_PENDING"
+  | "APPROVED"
+  | "REJECTED";
 
 export type ApplicationWorkflowEvent = {
   stageIndex: number;
   stageId: string;
   stageLabel: string;
+  occurredAt: number;
+};
+
+export type ApplicationDecisionActor = "SYSTEM" | "MAKER" | "CHECKER";
+
+export type ApplicationDecisionEvent = {
+  actor: ApplicationDecisionActor;
+  fromStatus: LoanApplicationStatus | null;
+  toStatus: LoanApplicationStatus;
+  note: string;
   occurredAt: number;
 };
 
@@ -38,6 +53,7 @@ export type LoanApplication = {
   workflowName: string | null;
   workflowStageIndex: number;
   workflowHistory: ApplicationWorkflowEvent[];
+  decisionHistory: ApplicationDecisionEvent[];
   bureauProvider: string;
   bureauPurpose: string;
   bureauConsent: boolean;
@@ -46,6 +62,7 @@ export type LoanApplication = {
 };
 
 export type LoanApplicationInput = {
+  status?: LoanApplicationStatus;
   beneficiaryName: string;
   nationalId: string;
   phone: string;
@@ -86,12 +103,13 @@ export const useLoanApplicationStore = create<LoanApplicationState>()(
       addApplication: (input) => {
         const now = Date.now();
         const applicationNo = generateApplicationNo(input.productCode);
+        const initialStatus = input.status ?? "DRAFT";
         const application: LoanApplication = {
           id: uuidV4(),
           applicationNo,
           createdAt: now,
           updatedAt: now,
-          status: "DRAFT",
+          status: initialStatus,
           beneficiaryName: input.beneficiaryName.trim(),
           nationalId: input.nationalId.trim(),
           phone: input.phone.trim(),
@@ -128,6 +146,18 @@ export const useLoanApplicationStore = create<LoanApplicationState>()(
           workflowName: input.workflowName ?? null,
           workflowStageIndex: -1,
           workflowHistory: [],
+          decisionHistory:
+            initialStatus === "SUBMITTED"
+              ? [
+                  {
+                    actor: "SYSTEM",
+                    fromStatus: null,
+                    toStatus: "SUBMITTED",
+                    note: "Entered maker inbox",
+                    occurredAt: now,
+                  },
+                ]
+              : [],
           bureauProvider: input.bureauProvider.trim() || "Unknown",
           bureauPurpose: input.bureauPurpose.trim() || "",
           bureauConsent: Boolean(input.bureauConsent),
@@ -147,10 +177,23 @@ export const useLoanApplicationStore = create<LoanApplicationState>()(
         set((prev) => {
           const existing = prev.applications[id];
           if (!existing) return prev;
+          if (existing.status === status) return prev;
+
+          const now = Date.now();
+          const decisionEvent = buildDecisionEvent(existing.status, status, now);
+          const nextDecisionHistory = decisionEvent
+            ? [...(existing.decisionHistory ?? []), decisionEvent]
+            : existing.decisionHistory ?? [];
+
           return {
             applications: {
               ...prev.applications,
-              [id]: { ...existing, status, updatedAt: Date.now() },
+              [id]: {
+                ...existing,
+                status,
+                decisionHistory: nextDecisionHistory,
+                updatedAt: now,
+              },
             },
           };
         });
@@ -202,7 +245,7 @@ export const useLoanApplicationStore = create<LoanApplicationState>()(
     }),
     {
       name: "loan-applications",
-      version: 4,
+      version: 5,
       partialize: (state) => ({ applications: state.applications }),
       migrate: (persistedState, version) => {
         const base = persistedState as Partial<LoanApplicationState> &
@@ -253,14 +296,107 @@ export const useLoanApplicationStore = create<LoanApplicationState>()(
           return { ...base, applications: patched } satisfies Partial<LoanApplicationState>;
         }
 
+        if (version < 5) {
+          const patched: Record<string, LoanApplication> = {};
+          for (const [id, app] of Object.entries(applications)) {
+            patched[id] = {
+              decisionHistory: [],
+              ...(app as LoanApplication),
+            };
+          }
+          return { ...base, applications: patched } satisfies Partial<LoanApplicationState>;
+        }
+
         return base as LoanApplicationState;
       },
     },
   ),
 );
 
+function buildDecisionEvent(
+  fromStatus: LoanApplicationStatus,
+  toStatus: LoanApplicationStatus,
+  occurredAt: number,
+): ApplicationDecisionEvent | null {
+  if (fromStatus === "SUBMITTED" && toStatus === "CHECKER_PENDING") {
+    return {
+      actor: "MAKER",
+      fromStatus,
+      toStatus,
+      note: "Submitted to checker",
+      occurredAt,
+    };
+  }
+
+  if (fromStatus === "SUBMITTED" && toStatus === "APPROVED") {
+    return {
+      actor: "MAKER",
+      fromStatus,
+      toStatus,
+      note: "Approved by maker",
+      occurredAt,
+    };
+  }
+
+  if (fromStatus === "SUBMITTED" && toStatus === "REJECTED") {
+    return {
+      actor: "MAKER",
+      fromStatus,
+      toStatus,
+      note: "Rejected by maker",
+      occurredAt,
+    };
+  }
+
+  if (fromStatus === "CHECKER_PENDING" && toStatus === "APPROVED") {
+    return {
+      actor: "CHECKER",
+      fromStatus,
+      toStatus,
+      note: "Approved by checker",
+      occurredAt,
+    };
+  }
+
+  if (fromStatus === "CHECKER_PENDING" && toStatus === "REJECTED") {
+    return {
+      actor: "CHECKER",
+      fromStatus,
+      toStatus,
+      note: "Rejected by checker",
+      occurredAt,
+    };
+  }
+
+  if (toStatus === "SUBMITTED") {
+    return {
+      actor: "SYSTEM",
+      fromStatus,
+      toStatus,
+      note: "Entered maker inbox",
+      occurredAt,
+    };
+  }
+
+  return null;
+}
+
 export function getLoanApplicationList(applications: Record<string, LoanApplication>) {
   return Object.values(applications).sort((a, b) => b.createdAt - a.createdAt);
+}
+
+export function getLoanApplicationStatusLabel(application: LoanApplication) {
+  const isAutoApproved =
+    application.status === "APPROVED" &&
+    (application.decisionHistory?.length ?? 0) === 0;
+  if (isAutoApproved) return "Auto-Approved";
+
+  const isAutoRejected =
+    application.status === "REJECTED" &&
+    (application.decisionHistory?.length ?? 0) === 0;
+  if (isAutoRejected) return "Auto-Rejected";
+
+  return application.status;
 }
 
 function generateApplicationNo(productCode: string) {

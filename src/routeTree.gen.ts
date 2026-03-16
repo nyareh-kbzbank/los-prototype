@@ -15,14 +15,19 @@ import { Route as LoanIndexRouteImport } from './routes/loan/index'
 import { Route as WorkflowSetupRouteImport } from './routes/workflow/setup'
 import { Route as WorkflowWorkflowIdRouteImport } from './routes/workflow/$workflowId'
 import { Route as LoanScorecardsRouteImport } from './routes/loan/scorecards'
+import { Route as LoanScorecardSetupAdvancedRouteImport } from './routes/loan/scorecard-setup-advanced'
 import { Route as LoanScorecardSetupRouteImport } from './routes/loan/scorecard-setup'
 import { Route as LoanRepaymentSetupRouteImport } from './routes/loan/repayment-setup'
 import { Route as LoanRepaymentPlansRouteImport } from './routes/loan/repayment-plans'
 import { Route as LoanEmiCustomCalculatorRouteImport } from './routes/loan/emi-custom-calculator'
 import { Route as LoanEmiCalculatorRouteImport } from './routes/loan/emi-calculator'
 import { Route as LoanSetupIndexRouteImport } from './routes/loan/setup/index'
+import { Route as LoanMakerInboxIndexRouteImport } from './routes/loan/maker-inbox/index'
+import { Route as LoanCheckerInboxIndexRouteImport } from './routes/loan/checker-inbox/index'
 import { Route as LoanApplicationsIndexRouteImport } from './routes/loan/applications/index'
 import { Route as LoanSetupSetupIdRouteImport } from './routes/loan/setup/$setupId'
+import { Route as LoanMakerInboxApplicationIdRouteImport } from './routes/loan/maker-inbox/$applicationId'
+import { Route as LoanCheckerInboxApplicationIdRouteImport } from './routes/loan/checker-inbox/$applicationId'
 import { Route as LoanApplicationsCreateRouteImport } from './routes/loan/applications/create'
 import { Route as LoanApplicationsApplicationIdRouteImport } from './routes/loan/applications/$applicationId'
 
@@ -56,6 +61,12 @@ const LoanScorecardsRoute = LoanScorecardsRouteImport.update({
   path: '/loan/scorecards',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LoanScorecardSetupAdvancedRoute =
+  LoanScorecardSetupAdvancedRouteImport.update({
+    id: '/loan/scorecard-setup-advanced',
+    path: '/loan/scorecard-setup-advanced',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const LoanScorecardSetupRoute = LoanScorecardSetupRouteImport.update({
   id: '/loan/scorecard-setup',
   path: '/loan/scorecard-setup',
@@ -86,6 +97,16 @@ const LoanSetupIndexRoute = LoanSetupIndexRouteImport.update({
   path: '/loan/setup/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LoanMakerInboxIndexRoute = LoanMakerInboxIndexRouteImport.update({
+  id: '/loan/maker-inbox/',
+  path: '/loan/maker-inbox/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoanCheckerInboxIndexRoute = LoanCheckerInboxIndexRouteImport.update({
+  id: '/loan/checker-inbox/',
+  path: '/loan/checker-inbox/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LoanApplicationsIndexRoute = LoanApplicationsIndexRouteImport.update({
   id: '/loan/applications/',
   path: '/loan/applications/',
@@ -96,6 +117,18 @@ const LoanSetupSetupIdRoute = LoanSetupSetupIdRouteImport.update({
   path: '/loan/setup/$setupId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LoanMakerInboxApplicationIdRoute =
+  LoanMakerInboxApplicationIdRouteImport.update({
+    id: '/loan/maker-inbox/$applicationId',
+    path: '/loan/maker-inbox/$applicationId',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const LoanCheckerInboxApplicationIdRoute =
+  LoanCheckerInboxApplicationIdRouteImport.update({
+    id: '/loan/checker-inbox/$applicationId',
+    path: '/loan/checker-inbox/$applicationId',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const LoanApplicationsCreateRoute = LoanApplicationsCreateRouteImport.update({
   id: '/loan/applications/create',
   path: '/loan/applications/create',
@@ -115,6 +148,7 @@ export interface FileRoutesByFullPath {
   '/loan/repayment-plans': typeof LoanRepaymentPlansRoute
   '/loan/repayment-setup': typeof LoanRepaymentSetupRoute
   '/loan/scorecard-setup': typeof LoanScorecardSetupRoute
+  '/loan/scorecard-setup-advanced': typeof LoanScorecardSetupAdvancedRoute
   '/loan/scorecards': typeof LoanScorecardsRoute
   '/workflow/$workflowId': typeof WorkflowWorkflowIdRoute
   '/workflow/setup': typeof WorkflowSetupRoute
@@ -122,8 +156,12 @@ export interface FileRoutesByFullPath {
   '/workflow': typeof WorkflowIndexRoute
   '/loan/applications/$applicationId': typeof LoanApplicationsApplicationIdRoute
   '/loan/applications/create': typeof LoanApplicationsCreateRoute
+  '/loan/checker-inbox/$applicationId': typeof LoanCheckerInboxApplicationIdRoute
+  '/loan/maker-inbox/$applicationId': typeof LoanMakerInboxApplicationIdRoute
   '/loan/setup/$setupId': typeof LoanSetupSetupIdRoute
   '/loan/applications': typeof LoanApplicationsIndexRoute
+  '/loan/checker-inbox': typeof LoanCheckerInboxIndexRoute
+  '/loan/maker-inbox': typeof LoanMakerInboxIndexRoute
   '/loan/setup': typeof LoanSetupIndexRoute
 }
 export interface FileRoutesByTo {
@@ -133,6 +171,7 @@ export interface FileRoutesByTo {
   '/loan/repayment-plans': typeof LoanRepaymentPlansRoute
   '/loan/repayment-setup': typeof LoanRepaymentSetupRoute
   '/loan/scorecard-setup': typeof LoanScorecardSetupRoute
+  '/loan/scorecard-setup-advanced': typeof LoanScorecardSetupAdvancedRoute
   '/loan/scorecards': typeof LoanScorecardsRoute
   '/workflow/$workflowId': typeof WorkflowWorkflowIdRoute
   '/workflow/setup': typeof WorkflowSetupRoute
@@ -140,8 +179,12 @@ export interface FileRoutesByTo {
   '/workflow': typeof WorkflowIndexRoute
   '/loan/applications/$applicationId': typeof LoanApplicationsApplicationIdRoute
   '/loan/applications/create': typeof LoanApplicationsCreateRoute
+  '/loan/checker-inbox/$applicationId': typeof LoanCheckerInboxApplicationIdRoute
+  '/loan/maker-inbox/$applicationId': typeof LoanMakerInboxApplicationIdRoute
   '/loan/setup/$setupId': typeof LoanSetupSetupIdRoute
   '/loan/applications': typeof LoanApplicationsIndexRoute
+  '/loan/checker-inbox': typeof LoanCheckerInboxIndexRoute
+  '/loan/maker-inbox': typeof LoanMakerInboxIndexRoute
   '/loan/setup': typeof LoanSetupIndexRoute
 }
 export interface FileRoutesById {
@@ -152,6 +195,7 @@ export interface FileRoutesById {
   '/loan/repayment-plans': typeof LoanRepaymentPlansRoute
   '/loan/repayment-setup': typeof LoanRepaymentSetupRoute
   '/loan/scorecard-setup': typeof LoanScorecardSetupRoute
+  '/loan/scorecard-setup-advanced': typeof LoanScorecardSetupAdvancedRoute
   '/loan/scorecards': typeof LoanScorecardsRoute
   '/workflow/$workflowId': typeof WorkflowWorkflowIdRoute
   '/workflow/setup': typeof WorkflowSetupRoute
@@ -159,8 +203,12 @@ export interface FileRoutesById {
   '/workflow/': typeof WorkflowIndexRoute
   '/loan/applications/$applicationId': typeof LoanApplicationsApplicationIdRoute
   '/loan/applications/create': typeof LoanApplicationsCreateRoute
+  '/loan/checker-inbox/$applicationId': typeof LoanCheckerInboxApplicationIdRoute
+  '/loan/maker-inbox/$applicationId': typeof LoanMakerInboxApplicationIdRoute
   '/loan/setup/$setupId': typeof LoanSetupSetupIdRoute
   '/loan/applications/': typeof LoanApplicationsIndexRoute
+  '/loan/checker-inbox/': typeof LoanCheckerInboxIndexRoute
+  '/loan/maker-inbox/': typeof LoanMakerInboxIndexRoute
   '/loan/setup/': typeof LoanSetupIndexRoute
 }
 export interface FileRouteTypes {
@@ -172,6 +220,7 @@ export interface FileRouteTypes {
     | '/loan/repayment-plans'
     | '/loan/repayment-setup'
     | '/loan/scorecard-setup'
+    | '/loan/scorecard-setup-advanced'
     | '/loan/scorecards'
     | '/workflow/$workflowId'
     | '/workflow/setup'
@@ -179,8 +228,12 @@ export interface FileRouteTypes {
     | '/workflow'
     | '/loan/applications/$applicationId'
     | '/loan/applications/create'
+    | '/loan/checker-inbox/$applicationId'
+    | '/loan/maker-inbox/$applicationId'
     | '/loan/setup/$setupId'
     | '/loan/applications'
+    | '/loan/checker-inbox'
+    | '/loan/maker-inbox'
     | '/loan/setup'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -190,6 +243,7 @@ export interface FileRouteTypes {
     | '/loan/repayment-plans'
     | '/loan/repayment-setup'
     | '/loan/scorecard-setup'
+    | '/loan/scorecard-setup-advanced'
     | '/loan/scorecards'
     | '/workflow/$workflowId'
     | '/workflow/setup'
@@ -197,8 +251,12 @@ export interface FileRouteTypes {
     | '/workflow'
     | '/loan/applications/$applicationId'
     | '/loan/applications/create'
+    | '/loan/checker-inbox/$applicationId'
+    | '/loan/maker-inbox/$applicationId'
     | '/loan/setup/$setupId'
     | '/loan/applications'
+    | '/loan/checker-inbox'
+    | '/loan/maker-inbox'
     | '/loan/setup'
   id:
     | '__root__'
@@ -208,6 +266,7 @@ export interface FileRouteTypes {
     | '/loan/repayment-plans'
     | '/loan/repayment-setup'
     | '/loan/scorecard-setup'
+    | '/loan/scorecard-setup-advanced'
     | '/loan/scorecards'
     | '/workflow/$workflowId'
     | '/workflow/setup'
@@ -215,8 +274,12 @@ export interface FileRouteTypes {
     | '/workflow/'
     | '/loan/applications/$applicationId'
     | '/loan/applications/create'
+    | '/loan/checker-inbox/$applicationId'
+    | '/loan/maker-inbox/$applicationId'
     | '/loan/setup/$setupId'
     | '/loan/applications/'
+    | '/loan/checker-inbox/'
+    | '/loan/maker-inbox/'
     | '/loan/setup/'
   fileRoutesById: FileRoutesById
 }
@@ -227,6 +290,7 @@ export interface RootRouteChildren {
   LoanRepaymentPlansRoute: typeof LoanRepaymentPlansRoute
   LoanRepaymentSetupRoute: typeof LoanRepaymentSetupRoute
   LoanScorecardSetupRoute: typeof LoanScorecardSetupRoute
+  LoanScorecardSetupAdvancedRoute: typeof LoanScorecardSetupAdvancedRoute
   LoanScorecardsRoute: typeof LoanScorecardsRoute
   WorkflowWorkflowIdRoute: typeof WorkflowWorkflowIdRoute
   WorkflowSetupRoute: typeof WorkflowSetupRoute
@@ -234,8 +298,12 @@ export interface RootRouteChildren {
   WorkflowIndexRoute: typeof WorkflowIndexRoute
   LoanApplicationsApplicationIdRoute: typeof LoanApplicationsApplicationIdRoute
   LoanApplicationsCreateRoute: typeof LoanApplicationsCreateRoute
+  LoanCheckerInboxApplicationIdRoute: typeof LoanCheckerInboxApplicationIdRoute
+  LoanMakerInboxApplicationIdRoute: typeof LoanMakerInboxApplicationIdRoute
   LoanSetupSetupIdRoute: typeof LoanSetupSetupIdRoute
   LoanApplicationsIndexRoute: typeof LoanApplicationsIndexRoute
+  LoanCheckerInboxIndexRoute: typeof LoanCheckerInboxIndexRoute
+  LoanMakerInboxIndexRoute: typeof LoanMakerInboxIndexRoute
   LoanSetupIndexRoute: typeof LoanSetupIndexRoute
 }
 
@@ -283,6 +351,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LoanScorecardsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/loan/scorecard-setup-advanced': {
+      id: '/loan/scorecard-setup-advanced'
+      path: '/loan/scorecard-setup-advanced'
+      fullPath: '/loan/scorecard-setup-advanced'
+      preLoaderRoute: typeof LoanScorecardSetupAdvancedRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/loan/scorecard-setup': {
       id: '/loan/scorecard-setup'
       path: '/loan/scorecard-setup'
@@ -325,6 +400,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LoanSetupIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/loan/maker-inbox/': {
+      id: '/loan/maker-inbox/'
+      path: '/loan/maker-inbox'
+      fullPath: '/loan/maker-inbox'
+      preLoaderRoute: typeof LoanMakerInboxIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/loan/checker-inbox/': {
+      id: '/loan/checker-inbox/'
+      path: '/loan/checker-inbox'
+      fullPath: '/loan/checker-inbox'
+      preLoaderRoute: typeof LoanCheckerInboxIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/loan/applications/': {
       id: '/loan/applications/'
       path: '/loan/applications'
@@ -337,6 +426,20 @@ declare module '@tanstack/react-router' {
       path: '/loan/setup/$setupId'
       fullPath: '/loan/setup/$setupId'
       preLoaderRoute: typeof LoanSetupSetupIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/loan/maker-inbox/$applicationId': {
+      id: '/loan/maker-inbox/$applicationId'
+      path: '/loan/maker-inbox/$applicationId'
+      fullPath: '/loan/maker-inbox/$applicationId'
+      preLoaderRoute: typeof LoanMakerInboxApplicationIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/loan/checker-inbox/$applicationId': {
+      id: '/loan/checker-inbox/$applicationId'
+      path: '/loan/checker-inbox/$applicationId'
+      fullPath: '/loan/checker-inbox/$applicationId'
+      preLoaderRoute: typeof LoanCheckerInboxApplicationIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/loan/applications/create': {
@@ -363,6 +466,7 @@ const rootRouteChildren: RootRouteChildren = {
   LoanRepaymentPlansRoute: LoanRepaymentPlansRoute,
   LoanRepaymentSetupRoute: LoanRepaymentSetupRoute,
   LoanScorecardSetupRoute: LoanScorecardSetupRoute,
+  LoanScorecardSetupAdvancedRoute: LoanScorecardSetupAdvancedRoute,
   LoanScorecardsRoute: LoanScorecardsRoute,
   WorkflowWorkflowIdRoute: WorkflowWorkflowIdRoute,
   WorkflowSetupRoute: WorkflowSetupRoute,
@@ -370,8 +474,12 @@ const rootRouteChildren: RootRouteChildren = {
   WorkflowIndexRoute: WorkflowIndexRoute,
   LoanApplicationsApplicationIdRoute: LoanApplicationsApplicationIdRoute,
   LoanApplicationsCreateRoute: LoanApplicationsCreateRoute,
+  LoanCheckerInboxApplicationIdRoute: LoanCheckerInboxApplicationIdRoute,
+  LoanMakerInboxApplicationIdRoute: LoanMakerInboxApplicationIdRoute,
   LoanSetupSetupIdRoute: LoanSetupSetupIdRoute,
   LoanApplicationsIndexRoute: LoanApplicationsIndexRoute,
+  LoanCheckerInboxIndexRoute: LoanCheckerInboxIndexRoute,
+  LoanMakerInboxIndexRoute: LoanMakerInboxIndexRoute,
   LoanSetupIndexRoute: LoanSetupIndexRoute,
 }
 export const routeTree = rootRouteImport

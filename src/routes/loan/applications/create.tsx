@@ -10,10 +10,11 @@ import {
 	type LoanWorkflowSnapshot,
 	useLoanSetupStore,
 } from "@/lib/loan-setup-store";
+import { evaluateScoreCard, type RiskGrade } from "@/lib/scorecard-engine";
 import { useScoreCardStore } from "@/lib/scorecard-store";
 
 export const Route = createFileRoute("/loan/applications/create")({
-	component: RouteComponent,
+	component: LoanApplicationCreate,
 });
 
 type DocumentUploadField = {
@@ -590,7 +591,95 @@ const formatDocumentTypeLabel = (documentTypeId: string) => {
 	return value.replaceAll("_", " ");
 };
 
-function RouteComponent() {
+const normalizeScoreFieldKey = (value: string) =>
+	value
+		.trim()
+		.toLowerCase()
+		.replaceAll(/[^a-z0-9]/g, "");
+
+const includesAny = (value: string, parts: string[]) =>
+	parts.some((part) => value.includes(part));
+
+const buildScoreInputsFromApplication = (
+	fields: Array<{ field: string }>,
+	input: {
+		beneficiaryName: string;
+		nationalId: string;
+		phone: string;
+		age: number | null;
+		monthlyIncome: number | null;
+		requestedAmount: number | null;
+		tenureValue: number | null;
+		channelCode: string;
+		destinationType: DisbursementDestinationType;
+		bureauProvider: string;
+		bureauPurpose: string;
+		bureauConsent: boolean;
+		notes: string;
+	},
+) => {
+	const resolveFieldValue = (normalizedField: string): string => {
+		if (
+			normalizedField === "age" ||
+			(normalizedField.includes("age") && !normalizedField.includes("average"))
+		) {
+			return input.age === null ? "" : String(input.age);
+		}
+		if (includesAny(normalizedField, ["monthlyincome", "income", "salary"])) {
+			return input.monthlyIncome === null ? "" : String(input.monthlyIncome);
+		}
+		if (includesAny(normalizedField, ["requestedamount", "loanamount", "amount", "principal"])) {
+			return input.requestedAmount === null ? "" : String(input.requestedAmount);
+		}
+		if (includesAny(normalizedField, ["tenure", "term", "duration"])) {
+			return input.tenureValue === null ? "" : String(input.tenureValue);
+		}
+		if (includesAny(normalizedField, ["beneficiaryname", "customername", "applicantname", "name"])) {
+			return input.beneficiaryName.trim();
+		}
+		if (includesAny(normalizedField, ["nationalid", "nrc", "idno", "identityno", "idnumber"])) {
+			return input.nationalId.trim();
+		}
+		if (includesAny(normalizedField, ["mobile", "phone", "phoneno", "mobileno"])) {
+			return input.phone.trim();
+		}
+		if (includesAny(normalizedField, ["channelcode", "channel"])) {
+			return input.channelCode.trim();
+		}
+		if (includesAny(normalizedField, ["disbursement", "destination"])) {
+			return input.destinationType;
+		}
+		if (includesAny(normalizedField, ["bureauprovider", "creditbureauprovider"])) {
+			return input.bureauProvider.trim();
+		}
+		if (includesAny(normalizedField, ["bureaupurpose", "creditbureaupurpose", "purpose"])) {
+			return input.bureauPurpose.trim();
+		}
+		if (includesAny(normalizedField, ["bureauconsent", "consent"])) {
+			return String(input.bureauConsent);
+		}
+		if (includesAny(normalizedField, ["remark", "remarks", "note", "notes"])) {
+			return input.notes.trim();
+		}
+		return "";
+	};
+
+	return fields.reduce<Record<string, string>>((acc, field) => {
+		const normalizedKey = normalizeScoreFieldKey(field.field);
+		acc[field.field] = resolveFieldValue(normalizedKey);
+		return acc;
+	}, {});
+};
+
+const getApplicationStatusFromRiskGrade = (
+	riskGrade: RiskGrade | null,
+): LoanApplicationStatus => {
+	if (riskGrade === "LOW") return "APPROVED";
+	if (riskGrade === "HIGH") return "REJECTED";
+	return "SUBMITTED";
+};
+
+function LoanApplicationCreate() {
 	const navigate = useNavigate();
 	const bureauPurposeListId = useId();
 	const channelOptionsListId = useId();
@@ -682,8 +771,91 @@ function RouteComponent() {
 		Array<OtherDocumentUpload>
 	>(() => [createOtherDocumentUpload()]);
 
+	const computedScoreInputs = useMemo(() => {
+		if (!activeScoreCard) return null;
+		const parsedAge = Number(ageInput);
+		const parsedMonthlyIncome = Number(monthlyIncomeInput);
+		const parsedRequestedAmount = Number(amountInput);
+		return buildScoreInputsFromApplication(activeScoreCard.fields, {
+			beneficiaryName,
+			nationalId,
+			phone,
+			age: Number.isFinite(parsedAge) ? parsedAge : null,
+			monthlyIncome: Number.isFinite(parsedMonthlyIncome)
+				? parsedMonthlyIncome
+				: null,
+			requestedAmount: Number.isFinite(parsedRequestedAmount)
+				? parsedRequestedAmount
+				: null,
+			tenureValue,
+			channelCode,
+			destinationType,
+			bureauProvider,
+			bureauPurpose,
+			bureauConsent,
+			notes,
+		});
+	}, [
+		activeScoreCard,
+		ageInput,
+		amountInput,
+		beneficiaryName,
+		bureauConsent,
+		bureauProvider,
+		bureauPurpose,
+		channelCode,
+		destinationType,
+		monthlyIncomeInput,
+		nationalId,
+		notes,
+		phone,
+		tenureValue,
+	]);
+
+	const riskEvaluationReady = useMemo(() => {
+		if (!activeSetup) return false;
+		const parsedAge = Number(ageInput);
+		const parsedMonthlyIncome = Number(monthlyIncomeInput);
+		const parsedRequestedAmount = Number(amountInput);
+		if (!beneficiaryName.trim()) return false;
+		if (!nationalId.trim()) return false;
+		if (!Number.isFinite(parsedAge) || parsedAge <= 0) return false;
+		if (!Number.isFinite(parsedMonthlyIncome) || parsedMonthlyIncome < 0) {
+			return false;
+		}
+		if (!Number.isFinite(parsedRequestedAmount)) return false;
+		if (tenureValue === null || tenureValue <= 0) return false;
+		if (activeSetup.bureauConsentRequired) {
+			if (!bureauProvider.trim()) return false;
+			if (!bureauPurpose.trim()) return false;
+			if (!bureauConsent) return false;
+		}
+		return true;
+	}, [
+		activeSetup,
+		ageInput,
+		amountInput,
+		beneficiaryName,
+		bureauConsent,
+		bureauProvider,
+		bureauPurpose,
+		monthlyIncomeInput,
+		nationalId,
+		tenureValue,
+	]);
+
+	const computedRiskResult = useMemo(() => {
+		if (!activeScoreCard || !computedScoreInputs || !riskEvaluationReady) {
+			return null;
+		}
+		return evaluateScoreCard(activeScoreCard, computedScoreInputs);
+	}, [activeScoreCard, computedScoreInputs, riskEvaluationReady]);
+
+	const computedRiskGrade: RiskGrade | null = computedRiskResult?.riskGrade ?? null;
+
 	const documentUploadFields = useMemo<DocumentUploadField[]>(() => {
 		if (!activeSetup) return [];
+		if (!riskEvaluationReady) return [];
 
 		const parsedAmount = Number(amountInput);
 		const hasAmount = Number.isFinite(parsedAmount) && parsedAmount >= 0;
@@ -695,9 +867,9 @@ function RouteComponent() {
 			const collateralAlwaysRequired =
 				activeSetup.isSecuredLoan && requirement.collateralRequired;
 			if (
-				activeSetup.riskGrade &&
+				computedRiskGrade &&
 				requirement.riskGrade &&
-				requirement.riskGrade !== activeSetup.riskGrade &&
+				requirement.riskGrade !== computedRiskGrade &&
 				!collateralAlwaysRequired
 			) {
 				continue;
@@ -727,7 +899,7 @@ function RouteComponent() {
 			a.documentTypeId.localeCompare(b.documentTypeId),
 		);
 		return requiredByScore;
-	}, [activeSetup, amountInput]);
+	}, [activeSetup, amountInput, computedRiskGrade, riskEvaluationReady]);
 
 	useEffect(() => {
 		setTenureValue(tenureOptions[0] ?? null);
@@ -845,7 +1017,9 @@ function RouteComponent() {
 	}, [activeSetup, amountInput, tenureValue]);
 
 	const disabled = setupList.length === 0;
-	const statusBadge: LoanApplicationStatus | "" = "DRAFT";
+	const statusBadge: LoanApplicationStatus | "" = activeSetup
+		? getApplicationStatusFromRiskGrade(computedRiskGrade)
+		: "";
 
 	const validateStepOne = () => {
 		if (disabled || !activeSetup) return null;
@@ -942,6 +1116,13 @@ function RouteComponent() {
 		const validated = validateStepOne();
 		if (!validated) return;
 
+		if (activeScoreCard && !riskEvaluationReady) {
+			setFormError(
+				"Complete all required application inputs before risk and document status can be determined.",
+			);
+			return;
+		}
+
 		const missingRequiredDocuments = documentUploadFields
 			.filter((field) => field.isMandatory && !documentFiles[field.documentTypeId])
 			.map((field) => formatDocumentTypeLabel(field.documentTypeId));
@@ -953,10 +1134,35 @@ function RouteComponent() {
 		}
 
 		setFormError(null);
-		const creditScoreToSave = activeSetup.totalScore ?? null;
-		const creditMaxToSave = activeScoreCard?.maxScore ?? null;
+		const submitScoreInputs = activeScoreCard
+			? buildScoreInputsFromApplication(activeScoreCard.fields, {
+					beneficiaryName,
+					nationalId,
+					phone,
+					age: validated.parsedAge,
+					monthlyIncome: validated.parsedMonthlyIncome,
+					requestedAmount: validated.parsedAmount,
+					tenureValue,
+					channelCode,
+					destinationType,
+					bureauProvider,
+					bureauPurpose,
+					bureauConsent,
+					notes,
+				})
+			: null;
+		const submitRiskResult =
+			activeScoreCard && submitScoreInputs && riskEvaluationReady
+				? evaluateScoreCard(activeScoreCard, submitScoreInputs)
+				: null;
+		const creditScoreToSave = submitRiskResult?.totalScore ?? null;
+		const creditMaxToSave = submitRiskResult?.maxScore ?? null;
+		const status = getApplicationStatusFromRiskGrade(
+			submitRiskResult?.riskGrade ?? null,
+		);
 
 		addApplication({
+			status,
 			beneficiaryName,
 			nationalId,
 			phone,
@@ -1068,9 +1274,15 @@ function RouteComponent() {
 								<span>Status</span>
 								<input
 									readOnly
-									value={statusBadge}
+									value={riskEvaluationReady ? statusBadge : ""}
+									placeholder="Complete inputs to determine"
 									className="border px-2 py-2 rounded bg-gray-50"
 								/>
+								<span className="text-xs text-gray-600">
+									{riskEvaluationReady
+										? "Status is calculated from scorecard inputs."
+										: "Status appears after all scoring inputs are filled."}
+								</span>
 							</label>
 						</div>
 
@@ -1231,35 +1443,7 @@ function RouteComponent() {
 								<div className="text-base font-semibold">Complete remaining application fields</div>
 							</div>
 
-							<div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-								<label className="flex flex-col gap-1 text-sm">
-									<span>Tenure</span>
-									<select
-										className="border px-2 py-2 rounded"
-										value={tenureValue ?? ""}
-										onChange={(e) =>
-											setTenureValue(
-												e.target.value ? Number(e.target.value) : null,
-											)
-										}
-										disabled={disabled || tenureOptions.length === 0}
-									>
-										{tenureOptions.map((months) => {
-											const baseUnit =
-												activeSetup?.product.loanTenor?.TenorUnit ?? "month";
-											const unit =
-												baseUnit.endsWith("s") || months === 1
-													? baseUnit
-													: `${baseUnit}s`;
-											return (
-												<option key={months} value={months}>
-													{months} {unit}
-												</option>
-											);
-										})}
-									</select>
-								</label>
-
+							<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 								<label className="flex flex-col gap-1 text-sm">
 									<span>Channel code</span>
 									<input
@@ -1453,7 +1637,7 @@ function RouteComponent() {
 										Upload requirements are derived from the configured score outcome.
 									</div>
 									<div>
-										Risk grade: {activeSetup?.riskGrade ?? "Not available"}
+										Risk grade: {computedRiskGrade?? "Not available"}
 									</div>
 								</div>
 
@@ -1579,7 +1763,7 @@ function RouteComponent() {
 										className="px-4 py-2 rounded bg-emerald-600 text-white shadow hover:bg-emerald-700"
 										disabled={disabled}
 									>
-                    Save Documents
+                    Submit Application
 									</button>
 								</>
 							)}

@@ -11,7 +11,7 @@ import {
 	Table,
 } from "lucide-react";
 
-export const Route = createFileRoute("/")({ component: App });
+export const Route = createFileRoute("/")({ component: HomePage });
 
 const configureCards = [
 	{
@@ -38,6 +38,14 @@ const configureCards = [
 		accent: "bg-amber-500/15 text-amber-300",
 	},
 	{
+		title: "Advanced Scorecard Setup",
+		description:
+			"Run FICO, technical scaling, utilization, and ECL evaluations in a separate setup.",
+		to: "/loan/scorecard-setup-advanced",
+		icon: ClipboardList,
+		accent: "bg-orange-500/15 text-orange-300",
+	},
+	{
 		title: "Repayment Setup",
 		description:
 			"Create and manage reusable repayment plans for loan products.",
@@ -47,7 +55,7 @@ const configureCards = [
 	},
 ];
 
-function App() {
+function HomePage() {
 	const libraryCards = [
 		{
 			title: "Loan Setup Library",
@@ -93,6 +101,23 @@ function App() {
 			to: "/loan/applications",
 			icon: Table,
 			accent: "bg-teal-500/15 text-teal-300",
+		},
+	];
+
+	const inboxCards = [
+		{
+			title: "Maker Inbox",
+			description: "Review manual cases and approve, reject, or submit to checker.",
+			to: "/loan/maker-inbox",
+			icon: Table,
+			accent: "bg-violet-500/15 text-violet-300",
+		},
+		{
+			title: "Checker Inbox",
+			description: "Review maker-submitted cases and make the final decision.",
+			to: "/loan/checker-inbox",
+			icon: Table,
+			accent: "bg-purple-500/15 text-purple-300",
 		},
 	];
 
@@ -176,6 +201,13 @@ function App() {
 							<h2 className="text-sm font-semibold text-slate-700">Applications</h2>
 							<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 								{actionCards.map(renderCard)}
+							</div>
+						</div>
+
+						<div className="space-y-3">
+							<h2 className="text-sm font-semibold text-slate-700">Inboxes</h2>
+							<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+								{inboxCards.map(renderCard)}
 							</div>
 						</div>
 

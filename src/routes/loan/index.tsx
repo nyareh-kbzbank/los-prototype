@@ -56,6 +56,18 @@ function LoanWorkflowList() {
 					>
 						Score Card List
 					</Link>
+					<Link
+						to="/loan/maker-inbox"
+						className="text-sm border px-3 rounded hover:bg-gray-50"
+					>
+						Maker Inbox
+					</Link>
+					<Link
+						to="/loan/checker-inbox"
+						className="text-sm border px-3 rounded hover:bg-gray-50"
+					>
+						Checker Inbox
+					</Link>
 				</div>
 			</div>
 

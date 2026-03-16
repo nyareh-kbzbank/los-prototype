@@ -70,6 +70,20 @@ Source: src/lib/scorecard-engine.ts
 - Caps total score at maxScore.
 - Maps to riskGrade and a minimal documents list.
 
+## Advanced Score Engine Setup
+
+Sources:
+
+- src/routes/loan/scorecard-setup-advanced.tsx
+- src/lib/scorecard-engine-advanced.ts
+
+- Runs in a separate setup page and does not modify the original scorecard setup flow.
+- Reuses saved scorecards, but evaluates with advanced formulas:
+  - FICO weighted score: payment history 35%, credit utilization 30%, credit history length 15%, credit mix 10%, new credit 10%.
+  - Technical scaling fallback: raw matched score scaled by max rule score per field to scorecard max.
+  - Credit utilization derivation: (creditBalance / creditLimit) * 100 when direct utilization input is absent.
+  - ECL: PD × LGD × EAD × discountFactor (with PD/LGD decimal-or-percent normalization).
+
 ## Loan Applications
 
 Source: src/lib/loan-application-store.ts
@@ -80,6 +94,22 @@ Source: src/lib/loan-application-store.ts
   - Clamps numeric fields to non-negative values.
   - Generates applicationNo as `${productCode}-${Date.now().toString(36).toUpperCase()}`.
   - Initializes workflow history and bureau metadata.
+  - Re-evaluates scorecard risk grade from current application inputs at submit time (does not rely on setup snapshot risk grade) and sets initial status:
+    - `LOW` risk grade → `APPROVED` (auto-approved)
+    - `HIGH` risk grade → `REJECTED` (auto-rejected)
+    - `MEDIUM` or missing risk grade → `SUBMITTED` (manual review)
+- Manual review queue flow:
+  - `SUBMITTED` applications appear in Maker Inbox.
+  - Maker can `APPROVE`, `REJECT`, or `SUBMIT TO CHECKER`.
+  - Submitting to checker sets status to `CHECKER_PENDING`.
+  - `CHECKER_PENDING` applications appear in Checker Inbox.
+  - Checker can only `APPROVE` or `REJECT` (no submit-to-checker action).
+  - `REJECTED` is source-aware in decision history:
+    - Auto-rejected from setup decision engine is system-driven.
+    - Rejected by maker/checker is manual-review-driven and tracked with actor + transition.
+  - Application list displays auto outcomes as `Auto-Approved` / `Auto-Rejected` to distinguish them from maker/checker `APPROVED` / `REJECTED`.
+  - Application detail shows maker/checker workflow history from these transitions.
+  - Auto-approved and auto-rejected applications show no maker/checker workflow history.
 - updateStatus updates status and updatedAt timestamp.
 - advanceWorkflowStage appends history and blocks regressions.
 - resetWorkflowProgress clears history and sets stage index to -1.
@@ -100,6 +130,7 @@ Loan application create flow details:
 
 - Step 1 prioritizes quick eligibility inputs first: beneficiary name, age, monthly income, and requested amount.
 - Step 1 shows a payment schedule preview using the loan setup's custom EMI formula (if configured).
+- Risk/status and required-document determination are deferred until required application inputs are filled in Step 1.
 - Step 1 also shows an estimated eligible amount derived from an affordability rule (`50%` of monthly income as EMI capacity), then caps by product max amount.
 - Remaining fields (identity, channel/disbursement, bureau details, notes) are grouped under a separate Additional details section.
 

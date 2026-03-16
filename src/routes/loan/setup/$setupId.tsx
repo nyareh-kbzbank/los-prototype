@@ -240,12 +240,7 @@ function RouteComponent() {
 			);
 			const groupedRequirements = setup.documentRequirements.length
 				? groupDocumentRequirements(setup.documentRequirements)
-				: [
-						createDocumentRequirementItem(
-							"LOW",
-							DEFAULT_REQUIRED_DOCUMENTS,
-						),
-					];
+				: [createDocumentRequirementItem("LOW", DEFAULT_REQUIRED_DOCUMENTS)];
 			setDocumentRequirements(
 				ensureSecuredCollateralDocuments(
 					groupedRequirements,
@@ -263,7 +258,7 @@ function RouteComponent() {
 				createDocumentRequirementItem("LOW", DEFAULT_REQUIRED_DOCUMENTS),
 			]);
 		}
-	}, [setup, selectScoreCard, selectWorkflow, selectRepaymentPlan, groupDocumentRequirements]);
+	}, [setup, selectScoreCard, selectWorkflow, selectRepaymentPlan]);
 
 	const handleTextChange =
 		(field: "productCode" | "productName") =>
@@ -439,16 +434,17 @@ function RouteComponent() {
 			true,
 		);
 
-		const normalizedRequirements = effectiveRequirements.flatMap((requirement) =>
-			requirement.documents.map((document) => ({
-				documentTypeId: document.documentTypeId,
-				minAmount: document.minAmount,
-				maxAmount: document.maxAmount,
-				employmentType: document.employmentType,
-				collateralRequired: document.collateralRequired,
-				riskGrade: requirement.grade,
-				isMandatory: document.isMandatory,
-			})),
+		const normalizedRequirements = effectiveRequirements.flatMap(
+			(requirement) =>
+				requirement.documents.map((document) => ({
+					documentTypeId: document.documentTypeId,
+					minAmount: document.minAmount,
+					maxAmount: document.maxAmount,
+					employmentType: document.employmentType,
+					collateralRequired: document.collateralRequired,
+					riskGrade: requirement.grade,
+					isMandatory: document.isMandatory,
+				})),
 		);
 
 		const payload = {

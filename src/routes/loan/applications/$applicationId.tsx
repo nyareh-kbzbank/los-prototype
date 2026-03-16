@@ -2,8 +2,8 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo } from "react";
 import type { WorkflowJsonNode } from "@/components/workflow/types";
 import {
+	type ApplicationDecisionEvent,
 	type ApplicationWorkflowEvent,
-	type LoanApplicationStatus,
 	useLoanApplicationStore,
 } from "@/lib/loan-application-store";
 import { useLoanSetupStore } from "@/lib/loan-setup-store";
@@ -18,7 +18,6 @@ function RouteComponent() {
 	const application = useLoanApplicationStore(
 		(s) => s.applications[applicationId],
 	);
-	const updateStatus = useLoanApplicationStore((s) => s.updateStatus);
 	const advanceWorkflowStage = useLoanApplicationStore(
 		(s) => s.advanceWorkflowStage,
 	);
@@ -53,6 +52,15 @@ function RouteComponent() {
 
 	const currentStageIndex = application?.workflowStageIndex ?? -1;
 	const nextStage = workflowStages[currentStageIndex + 1];
+	const decisionWorkflowHistory = useMemo(() => {
+		const history = [...(application?.decisionHistory ?? [])];
+		history.sort((a, b) => a.occurredAt - b.occurredAt);
+		return history;
+	}, [application?.decisionHistory]);
+
+	const lastDecisionEvent = decisionWorkflowHistory.at(-1);
+	const isAutoRejected =
+		application?.status === "REJECTED" && decisionWorkflowHistory.length === 0;
 
 	const getStageLabel = (node: WorkflowJsonNode) => {
 		const label =
@@ -61,7 +69,7 @@ function RouteComponent() {
 	};
 
 	const handleAdvanceStage = () => {
-		if (!application || !nextStage) return;
+		if (!application || !nextStage || isAutoRejected) return;
 		advanceWorkflowStage(application.id, {
 			stageId: nextStage.id,
 			stageIndex: currentStageIndex + 1,
@@ -71,7 +79,7 @@ function RouteComponent() {
 	};
 
 	const handleResetWorkflow = () => {
-		if (!application) return;
+		if (!application || isAutoRejected) return;
 		resetWorkflowProgress(application.id);
 	};
 
@@ -91,9 +99,9 @@ function RouteComponent() {
 		return new Date(application.bureauRequestedAt).toLocaleString();
 	}, [application?.bureauRequestedAt]);
 
-	const statuses: LoanApplicationStatus[] = useMemo(
-		() => ["DRAFT", "SUBMITTED", "APPROVED", "REJECTED"],
-		[],
+	const decisionSummary = useMemo(
+		() => getDecisionSummary(application?.status, lastDecisionEvent?.actor),
+		[application?.status, lastDecisionEvent?.actor],
 	);
 
 	const getStatusTone = (statusLabel: string) => {
@@ -115,6 +123,19 @@ function RouteComponent() {
 				};
 		}
 	};
+
+	const isAutoOutcome = useMemo(() => {
+		const decisionHistory = application?.decisionHistory ?? [];
+		return (
+			decisionHistory.length === 0 &&
+			(application?.status === "APPROVED" || application?.status === "REJECTED")
+		);
+	}, [application?.decisionHistory, application?.status]);
+
+	const decisionWorkflowHistoryContent = getDecisionWorkflowHistoryContent(
+		isAutoOutcome,
+		decisionWorkflowHistory,
+	);
 
 	if (!application) {
 		return (
@@ -157,24 +178,14 @@ function RouteComponent() {
 
 			<section className="border rounded p-4 text-sm space-y-3">
 				<div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
-					<div className="font-semibold">Status</div>
-					<select
-						className="border px-2 py-2 rounded"
-						value={application.status}
-						onChange={(e) =>
-							updateStatus(
-								application.id,
-								e.target.value as LoanApplicationStatus,
-							)
-						}
+					<div className="font-semibold">Decision outcome</div>
+					<span
+						className={`text-xs px-2 py-1 rounded-full border ${decisionSummary.badge}`}
 					>
-						{statuses.map((status) => (
-							<option key={status} value={status}>
-								{status}
-							</option>
-						))}
-					</select>
+						{decisionSummary.title}
+					</span>
 				</div>
+				<div className="text-xs text-gray-600">{decisionSummary.detail}</div>
 				<div className="grid grid-cols-1 md:grid-cols-2 gap-3">
 					<Field label="Application #" value={application.applicationNo} />
 					<Field label="Beneficiary" value={application.beneficiaryName} />
@@ -219,84 +230,104 @@ function RouteComponent() {
 				</div>
 			</section>
 
-			<section className="border rounded p-4 text-sm space-y-3">
-				<div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-					<div>
-						<div className="font-semibold">Workflow history</div>
-						<div className="text-xs text-gray-600">
-							Linked workflow:{" "}
-							{setup?.workflowName ??
-								application.workflowName ??
-								"(not linked)"}
+			{isAutoOutcome ? null : (
+				<>
+					<section className="border rounded p-4 text-sm space-y-3">
+						<div>
+							<div className="font-semibold">Maker / Checker workflow history</div>
+							<div className="text-xs text-gray-600">
+								Decision trail through maker and checker review.
+							</div>
 						</div>
-					</div>
-					<div className="flex gap-2">
-						<button
-							type="button"
-							className="text-sm border px-3 py-2 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-							onClick={handleAdvanceStage}
-							disabled={!nextStage}
-						>
-							{nextStage
-								? `Advance to ${getStageLabel(nextStage)}`
-								: "No next stage"}
-						</button>
-						<button
-							type="button"
-							className="text-sm border px-3 py-2 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-							onClick={handleResetWorkflow}
-							disabled={(application.workflowHistory?.length ?? 0) === 0}
-						>
-							Reset stages
-						</button>
-					</div>
-				</div>
+						{decisionWorkflowHistoryContent}
+					</section>
 
-				{!savedWorkflow ? (
-					<div className="border rounded p-3 bg-yellow-50 text-gray-800">
-						No workflow is linked to this loan setup. Attach one in Loan Setup
-						to track stage history.
-					</div>
-				) : workflowStages.length === 0 ? (
-					<div className="border rounded p-3 bg-gray-50 text-gray-700">
-						Workflow has no stages defined.
-					</div>
-				) : (
-					<div className="space-y-2">
-						{workflowStages.map((stage, idx) => {
-							const history = historyByStageIndex.get(idx);
-							const statusLabel =
-								idx < currentStageIndex
-									? "Completed"
-									: idx === currentStageIndex
-										? "Current"
-									: "Pending";
-							const statusTone = getStatusTone(statusLabel);
-							return (
-								<div
-									key={`${stage.id}-${idx}`}
-									className={`flex items-start justify-between gap-2 border rounded p-3 ${statusTone.card}`}
-								>
-									<div className="space-y-1">
-										<div className="font-semibold">{getStageLabel(stage)}</div>
-										<div className="text-xs text-gray-600">Stage {idx + 1}</div>
-										{history ? (
-											<div className="text-xs text-gray-700">
-												Reached {new Date(history.occurredAt).toLocaleString()}
-											</div>
-										) : null}
-									</div>
-										<span
-											className={`text-xs px-2 py-1 rounded-full border ${statusTone.badge}`}
-										>
-										{statusLabel}
-									</span>
+					{/* <section className="border rounded p-4 text-sm space-y-3">
+						<div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+							<div>
+								<div className="font-semibold">Workflow history</div>
+								<div className="text-xs text-gray-600">
+									Linked workflow:{" "}
+									{setup?.workflowName ??
+										application.workflowName ??
+										"(not linked)"}
 								</div>
-							);
-						})}
-					</div>
-				)}
-			</section>
+							</div>
+							{isAutoRejected ? (
+								<div className="text-xs text-red-700 border border-red-200 bg-red-50 rounded px-3 py-2">
+									Workflow actions are disabled for auto-rejected applications.
+								</div>
+							) : (
+								<div className="flex gap-2">
+									<button
+										type="button"
+										className="text-sm border px-3 py-2 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+										onClick={handleAdvanceStage}
+										disabled={!nextStage}
+									>
+										{nextStage
+											? `Advance to ${getStageLabel(nextStage)}`
+											: "No next stage"}
+									</button>
+									<button
+										type="button"
+										className="text-sm border px-3 py-2 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+										onClick={handleResetWorkflow}
+										disabled={(application.workflowHistory?.length ?? 0) === 0}
+									>
+										Reset stages
+									</button>
+								</div>
+							)}
+						</div>
+
+						{!savedWorkflow ? (
+							<div className="border rounded p-3 bg-yellow-50 text-gray-800">
+								No workflow is linked to this loan setup. Attach one in Loan Setup
+								to track stage history.
+							</div>
+						) : workflowStages.length === 0 ? (
+							<div className="border rounded p-3 bg-gray-50 text-gray-700">
+								Workflow has no stages defined.
+							</div>
+						) : (
+							<div className="space-y-2">
+								{workflowStages.map((stage, idx) => {
+									const history = historyByStageIndex.get(idx);
+									const statusLabel =
+										idx < currentStageIndex
+											? "Completed"
+											: idx === currentStageIndex
+												? "Current"
+												: "Pending";
+									const statusTone = getStatusTone(statusLabel);
+									return (
+										<div
+											key={`${stage.id}-${idx}`}
+											className={`flex items-start justify-between gap-2 border rounded p-3 ${statusTone.card}`}
+										>
+											<div className="space-y-1">
+												<div className="font-semibold">{getStageLabel(stage)}</div>
+												<div className="text-xs text-gray-600">Stage {idx + 1}</div>
+												{history ? (
+													<div className="text-xs text-gray-700">
+														Reached {new Date(history.occurredAt).toLocaleString()}
+													</div>
+												) : null}
+											</div>
+												<span
+													className={`text-xs px-2 py-1 rounded-full border ${statusTone.badge}`}
+												>
+												{statusLabel}
+											</span>
+										</div>
+									);
+								})}
+							</div>
+						)}
+					</section> */}
+				</>
+			)}
 
 			<section className="border rounded p-4 text-sm text-gray-700">
 				<div className="font-semibold mb-1">Timestamps</div>
@@ -317,4 +348,132 @@ function Field({
 			<span className="font-medium">{value}</span>
 		</div>
 	);
+}
+
+function DecisionHistoryItem({
+	event,
+}: Readonly<{ event: ApplicationDecisionEvent }>) {
+	const actorLabel =
+		event.note === "Entered maker inbox" && event.actor === "SYSTEM"
+			? "CUSTOMER"
+			: event.actor;
+
+	return (
+		<div className="flex items-start justify-between gap-2 border rounded p-3 bg-white">
+			<div className="space-y-1">
+				<div className="font-semibold">{event.note}</div>
+				<div className="text-xs text-gray-600">
+					Actor: {actorLabel} · {event.fromStatus ?? "NONE"} → {event.toStatus}
+				</div>
+			</div>
+			<span className="text-xs text-gray-600 whitespace-nowrap">
+				{new Date(event.occurredAt).toLocaleString()}
+			</span>
+		</div>
+	);
+}
+
+function getDecisionWorkflowHistoryContent(
+	isAutoOutcome: boolean,
+	decisionWorkflowHistory: ApplicationDecisionEvent[],
+) {
+	if (isAutoOutcome) {
+		return (
+			<div className="border rounded p-3 bg-gray-50 text-gray-700">
+				None — this application was auto-approved or auto-rejected.
+			</div>
+		);
+	}
+
+	if (decisionWorkflowHistory.length === 0) {
+		return (
+			<div className="border rounded p-3 bg-gray-50 text-gray-700">
+				No maker/checker workflow events yet.
+			</div>
+		);
+	}
+
+	return (
+		<div className="space-y-2">
+			{decisionWorkflowHistory.map((event, idx) => (
+				<DecisionHistoryItem
+					key={`${event.occurredAt}-${event.toStatus}-${idx}`}
+					event={event}
+				/>
+			))}
+		</div>
+	);
+}
+
+function getDecisionSummary(
+	status: string | undefined,
+	actor: ApplicationDecisionEvent["actor"] | undefined,
+) {
+	if (status === "APPROVED") {
+		if (actor === "MAKER") {
+			return {
+				title: "Approved by Maker",
+				detail: "The application was approved by maker during manual review.",
+				badge: "bg-emerald-50 text-emerald-700 border-emerald-200",
+			};
+		}
+		if (actor === "CHECKER") {
+			return {
+				title: "Approved by Checker",
+				detail:
+					"The application was approved by checker after maker submission.",
+				badge: "bg-teal-50 text-teal-700 border-teal-200",
+			};
+		}
+		return {
+			title: "Auto-Approved",
+			detail: "The application is approved automatically by setup decision rules.",
+			badge: "bg-green-50 text-green-700 border-green-200",
+		};
+	}
+
+	if (status === "REJECTED") {
+		if (actor === "MAKER") {
+			return {
+				title: "Rejected by Maker",
+				detail: "The application was rejected by maker during manual review.",
+				badge: "bg-rose-50 text-rose-700 border-rose-200",
+			};
+		}
+		if (actor === "CHECKER") {
+			return {
+				title: "Rejected by Checker",
+				detail:
+					"The application was rejected by checker after maker submission.",
+				badge: "bg-red-50 text-red-700 border-red-200",
+			};
+		}
+		return {
+			title: "Auto-Rejected",
+			detail: "The application is rejected automatically by setup decision rules.",
+			badge: "bg-red-50 text-red-700 border-red-200",
+		};
+	}
+
+	if (status === "SUBMITTED") {
+		return {
+			title: "Manual Review Required",
+			detail: "The application is submitted for manual underwriter review.",
+			badge: "bg-yellow-50 text-yellow-800 border-yellow-200",
+		};
+	}
+
+	if (status === "CHECKER_PENDING") {
+		return {
+			title: "Submitted to Checker",
+			detail: "Maker has submitted this application to checker for final decision.",
+			badge: "bg-blue-50 text-blue-700 border-blue-200",
+		};
+	}
+
+	return {
+		title: "Draft",
+		detail: "The application is still in draft state.",
+		badge: "bg-gray-50 text-gray-700 border-gray-200",
+	};
 }

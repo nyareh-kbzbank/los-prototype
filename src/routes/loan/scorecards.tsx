@@ -26,6 +26,11 @@ function ScorecardListPage() {
 		navigate({ to: "/loan/setup" });
 	};
 
+	const handleOpenAdvanced = (id: string) => {
+		selectScoreCard(id);
+		navigate({ to: "/loan/scorecard-setup-advanced" });
+	};
+
 	return (
 		<div className="p-6 font-sans max-w-5xl mx-auto">
 			<div className="flex items-center justify-between mb-4 gap-3">
@@ -42,6 +47,12 @@ function ScorecardListPage() {
 						className="text-sm border px-3 py-2 rounded hover:bg-gray-50"
 					>
 						Create / Edit
+					</Link>
+					<Link
+						to="/loan/scorecard-setup-advanced"
+						className="text-sm border px-3 py-2 rounded hover:bg-gray-50"
+					>
+						Advanced Setup
 					</Link>
 				</div>
 			</div>
@@ -91,6 +102,13 @@ function ScorecardListPage() {
 													className="border px-3 py-1 rounded text-sm hover:bg-gray-50"
 												>
 													Open in editor
+												</button>
+												<button
+													type="button"
+													onClick={() => handleOpenAdvanced(card.scoreCardId)}
+													className="border px-3 py-1 rounded text-sm hover:bg-gray-50"
+												>
+													Open advanced
 												</button>
 											</div>
 										</td>
