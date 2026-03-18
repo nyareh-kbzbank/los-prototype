@@ -117,32 +117,32 @@ const coreFieldDefinitions: Array<{
 		label: "Days In Period",
 		description: "Number of days between previous and current payment date.",
 	},
-	{
-		key: "ratePeriod",
-		label: "Rate Per Period",
-		description:
-			"Effective rate for the current period; for daily accrual it equals annualRate * daysInPeriod / 365.",
-	},
+	// {
+	// 	key: "ratePeriod",
+	// 	label: "Rate Per Period",
+	// 	description:
+	// 		"Effective rate for the current period; for daily accrual it equals annualRate * daysInPeriod / 365.",
+	// },
 	{
 		key: "baseEmi",
 		label: "Base EMI",
 		description: "Standard reducing-balance EMI reference value.",
 	},
-	{
-		key: "prevPayment",
-		label: "Previous Payment",
-		description: "Previous period payment amount.",
-	},
-	{
-		key: "prevPrincipal",
-		label: "Previous Principal",
-		description: "Previous period principal component.",
-	},
-	{
-		key: "prevInterest",
-		label: "Previous Interest",
-		description: "Previous period interest component.",
-	},
+	// {
+	// 	key: "prevPayment",
+	// 	label: "Previous Payment",
+	// 	description: "Previous period payment amount.",
+	// },
+	// {
+	// 	key: "prevPrincipal",
+	// 	label: "Previous Principal",
+	// 	description: "Previous period principal component.",
+	// },
+	// {
+	// 	key: "prevInterest",
+	// 	label: "Previous Interest",
+	// 	description: "Previous period interest component.",
+	// },
 ];
 
 const supportedFunctions = [
