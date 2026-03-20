@@ -7,6 +7,7 @@ import {
 	LayoutTemplate,
 	ListChecks,
 	Network,
+	Package,
 	Receipt,
 	Table,
 } from "lucide-react";
@@ -80,7 +81,8 @@ function HomePage() {
 		},
 		{
 			title: "Repayment Library",
-			description: "View saved repayment plans and open them for editing or use.",
+			description:
+				"View saved repayment plans and open them for editing or use.",
 			to: "/loan/repayment-plans",
 			icon: ListChecks,
 			accent: "bg-fuchsia-500/15 text-fuchsia-300",
@@ -107,7 +109,8 @@ function HomePage() {
 	const inboxCards = [
 		{
 			title: "Maker Inbox",
-			description: "Review manual cases and approve, reject, or submit to checker.",
+			description:
+				"Review manual cases and approve, reject, or submit to checker.",
 			to: "/loan/maker-inbox",
 			icon: Table,
 			accent: "bg-violet-500/15 text-violet-300",
@@ -129,11 +132,22 @@ function HomePage() {
 			icon: Calculator,
 			accent: "bg-rose-500/15 text-rose-300",
 		},
-    	{
+		{
 			title: "Custom EMI Calculator",
-			description: "Quickly calculate monthly payments and total interest with custom formulat",
+			description:
+				"Quickly calculate monthly payments and total interest with custom formulat",
 			to: "/loan/emi-custom-calculator",
 			icon: Calculator,
+			accent: "bg-rose-500/15 text-rose-300",
+		},
+	];
+
+	const requetCards = [
+		{
+			title: "Request Page",
+			description: "Demo page requested by Ko Nand",
+			to: "/test/request-test",
+			icon: Package,
 			accent: "bg-rose-500/15 text-rose-300",
 		},
 	];
@@ -170,7 +184,7 @@ function HomePage() {
 			<section className="max-w-5xl mx-auto space-y-8">
 				<div className="bg-white border border-slate-200 rounded-2xl p-8 shadow-sm">
 					<p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-700 mb-2">
-            Smart Lending Solution
+						Smart Lending Solution
 					</p>
 					<h1 className="text-3xl font-bold mb-2">Welcome back</h1>
 					<p className="text-slate-600 text-base leading-relaxed mb-8">
@@ -198,7 +212,9 @@ function HomePage() {
 						</div>
 
 						<div className="space-y-3">
-							<h2 className="text-sm font-semibold text-slate-700">Applications</h2>
+							<h2 className="text-sm font-semibold text-slate-700">
+								Applications
+							</h2>
 							<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 								{actionCards.map(renderCard)}
 							</div>
@@ -215,6 +231,12 @@ function HomePage() {
 							<h2 className="text-sm font-semibold text-slate-700">Tools</h2>
 							<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 								{toolCards.map(renderCard)}
+							</div>
+						</div>
+						<div className="space-y-3">
+							<h2 className="text-sm font-semibold text-slate-700">Request</h2>
+							<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+								{requetCards.map(renderCard)}
 							</div>
 						</div>
 					</div>
