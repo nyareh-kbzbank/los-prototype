@@ -19,7 +19,7 @@ import {
 import { useState } from "react";
 
 
-export const Route = createFileRoute("/request-test")({
+export const Route = createFileRoute("/test/request-test")({
 	component: RequestTest,
 });
 
@@ -124,7 +124,7 @@ function RequestTest() {
 			title: "Review & Brand",
 			icon: <CheckCircle2 className="w-5 h-5" />,
 		},
-	];
+	]
 
 	const handleNext = () =>
 		setCurrentStep((prev) => Math.min(prev + 1, steps.length - 1));
@@ -133,7 +133,7 @@ function RequestTest() {
 
 	const updateFormData = (field, value) => {
 		setFormData((prev) => ({ ...prev, [field]: value }));
-	};
+	}
 
 	const changeCoverImage = () => {
 		const images = [
@@ -144,14 +144,14 @@ function RequestTest() {
 			"https://images.unsplash.com/photo-1554224155-6726b3ff858f?auto=format&fit=crop&q=80&w=1000",
 
 			"https://images.unsplash.com/photo-1579621970795-87facc2f976d?auto=format&fit=crop&q=80&w=1000",
-		];
+		]
 
 		const currentIndex = images.indexOf(formData.coverImage);
 
 		const nextIndex = (currentIndex + 1) % images.length;
 
 		updateFormData("coverImage", images[nextIndex]);
-	};
+	}
 
 	const StepBasics = () => (
 		<div className="space-y-6 animate-in fade-in duration-500">
@@ -202,7 +202,7 @@ function RequestTest() {
 				/>
 			</div>
 		</div>
-	);
+	)
 
 	const StepFinancials = () => (
 		<div className="space-y-6 animate-in fade-in duration-500">
@@ -292,7 +292,7 @@ function RequestTest() {
 				</p>
 			</div>
 		</div>
-	);
+	)
 
 	const StepRisk = () => (
 		<div className="space-y-6 animate-in fade-in duration-500">
@@ -351,7 +351,7 @@ function RequestTest() {
 				))}
 			</div>
 		</div>
-	);
+	)
 
 	const StepReview = () => (
 		<div className="space-y-8 pb-4 animate-in fade-in duration-500">
@@ -475,7 +475,7 @@ function RequestTest() {
 				</div>
 			</div>
 		</div>
-	);
+	)
 
 	return (
 		<div className="min-h-screen bg-slate-50 flex flex-col items-center py-12 px-6 font-sans">
@@ -532,7 +532,7 @@ function RequestTest() {
 
 								<div>
 									<span
-										className={`text-xs font-black uppercase tracking-widest block leading-none ${currentStep === idx ? "text-white" : ""}`}
+										className={`text-xs font-black uppercase tracking-widest block leading-none ${currentStep === idx ? `text-white` : ``}`}
 									>
 										{step.title}
 									</span>
@@ -676,7 +676,7 @@ function RequestTest() {
 
 											<div className="flex items-center gap-4">
 												<span
-													className={`text-[9px] font-black px-3 py-1 rounded-full ${doc.required ? "bg-blue-50 text-blue-600" : "bg-slate-50 text-slate-400"}`}
+													className={`text-[9px] font-black px-3 py-1 rounded-full ${doc.required ? `bg-blue-50 text-blue-600` : `bg-slate-50 text-slate-400`}`}
 												>
 													{doc.required ? "MANDATORY" : "OPTIONAL"}
 												</span>
@@ -739,5 +739,5 @@ function RequestTest() {
 				<span>Encrypted Workspace</span>
 			</div>
 		</div>
-	);
+	)
 }

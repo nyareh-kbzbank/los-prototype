@@ -9,12 +9,12 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as RequestTestRouteImport } from './routes/request-test'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as WorkflowIndexRouteImport } from './routes/workflow/index'
 import { Route as LoanIndexRouteImport } from './routes/loan/index'
 import { Route as WorkflowSetupRouteImport } from './routes/workflow/setup'
 import { Route as WorkflowWorkflowIdRouteImport } from './routes/workflow/$workflowId'
+import { Route as TestRequestTestRouteImport } from './routes/test/request-test'
 import { Route as LoanScorecardsRouteImport } from './routes/loan/scorecards'
 import { Route as LoanScorecardSetupAdvancedRouteImport } from './routes/loan/scorecard-setup-advanced'
 import { Route as LoanScorecardSetupRouteImport } from './routes/loan/scorecard-setup'
@@ -32,11 +32,6 @@ import { Route as LoanCheckerInboxApplicationIdRouteImport } from './routes/loan
 import { Route as LoanApplicationsCreateRouteImport } from './routes/loan/applications/create'
 import { Route as LoanApplicationsApplicationIdRouteImport } from './routes/loan/applications/$applicationId'
 
-const RequestTestRoute = RequestTestRouteImport.update({
-  id: '/request-test',
-  path: '/request-test',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -60,6 +55,11 @@ const WorkflowSetupRoute = WorkflowSetupRouteImport.update({
 const WorkflowWorkflowIdRoute = WorkflowWorkflowIdRouteImport.update({
   id: '/workflow/$workflowId',
   path: '/workflow/$workflowId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TestRequestTestRoute = TestRequestTestRouteImport.update({
+  id: '/test/request-test',
+  path: '/test/request-test',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoanScorecardsRoute = LoanScorecardsRouteImport.update({
@@ -149,7 +149,6 @@ const LoanApplicationsApplicationIdRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/request-test': typeof RequestTestRoute
   '/loan/emi-calculator': typeof LoanEmiCalculatorRoute
   '/loan/emi-custom-calculator': typeof LoanEmiCustomCalculatorRoute
   '/loan/repayment-plans': typeof LoanRepaymentPlansRoute
@@ -157,6 +156,7 @@ export interface FileRoutesByFullPath {
   '/loan/scorecard-setup': typeof LoanScorecardSetupRoute
   '/loan/scorecard-setup-advanced': typeof LoanScorecardSetupAdvancedRoute
   '/loan/scorecards': typeof LoanScorecardsRoute
+  '/test/request-test': typeof TestRequestTestRoute
   '/workflow/$workflowId': typeof WorkflowWorkflowIdRoute
   '/workflow/setup': typeof WorkflowSetupRoute
   '/loan': typeof LoanIndexRoute
@@ -173,7 +173,6 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/request-test': typeof RequestTestRoute
   '/loan/emi-calculator': typeof LoanEmiCalculatorRoute
   '/loan/emi-custom-calculator': typeof LoanEmiCustomCalculatorRoute
   '/loan/repayment-plans': typeof LoanRepaymentPlansRoute
@@ -181,6 +180,7 @@ export interface FileRoutesByTo {
   '/loan/scorecard-setup': typeof LoanScorecardSetupRoute
   '/loan/scorecard-setup-advanced': typeof LoanScorecardSetupAdvancedRoute
   '/loan/scorecards': typeof LoanScorecardsRoute
+  '/test/request-test': typeof TestRequestTestRoute
   '/workflow/$workflowId': typeof WorkflowWorkflowIdRoute
   '/workflow/setup': typeof WorkflowSetupRoute
   '/loan': typeof LoanIndexRoute
@@ -198,7 +198,6 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/request-test': typeof RequestTestRoute
   '/loan/emi-calculator': typeof LoanEmiCalculatorRoute
   '/loan/emi-custom-calculator': typeof LoanEmiCustomCalculatorRoute
   '/loan/repayment-plans': typeof LoanRepaymentPlansRoute
@@ -206,6 +205,7 @@ export interface FileRoutesById {
   '/loan/scorecard-setup': typeof LoanScorecardSetupRoute
   '/loan/scorecard-setup-advanced': typeof LoanScorecardSetupAdvancedRoute
   '/loan/scorecards': typeof LoanScorecardsRoute
+  '/test/request-test': typeof TestRequestTestRoute
   '/workflow/$workflowId': typeof WorkflowWorkflowIdRoute
   '/workflow/setup': typeof WorkflowSetupRoute
   '/loan/': typeof LoanIndexRoute
@@ -224,7 +224,6 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
-    | '/request-test'
     | '/loan/emi-calculator'
     | '/loan/emi-custom-calculator'
     | '/loan/repayment-plans'
@@ -232,6 +231,7 @@ export interface FileRouteTypes {
     | '/loan/scorecard-setup'
     | '/loan/scorecard-setup-advanced'
     | '/loan/scorecards'
+    | '/test/request-test'
     | '/workflow/$workflowId'
     | '/workflow/setup'
     | '/loan'
@@ -248,7 +248,6 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
-    | '/request-test'
     | '/loan/emi-calculator'
     | '/loan/emi-custom-calculator'
     | '/loan/repayment-plans'
@@ -256,6 +255,7 @@ export interface FileRouteTypes {
     | '/loan/scorecard-setup'
     | '/loan/scorecard-setup-advanced'
     | '/loan/scorecards'
+    | '/test/request-test'
     | '/workflow/$workflowId'
     | '/workflow/setup'
     | '/loan'
@@ -272,7 +272,6 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
-    | '/request-test'
     | '/loan/emi-calculator'
     | '/loan/emi-custom-calculator'
     | '/loan/repayment-plans'
@@ -280,6 +279,7 @@ export interface FileRouteTypes {
     | '/loan/scorecard-setup'
     | '/loan/scorecard-setup-advanced'
     | '/loan/scorecards'
+    | '/test/request-test'
     | '/workflow/$workflowId'
     | '/workflow/setup'
     | '/loan/'
@@ -297,7 +297,6 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  RequestTestRoute: typeof RequestTestRoute
   LoanEmiCalculatorRoute: typeof LoanEmiCalculatorRoute
   LoanEmiCustomCalculatorRoute: typeof LoanEmiCustomCalculatorRoute
   LoanRepaymentPlansRoute: typeof LoanRepaymentPlansRoute
@@ -305,6 +304,7 @@ export interface RootRouteChildren {
   LoanScorecardSetupRoute: typeof LoanScorecardSetupRoute
   LoanScorecardSetupAdvancedRoute: typeof LoanScorecardSetupAdvancedRoute
   LoanScorecardsRoute: typeof LoanScorecardsRoute
+  TestRequestTestRoute: typeof TestRequestTestRoute
   WorkflowWorkflowIdRoute: typeof WorkflowWorkflowIdRoute
   WorkflowSetupRoute: typeof WorkflowSetupRoute
   LoanIndexRoute: typeof LoanIndexRoute
@@ -322,13 +322,6 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/request-test': {
-      id: '/request-test'
-      path: '/request-test'
-      fullPath: '/request-test'
-      preLoaderRoute: typeof RequestTestRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/': {
       id: '/'
       path: '/'
@@ -362,6 +355,13 @@ declare module '@tanstack/react-router' {
       path: '/workflow/$workflowId'
       fullPath: '/workflow/$workflowId'
       preLoaderRoute: typeof WorkflowWorkflowIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/test/request-test': {
+      id: '/test/request-test'
+      path: '/test/request-test'
+      fullPath: '/test/request-test'
+      preLoaderRoute: typeof TestRequestTestRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/loan/scorecards': {
@@ -481,7 +481,6 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  RequestTestRoute: RequestTestRoute,
   LoanEmiCalculatorRoute: LoanEmiCalculatorRoute,
   LoanEmiCustomCalculatorRoute: LoanEmiCustomCalculatorRoute,
   LoanRepaymentPlansRoute: LoanRepaymentPlansRoute,
@@ -489,6 +488,7 @@ const rootRouteChildren: RootRouteChildren = {
   LoanScorecardSetupRoute: LoanScorecardSetupRoute,
   LoanScorecardSetupAdvancedRoute: LoanScorecardSetupAdvancedRoute,
   LoanScorecardsRoute: LoanScorecardsRoute,
+  TestRequestTestRoute: TestRequestTestRoute,
   WorkflowWorkflowIdRoute: WorkflowWorkflowIdRoute,
   WorkflowSetupRoute: WorkflowSetupRoute,
   LoanIndexRoute: LoanIndexRoute,
