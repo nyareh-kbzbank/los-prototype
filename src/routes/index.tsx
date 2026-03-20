@@ -144,9 +144,9 @@ function HomePage() {
 
 	const requetCards = [
 		{
-			title: "Request Page",
-			description: "Demo page requested by Ko Nand",
-			to: "/test/request-test",
+			title: "Loan Setup Page",
+			description: "Loan setup page V2",
+			to: "/solution/v2/loan-setup",
 			icon: Package,
 			accent: "bg-rose-500/15 text-rose-300",
 		},
@@ -234,7 +234,7 @@ function HomePage() {
 							</div>
 						</div>
 						<div className="space-y-3">
-							<h2 className="text-sm font-semibold text-slate-700">Request</h2>
+							<h2 className="text-sm font-semibold text-slate-700">V2</h2>
 							<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 								{requetCards.map(renderCard)}
 							</div>

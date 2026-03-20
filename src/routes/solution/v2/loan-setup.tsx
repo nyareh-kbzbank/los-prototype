@@ -19,7 +19,7 @@ import {
 import { useState } from "react";
 
 
-export const Route = createFileRoute("/test/request-test")({
+export const Route = createFileRoute("/solution/v2/loan-setup")({
 	component: RequestTest,
 });
 
