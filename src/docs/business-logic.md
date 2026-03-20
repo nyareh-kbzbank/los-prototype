@@ -133,6 +133,9 @@ Loan application create flow details:
 - Risk/status and required-document determination are deferred until required application inputs are filled in Step 1.
 - Step 1 also shows an estimated eligible amount derived from an affordability rule (`50%` of monthly income as EMI capacity), then caps by product max amount.
 - Remaining fields (identity, channel/disbursement, bureau details, notes) are grouped under a separate Additional details section.
+- In Additional details, disbursement destination drives required payout input:
+  - `BANK` requires `bankAccountNo`.
+  - `WALLET` (KPay flow) requires `phone`/`kpayPhoneNo`.
 
 ## Custom EMI Calculator
 

@@ -191,7 +191,18 @@ function RouteComponent() {
 					<Field label="Beneficiary" value={application.beneficiaryName} />
 					<Field label="National ID" value={application.nationalId} />
 					<Field label="Age" value={application.age ?? "—"} />
-					<Field label="Phone" value={application.phone} />
+					<Field
+						label={
+							application.destinationType === "BANK"
+								? "Bank account no"
+								: "Phone no (KPay)"
+						}
+						value={
+							application.destinationType === "BANK"
+								? application.bankAccountNo || "—"
+								: application.kpayPhoneNo || application.phone || "—"
+						}
+					/>
 					<Field
 						label="Monthly income"
 						value={

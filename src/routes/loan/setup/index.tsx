@@ -1077,16 +1077,17 @@ function LoanSetup() {
 			true,
 		);
 
-		const normalizedRequirements = effectiveRequirements.flatMap((requirement) =>
-			requirement.documents.map((document) => ({
-				documentTypeId: document.documentTypeId,
-				minAmount: document.minAmount,
-				maxAmount: document.maxAmount,
-				employmentType: document.employmentType,
-				collateralRequired: document.collateralRequired,
-				riskGrade: requirement.grade,
-				isMandatory: document.isMandatory,
-			})),
+		const normalizedRequirements = effectiveRequirements.flatMap(
+			(requirement) =>
+				requirement.documents.map((document) => ({
+					documentTypeId: document.documentTypeId,
+					minAmount: document.minAmount,
+					maxAmount: document.maxAmount,
+					employmentType: document.employmentType,
+					collateralRequired: document.collateralRequired,
+					riskGrade: requirement.grade,
+					isMandatory: document.isMandatory,
+				})),
 		);
 
 		addLoanSetup({
@@ -1281,7 +1282,7 @@ function LoanSetup() {
 			<section className="border p-4 rounded mb-6">
 				<div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between mb-3">
 					<div>
-						<h2 className="font-semibold">Custom EMI Formula</h2>
+						<h2 className="font-semibold">Custom Calculation Formula</h2>
 						<div className="text-xs text-gray-600">
 							Pick a saved formula to preview the EMI calculation here.
 						</div>
@@ -1308,7 +1309,7 @@ function LoanSetup() {
 				) : (
 					<div className="space-y-4">
 						<label className="flex flex-col gap-1 text-sm">
-							<span>Custom EMI Type</span>
+							<span>Custom Calculation Type</span>
 							<select
 								value={selectedCustomEmiTypeId}
 								onChange={(e) => setSelectedCustomEmiTypeId(e.target.value)}
@@ -1372,7 +1373,10 @@ function LoanSetup() {
 								<div className="grid gap-3 sm:grid-cols-2">
 									{selectedCustomEmiType?.fieldDefinitions.map((field) => (
 										<div key={field.id}>
-											<label className="block text-sm font-medium mb-1 text-gray-700">
+											<label
+												className="block text-sm font-medium mb-1 text-gray-700"
+												htmlFor="testing"
+											>
 												{field.label || field.key}
 											</label>
 											<input

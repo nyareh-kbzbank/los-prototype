@@ -36,6 +36,8 @@ export type LoanApplication = {
   beneficiaryName: string;
   nationalId: string;
   phone: string;
+  bankAccountNo: string;
+  kpayPhoneNo: string;
   age: number | null;
   monthlyIncome: number | null;
   requestedAmount: number;
@@ -66,6 +68,8 @@ export type LoanApplicationInput = {
   beneficiaryName: string;
   nationalId: string;
   phone: string;
+  bankAccountNo?: string;
+  kpayPhoneNo?: string;
   age?: number | null;
   monthlyIncome?: number | null;
   requestedAmount: number;
@@ -104,6 +108,14 @@ export const useLoanApplicationStore = create<LoanApplicationState>()(
         const now = Date.now();
         const applicationNo = generateApplicationNo(input.productCode);
         const initialStatus = input.status ?? "DRAFT";
+        const normalizedAge =
+          Number.isFinite(input.age ?? NaN) && input.age !== null
+            ? Math.max(0, input.age ?? 0)
+            : null;
+        const normalizedMonthlyIncome =
+          Number.isFinite(input.monthlyIncome ?? NaN) && input.monthlyIncome !== null
+            ? Math.max(0, input.monthlyIncome ?? 0)
+            : null;
         const application: LoanApplication = {
           id: uuidV4(),
           applicationNo,
@@ -113,14 +125,10 @@ export const useLoanApplicationStore = create<LoanApplicationState>()(
           beneficiaryName: input.beneficiaryName.trim(),
           nationalId: input.nationalId.trim(),
           phone: input.phone.trim(),
-          age:
-            Number.isFinite(input.age || NaN) && input.age !== null
-              ? Math.max(0, input.age)
-              : null,
-          monthlyIncome:
-            Number.isFinite(input.monthlyIncome || NaN) && input.monthlyIncome !== null
-              ? Math.max(0, input.monthlyIncome)
-              : null,
+          bankAccountNo: input.bankAccountNo?.trim() ?? "",
+          kpayPhoneNo: input.kpayPhoneNo?.trim() ?? "",
+          age: normalizedAge,
+          monthlyIncome: normalizedMonthlyIncome,
           requestedAmount: Number.isFinite(input.requestedAmount)
             ? Math.max(0, input.requestedAmount)
             : 0,
@@ -136,11 +144,11 @@ export const useLoanApplicationStore = create<LoanApplicationState>()(
           productName: input.productName ?? null,
           creditScore:
             Number.isFinite(input.creditScore || NaN) && input.creditScore !== null
-              ? input.creditScore
+              ? input.creditScore ?? null
               : null,
           creditMax:
             Number.isFinite(input.creditMax || NaN) && input.creditMax !== null
-              ? input.creditMax
+              ? input.creditMax ?? null
               : null,
           workflowId: input.workflowId ?? null,
           workflowName: input.workflowName ?? null,
@@ -165,7 +173,7 @@ export const useLoanApplicationStore = create<LoanApplicationState>()(
           bureauRequestedAt:
             Number.isFinite(input.bureauRequestedAt || NaN) &&
             input.bureauRequestedAt !== null
-              ? input.bureauRequestedAt
+              ? input.bureauRequestedAt ?? null
               : null,
         };
         set((prev) => ({
@@ -245,7 +253,7 @@ export const useLoanApplicationStore = create<LoanApplicationState>()(
     }),
     {
       name: "loan-applications",
-      version: 5,
+      version: 6,
       partialize: (state) => ({ applications: state.applications }),
       migrate: (persistedState, version) => {
         const base = persistedState as Partial<LoanApplicationState> &
@@ -302,6 +310,19 @@ export const useLoanApplicationStore = create<LoanApplicationState>()(
             patched[id] = {
               decisionHistory: [],
               ...(app as LoanApplication),
+            };
+          }
+          return { ...base, applications: patched } satisfies Partial<LoanApplicationState>;
+        }
+
+        if (version < 6) {
+          const patched: Record<string, LoanApplication> = {};
+          for (const [id, app] of Object.entries(applications)) {
+            const existing = app as LoanApplication;
+            patched[id] = {
+              ...existing,
+              bankAccountNo: existing.bankAccountNo ?? "",
+              kpayPhoneNo: existing.kpayPhoneNo ?? "",
             };
           }
           return { ...base, applications: patched } satisfies Partial<LoanApplicationState>;

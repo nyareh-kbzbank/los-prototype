@@ -606,6 +606,7 @@ const buildScoreInputsFromApplication = (
 		beneficiaryName: string;
 		nationalId: string;
 		phone: string;
+		bankAccountNo: string;
 		age: number | null;
 		monthlyIncome: number | null;
 		requestedAmount: number | null;
@@ -642,6 +643,9 @@ const buildScoreInputsFromApplication = (
 		}
 		if (includesAny(normalizedField, ["mobile", "phone", "phoneno", "mobileno"])) {
 			return input.phone.trim();
+		}
+		if (includesAny(normalizedField, ["bankaccount", "accountno", "accountnumber"])) {
+			return input.bankAccountNo.trim();
 		}
 		if (includesAny(normalizedField, ["channelcode", "channel"])) {
 			return input.channelCode.trim();
@@ -742,6 +746,7 @@ function LoanApplicationCreate() {
 	const [beneficiaryName, setBeneficiaryName] = useState("");
 	const [nationalId, setNationalId] = useState("");
 	const [phone, setPhone] = useState("");
+	const [bankAccountNo, setBankAccountNo] = useState("");
 	const [ageInput, setAgeInput] = useState("");
 	const [monthlyIncomeInput, setMonthlyIncomeInput] = useState("");
 	const [amountInput, setAmountInput] = useState("");
@@ -779,7 +784,8 @@ function LoanApplicationCreate() {
 		return buildScoreInputsFromApplication(activeScoreCard.fields, {
 			beneficiaryName,
 			nationalId,
-			phone,
+			phone: destinationType === "WALLET" ? phone : "",
+			bankAccountNo: destinationType === "BANK" ? bankAccountNo : "",
 			age: Number.isFinite(parsedAge) ? parsedAge : null,
 			monthlyIncome: Number.isFinite(parsedMonthlyIncome)
 				? parsedMonthlyIncome
@@ -800,6 +806,7 @@ function LoanApplicationCreate() {
 		ageInput,
 		amountInput,
 		beneficiaryName,
+		bankAccountNo,
 		bureauConsent,
 		bureauProvider,
 		bureauPurpose,
@@ -1088,6 +1095,16 @@ function LoanApplicationCreate() {
 			}
 		}
 
+		if (destinationType === "BANK" && !bankAccountNo.trim()) {
+			setFormError("Bank account no is required for bank disbursement.");
+			return null;
+		}
+
+		if (destinationType === "WALLET" && !phone.trim()) {
+			setFormError("Phone no is required for KPay disbursement.");
+			return null;
+		}
+
 		const parsedBureauRequestedAt = bureauRequestedAt
 			? Date.parse(bureauRequestedAt)
 			: null;
@@ -1138,7 +1155,8 @@ function LoanApplicationCreate() {
 			? buildScoreInputsFromApplication(activeScoreCard.fields, {
 					beneficiaryName,
 					nationalId,
-					phone,
+					phone: destinationType === "WALLET" ? phone : "",
+					bankAccountNo: destinationType === "BANK" ? bankAccountNo : "",
 					age: validated.parsedAge,
 					monthlyIncome: validated.parsedMonthlyIncome,
 					requestedAmount: validated.parsedAmount,
@@ -1165,7 +1183,9 @@ function LoanApplicationCreate() {
 			status,
 			beneficiaryName,
 			nationalId,
-			phone,
+			phone: destinationType === "WALLET" ? phone : "",
+			bankAccountNo: destinationType === "BANK" ? bankAccountNo : "",
+			kpayPhoneNo: destinationType === "WALLET" ? phone : "",
 			age: validated.parsedAge,
 			monthlyIncome: validated.parsedMonthlyIncome,
 			requestedAmount: validated.parsedAmount,
@@ -1497,18 +1517,27 @@ function LoanApplicationCreate() {
 										type="text"
 										className="border px-2 py-2 rounded"
 										value={nationalId}
+                    placeholder="12/XXX(X)123456"
 										onChange={(e) => setNationalId(e.target.value)}
 										disabled={disabled}
 									/>
 								</label>
 
 								<label className="flex flex-col gap-1 text-sm">
-									<span>Phone</span>
+									<span>
+										{destinationType === "BANK" ? "Bank account no" : "Phone no (KPay)"}
+									</span>
 									<input
-										type="tel"
+										type={destinationType === "BANK" ? "text" : "tel"}
 										className="border px-2 py-2 rounded"
-										value={phone}
-										onChange={(e) => setPhone(e.target.value)}
+										value={destinationType === "BANK" ? bankAccountNo : phone}
+										onChange={(e) => {
+											if (destinationType === "BANK") {
+												setBankAccountNo(e.target.value);
+												return;
+											}
+											setPhone(e.target.value);
+										}}
 										disabled={disabled}
 									/>
 								</label>
