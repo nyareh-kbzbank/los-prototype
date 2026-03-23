@@ -437,9 +437,12 @@ function DocumentRequirementsSection(
 				</div>
 			</div>
 
-			<div className="mt-6 space-y-3">
+			<div className="mt-6 space-y-3 border rounded-lg bg-gray-50 p-4">
 				<div className="flex items-center justify-between">
-					<h3 className="text-sm font-semibold">Configured requirements</h3>
+					<div>
+						<h3 className="text-sm font-semibold">Preview</h3>
+						<div className="text-[11px] text-gray-500">Preview only</div>
+					</div>
 					<span className="text-xs text-gray-600">
 						{requirements.length} section(s)
 					</span>
@@ -451,7 +454,10 @@ function DocumentRequirementsSection(
 				) : (
 					<div className="space-y-3">
 						{requirements.map((requirement) => (
-							<div key={requirement.id} className="border rounded p-3 text-sm">
+							<div
+								key={requirement.id}
+								className="border rounded bg-white p-3 text-sm"
+							>
 								<div className="flex items-center justify-between gap-2">
 									<div>
 										<div className="font-semibold">

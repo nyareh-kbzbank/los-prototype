@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as LoginRouteImport } from './routes/login'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as WorkflowIndexRouteImport } from './routes/workflow/index'
 import { Route as LoanIndexRouteImport } from './routes/loan/index'
@@ -32,6 +33,11 @@ import { Route as LoanCheckerInboxApplicationIdRouteImport } from './routes/loan
 import { Route as LoanApplicationsCreateRouteImport } from './routes/loan/applications/create'
 import { Route as LoanApplicationsApplicationIdRouteImport } from './routes/loan/applications/$applicationId'
 
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -149,6 +155,7 @@ const LoanApplicationsApplicationIdRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/login': typeof LoginRoute
   '/loan/emi-calculator': typeof LoanEmiCalculatorRoute
   '/loan/emi-custom-calculator': typeof LoanEmiCustomCalculatorRoute
   '/loan/repayment-plans': typeof LoanRepaymentPlansRoute
@@ -173,6 +180,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/login': typeof LoginRoute
   '/loan/emi-calculator': typeof LoanEmiCalculatorRoute
   '/loan/emi-custom-calculator': typeof LoanEmiCustomCalculatorRoute
   '/loan/repayment-plans': typeof LoanRepaymentPlansRoute
@@ -198,6 +206,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/login': typeof LoginRoute
   '/loan/emi-calculator': typeof LoanEmiCalculatorRoute
   '/loan/emi-custom-calculator': typeof LoanEmiCustomCalculatorRoute
   '/loan/repayment-plans': typeof LoanRepaymentPlansRoute
@@ -224,6 +233,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/login'
     | '/loan/emi-calculator'
     | '/loan/emi-custom-calculator'
     | '/loan/repayment-plans'
@@ -248,6 +258,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/login'
     | '/loan/emi-calculator'
     | '/loan/emi-custom-calculator'
     | '/loan/repayment-plans'
@@ -272,6 +283,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/login'
     | '/loan/emi-calculator'
     | '/loan/emi-custom-calculator'
     | '/loan/repayment-plans'
@@ -297,6 +309,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  LoginRoute: typeof LoginRoute
   LoanEmiCalculatorRoute: typeof LoanEmiCalculatorRoute
   LoanEmiCustomCalculatorRoute: typeof LoanEmiCustomCalculatorRoute
   LoanRepaymentPlansRoute: typeof LoanRepaymentPlansRoute
@@ -322,6 +335,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -481,6 +501,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  LoginRoute: LoginRoute,
   LoanEmiCalculatorRoute: LoanEmiCalculatorRoute,
   LoanEmiCustomCalculatorRoute: LoanEmiCustomCalculatorRoute,
   LoanRepaymentPlansRoute: LoanRepaymentPlansRoute,

@@ -51,6 +51,43 @@ Source: src/lib/loan-setup-store.ts
 - Persists selected custom EMI type details (id, name, formulas) and custom field values.
 - updateSetup re-normalizes inputs and preserves existing document requirements if none provided.
 
+## V2 Loan Setup Page
+
+Sources:
+
+- src/routes/solution/v2/loan-setup.tsx
+- src/components/loan/v2/*
+
+- V2 setup is a separate page/flow from the main loan setup route and should be treated as an independent implementation.
+- V2 may reference logic and UI patterns from `src/routes/loan/setup/index.tsx` and related components for consistency.
+- Referencing does not imply coupling: changes in V2 should not directly alter main loan setup unless explicitly requested.
+- Current V2 step order is: **Product Setup** → **Interest Setup** → **Repayment Setup** → **Credit Score Engine** → **Document Rule** → **Decision Rule** → **Disbursement Setup**.
+- V2 uses a sidebar stepper; each step is edited inline in the same page flow.
+- V2 step 2 is an **Interest Setup** section that configures interest rate plans.
+- Interest setup includes the same plan fields as the main setup interest section: interest type, rate type, base rate, parameter overrides, and policies.
+- V2 Interest Setup intentionally does not use an accordion; all fields are always visible in this step.
+- V2 step 3 is a **Repayment Setup** section inserted between Interest Setup and Credit Score Engine.
+- V2 Repayment Setup is local to the V2 flow (not reusable/global), so it does not include reusable plan naming or saved-plan config selection.
+- V2 Repayment Setup also includes inline custom formula fields based on the Custom EMI calculator format (principal formula, interest formula, and custom field definitions).
+- V2 Repayment Setup custom formula includes a **Test Calculate** action that opens a dialog for sample input values and displays installment/interest/payment output from the configured formulas.
+- V2 Repayment Setup references repayment fields from the main repayment setup flow but is configured only for the current V2 setup session.
+- V2 step 4 is a **Credit Score Engine** section that keeps scorecard setup and bureau settings in the same step.
+- Credit Score Engine behavior in V2 includes table-based rule editing, a sample calculation modal, and no raw JSON preview panel.
+- V2 Credit Score Engine includes a **Risk Grade Definition** section where users can configure minimum score thresholds for `LOW`, `MEDIUM`, and `HIGH` risk grades.
+- Sample calculation in V2 applies the configured thresholds when displaying risk grade outcomes.
+- V2 step 5 is a **Document Rule** section that reuses the existing document-requirements configuration pattern from the main loan setup flow.
+- V2 Document Rule maps required documents by risk grade and starts with default required documents for `LOW` risk.
+- In V2 Document Rule, when loan security is set to `SECURED`, collateral (`DOC-COLLATERAL`) is automatically enforced as `isMandatory=true` and `collateralRequired=true` for all configured risk grades.
+- V2 step 6 is a **Decision Rule** section where users can configure decision outcomes (`AUTO_APPROVE`, `MANUAL_REVIEW`, `AUTO_REJECT`) using conditional rules.
+- Decision rules support flexible key fields (for example `creditScore`, `riskGrade`, and other custom fields) with operators and values.
+- Decision Rule setup also keeps a default mapping by risk grade as a fallback outcome.
+- V2 step 7 is a **Disbursement Setup** section.
+- Disbursement Setup supports `Single` and `Multiple` disbursement types:
+  - `Single` auto-enforces “Release full amount at once”.
+  - `Multiple` enables tranche configuration with columns: Tranche, Amount, Trigger Type, and Timing Meaning.
+- Tranche timing meaning supports `Immediate` and `Based on milestone`.
+- Disbursement Setup includes method selection (`Bank Transfer`, `Wallet`, `Cash`, `Pay to Merchant`) and fee inputs (`Processing Fee`, `Disbursement Fee`).
+
 ## Scorecards
 
 Source: src/lib/scorecard-store.ts
@@ -174,3 +211,25 @@ Validation rules:
 - Principal and tenure months must be positive.
 - Selected custom type must exist and include non-empty principal/interest formulas.
 - Custom field keys must match `[A-Za-z_][A-Za-z0-9_]*` and should be unique for predictable formula behavior.
+
+## Authentication and Role Access (Prototype)
+
+Sources:
+
+- src/lib/auth-store.ts
+- src/routes/login.tsx
+- src/routes/__root.tsx
+
+- Authentication uses hardcoded prototype accounts stored client-side in Zustand persist state.
+- Supported credentials:
+  - `admin / admin123`
+  - `customer / customer123`
+- Login writes an auth session with `username` and `role` to local storage key `loan-auth-session`.
+- Root route guard enforces authentication for all routes except `/login`.
+- Role-based route access:
+  - `admin` can access all existing setup/workflow/configuration pages and application routes.
+  - `customer` can access home and loan application routes (`/loan/applications/*`) only.
+- Unauthenticated users are redirected to `/login`.
+- Authenticated users visiting `/login` are redirected to their role landing page:
+  - `admin` → `/loan/setup`
+  - `customer` → `/loan/applications/create`

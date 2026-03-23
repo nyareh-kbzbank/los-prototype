@@ -1,37 +1,28 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { Info, Plus, Trash2, Workflow } from "lucide-react";
+import { createFileRoute } from "@tanstack/react-router";
+import type { ReactNode } from "react";
 import { useMemo, useState } from "react";
+import { CreditScoreEngineTab } from "@/components/loan/v2/CreditScoreEngineTab";
+import {
+	createDefaultDecisionRules,
+	type DecisionRuleAction,
+	type DecisionRuleByGrade,
+	DecisionRuleSetupTab,
+} from "@/components/loan/v2/DecisionRuleSetupTab";
+import { DisbursementSetupTab } from "@/components/loan/v2/DisbursementSetupTab";
+import { DocumentSetupTab } from "@/components/loan/v2/DocumentSetupTab";
+import { InterestEngineTab } from "@/components/loan/v2/InterestEngineTab";
+import { ProductSetupTab } from "@/components/loan/v2/ProductSetupTab";
+import { RepaymentSetupTab } from "@/components/loan/v2/RepaymentSetupTab";
+import type {
+	ChannelConfig,
+	ProductSetupForm,
+	V2InterestConfig,
+} from "@/components/loan/v2/setup-types";
 import { getWorkflowList, useWorkflowStore } from "@/lib/workflow-store";
 
 export const Route = createFileRoute("/solution/v2/loan-setup")({
 	component: LoanProductSetup,
 });
-
-type LoanSecurityType = "SECURED" | "UNSECURED";
-type TenorUnit = "DAY" | "MONTH" | "YEAR";
-
-type TenorValueItem = {
-	id: string;
-	value: number;
-};
-
-type ProductSetupForm = {
-	productName: string;
-	productCode: string;
-	description: string;
-	loanSecurity: LoanSecurityType;
-	minAmount: number;
-	maxAmount: number;
-	tenorUnit: TenorUnit;
-	tenorValues: TenorValueItem[];
-};
-
-type ChannelConfig = {
-	id: string;
-	name: string;
-	code: string;
-	workflowId: string;
-};
 
 function createId() {
 	return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
@@ -41,28 +32,18 @@ function createChannelConfig(): ChannelConfig {
 	return { id: createId(), name: "", code: "", workflowId: "" };
 }
 
-function createTenorValue(value: number): TenorValueItem {
+function createTenorValue(value: number) {
 	return { id: createId(), value };
 }
 
-function InputInfoLabel({ label, info }: { label: string; info: string }) {
-	return (
-		<div className="flex items-center gap-1 text-sm font-medium text-slate-700">
-			<span>{label}</span>
-			<span className="relative inline-flex items-center">
-				<button
-					type="button"
-					aria-label={info}
-					className="peer inline-flex items-center justify-center text-slate-500 cursor-help"
-				>
-					<Info className="h-3.5 w-3.5" />
-				</button>
-				<span className="pointer-events-none absolute left-1/2 top-full z-20 mt-1 w-64 -translate-x-1/2 rounded-md bg-slate-900 px-2 py-1.5 text-[11px] leading-snug text-white opacity-0 shadow-lg transition-opacity peer-hover:opacity-100 peer-focus-visible:opacity-100">
-					{info}
-				</span>
-			</span>
-		</div>
-	);
+function createInterestConfig(baseRate = 18.5): V2InterestConfig {
+	return {
+		interestType: "REDUCING",
+		rateType: "FIXED",
+		baseRate,
+		config: { parameters: [] },
+		policies: [],
+	};
 }
 
 function LoanProductSetup() {
@@ -76,6 +57,36 @@ function LoanProductSetup() {
 			title: "Product Setup",
 			description: "Product, loan, channel, and workflow mapping",
 		},
+		{
+			id: "interest-setup",
+			title: "Interest Setup",
+			description: "Interest rate plans, parameters, and policies",
+		},
+		{
+			id: "repayment-setup",
+			title: "Repayment Setup",
+			description: "Repayment rules and custom formula",
+		},
+		{
+			id: "credit-score-engine",
+			title: "Credit Score Engine",
+			description: "Scorecard setup and bureau configuration",
+		},
+		{
+			id: "document-setup",
+			title: "Document Rule",
+			description: "Document requirements by risk grade",
+		},
+		{
+			id: "decision-rule-setup",
+			title: "Decision Rule",
+			description: "Auto-approve, manual-review, or auto-reject by grade",
+		},
+		{
+			id: "disbursement-setup",
+			title: "Disbursement Setup",
+			description: "Single or multiple tranches, method, and fees",
+		},
 	] as const;
 
 	const [productSetup, setProductSetup] = useState<ProductSetupForm>({
@@ -85,6 +96,11 @@ function LoanProductSetup() {
 		loanSecurity: "UNSECURED",
 		minAmount: 500000,
 		maxAmount: 10000000,
+		serviceFees: null,
+		adminFees: null,
+		stampDuty: null,
+		commissionFees: null,
+		insuranceFees: null,
 		tenorUnit: "MONTH",
 		tenorValues: [
 			createTenorValue(6),
@@ -95,6 +111,16 @@ function LoanProductSetup() {
 	const [channels, setChannels] = useState<ChannelConfig[]>([
 		createChannelConfig(),
 	]);
+	const [interestRatePlans, setInterestRatePlans] = useState<
+		V2InterestConfig[]
+	>([createInterestConfig()]);
+	const [bureauRequired, setBureauRequired] = useState(false);
+	const [bureauProvider, setBureauProvider] = useState("MMCB");
+	const [bureauPurpose, setBureauPurpose] = useState("Credit assessment");
+	const [bureauConsentRequired, setBureauConsentRequired] = useState(true);
+	const [decisionRules, setDecisionRules] = useState<DecisionRuleByGrade>(() =>
+		createDefaultDecisionRules(),
+	);
 
 	const mappedChannelWorkflows = useMemo(
 		() =>
@@ -164,301 +190,208 @@ function LoanProductSetup() {
 		);
 	};
 
-	const stepContent = (
-		<>
-			<section className="border rounded-lg p-5 space-y-4">
-				<h2 className="text-lg font-semibold">Product Basics</h2>
-				<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-					<div className="space-y-1">
-						<InputInfoLabel
-							label="Product Name"
-							info="Customer-facing product name shown in application journeys."
-						/>
-						<input
-							type="text"
-							value={productSetup.productName}
-							onChange={(event) =>
-								updateProductField("productName", event.target.value)
-							}
-							className="border rounded px-3 py-2 w-full"
-							placeholder="Product Name"
-						/>
-					</div>
-					<div className="space-y-1">
-						<InputInfoLabel
-							label="Product Code"
-							info="Unique internal code used to identify this product."
-						/>
-						<input
-							type="text"
-							value={productSetup.productCode}
-							onChange={(event) =>
-								updateProductField("productCode", event.target.value)
-							}
-							className="border rounded px-3 py-2 w-full"
-							placeholder="Product Code"
-						/>
-					</div>
-				</div>
-				<div className="space-y-1">
-					<InputInfoLabel
-						label="Description"
-						info="Short product summary for internal and customer context."
-					/>
-					<textarea
-						value={productSetup.description}
-						onChange={(event) =>
-							updateProductField("description", event.target.value)
-						}
-						className="border rounded px-3 py-2 min-h-24 w-full"
-						placeholder="Description"
-					/>
-				</div>
-			</section>
+	const updateInterestConfig = (
+		updater: (current: V2InterestConfig[]) => V2InterestConfig[],
+	) => {
+		setInterestRatePlans((current) => updater(current));
+	};
 
-			<section className="border rounded-lg p-5 space-y-4">
-				<h2 className="text-lg font-semibold">Loan Setup</h2>
-				<div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-					<div className="space-y-1">
-						<InputInfoLabel
-							label="Loan Security"
-							info="Choose secured if collateral is required, unsecured otherwise."
-						/>
-						<div className="flex items-center gap-6 text-sm pt-2">
-							<label className="inline-flex items-center gap-2">
-								<input
-									type="radio"
-									name="loan-security"
-									checked={productSetup.loanSecurity === "SECURED"}
-									onChange={() => updateProductField("loanSecurity", "SECURED")}
-								/>
-								<span>Secured</span>
-							</label>
-							<label className="inline-flex items-center gap-2">
-								<input
-									type="radio"
-									name="loan-security"
-									checked={productSetup.loanSecurity === "UNSECURED"}
-									onChange={() =>
-										updateProductField("loanSecurity", "UNSECURED")
-									}
-								/>
-								<span>Unsecured</span>
-							</label>
-						</div>
-					</div>
-					<div className="space-y-1">
-						<InputInfoLabel
-							label="Minimum Amount"
-							info="Lowest loan amount allowed for this product."
-						/>
-						<input
-							type="number"
-							min={0}
-							value={productSetup.minAmount}
-							onChange={(event) =>
-								updateProductField("minAmount", Number(event.target.value) || 0)
-							}
-							className="border rounded px-3 py-2 w-full"
-							placeholder="Minimum Amount"
-						/>
-					</div>
-					<div className="space-y-1">
-						<InputInfoLabel
-							label="Maximum Amount"
-							info="Highest loan amount allowed for this product."
-						/>
-						<input
-							type="number"
-							min={0}
-							value={productSetup.maxAmount}
-							onChange={(event) =>
-								updateProductField("maxAmount", Number(event.target.value) || 0)
-							}
-							className="border rounded px-3 py-2 w-full"
-							placeholder="Maximum Amount"
-						/>
-					</div>
-				</div>
+	const updatePlan = (
+		planIndex: number,
+		updater: (plan: V2InterestConfig) => V2InterestConfig,
+	) => {
+		updateInterestConfig((current) =>
+			current.map((plan, idx) => (idx === planIndex ? updater(plan) : plan)),
+		);
+	};
 
-				<div className="space-y-2">
-					<div className="flex items-end justify-between gap-4">
-						<div className="space-y-1">
-							<InputInfoLabel
-								label="Tenor Unit"
-								info="Unit used for tenor values (day, month, or year)."
-							/>
-							<select
-								value={productSetup.tenorUnit}
-								onChange={(event) =>
-									updateProductField(
-										"tenorUnit",
-										event.target.value as TenorUnit,
-									)
-								}
-								className="border rounded px-3 py-2 w-48"
-							>
-								<option value="DAY">Day</option>
-								<option value="MONTH">Month</option>
-								<option value="YEAR">Year</option>
-							</select>
-						</div>
-						<button
-							type="button"
-							onClick={addTenorValue}
-							className="inline-flex items-center gap-1 border rounded px-2 py-1 text-xs hover:bg-gray-50"
-						>
-							<Plus className="h-3 w-3" />
-							Add tenor
-						</button>
-					</div>
-					<InputInfoLabel
-						label="Tenor Values"
-						info="Allowed duration options for this product in the selected unit."
-					/>
-					<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-						{productSetup.tenorValues.map((item) => (
-							<div
-								key={item.id}
-								className="flex items-center gap-2 border rounded px-2 py-2"
-							>
-								<input
-									type="number"
-									min={0}
-									value={item.value}
-									onChange={(event) =>
-										updateTenorValue(item.id, event.target.value)
-									}
-									className="w-full outline-none"
-								/>
-								<button
-									type="button"
-									onClick={() => removeTenorValue(item.id)}
-									className="text-gray-500 hover:text-red-600"
-									aria-label="Remove tenor value"
-								>
-									<Trash2 className="h-4 w-4" />
-								</button>
-							</div>
-						))}
-					</div>
-				</div>
-			</section>
+	const addPlan = () => {
+		setInterestRatePlans((current) => {
+			const fallbackRate = current[current.length - 1]?.baseRate ?? 18.5;
+			return [...current, createInterestConfig(fallbackRate)];
+		});
+	};
 
-			<section className="border rounded-lg p-5 space-y-4">
-				<div className="flex items-center justify-between">
-					<h2 className="text-lg font-semibold">Channel Configuration</h2>
-					<button
-						type="button"
-						onClick={addChannel}
-						className="inline-flex items-center gap-2 border rounded px-3 py-2 text-sm hover:bg-gray-50"
-					>
-						<Plus className="h-4 w-4" />
-						Add channel
-					</button>
-				</div>
-				{channels.map((channel) => (
-					<div
-						key={channel.id}
-						className="grid grid-cols-1 md:grid-cols-[1fr_1fr_1.2fr_auto] gap-3 border rounded p-3"
-					>
-						<div className="space-y-1">
-							<InputInfoLabel
-								label="Channel Name"
-								info="Display name for the origination channel."
-							/>
-							<input
-								type="text"
-								value={channel.name}
-								onChange={(event) =>
-									updateChannelField(channel.id, "name", event.target.value)
-								}
-								className="border rounded px-3 py-2 w-full"
-								placeholder="Channel Name"
-							/>
-						</div>
-						<div className="space-y-1">
-							<InputInfoLabel
-								label="Channel Code"
-								info="Short code for integrations and reporting."
-							/>
-							<input
-								type="text"
-								value={channel.code}
-								onChange={(event) =>
-									updateChannelField(channel.id, "code", event.target.value)
-								}
-								className="border rounded px-3 py-2 w-full"
-								placeholder="Channel Code"
-							/>
-						</div>
-						<div className="space-y-1">
-							<InputInfoLabel
-								label="Workflow"
-								info="Workflow applied when applications come from this channel."
-							/>
-							<select
-								value={channel.workflowId}
-								onChange={(event) =>
-									updateChannelField(channel.id, "workflowId", event.target.value)
-								}
-								className="border rounded px-3 py-2 w-full"
-							>
-								<option value="">(Select workflow)</option>
-								{workflowList.map((workflow) => (
-									<option key={workflow.workflowId} value={workflow.workflowId}>
-										{workflow.name}
-									</option>
-								))}
-							</select>
-						</div>
-						<button
-							type="button"
-							onClick={() => removeChannel(channel.id)}
-							className="border rounded px-3 py-2 text-sm hover:bg-gray-50"
-						>
-							Remove
-						</button>
-					</div>
-				))}
-			</section>
+	const removePlan = (planIndex: number) => {
+		setInterestRatePlans((current) =>
+			current.length === 1
+				? current
+				: current.filter((_, index) => index !== planIndex),
+		);
+	};
 
-			<section className="border rounded-lg p-5">
-				<h2 className="text-lg font-semibold mb-2">Workflow Setup by Channel</h2>
-				<table className="w-full text-sm border-collapse">
-					<thead>
-						<tr className="border-b text-left text-gray-600">
-							<th className="py-2 pr-3">Channel</th>
-							<th className="py-2 pr-3">Code</th>
-							<th className="py-2">Assigned Workflow</th>
-						</tr>
-					</thead>
-					<tbody>
-						{mappedChannelWorkflows.map(({ channel, workflowName }) => (
-							<tr
-								key={`mapped-${channel.id}`}
-								className="border-b last:border-b-0"
-							>
-								<td className="py-2 pr-3">{channel.name || "(Unnamed channel)"}</td>
-								<td className="py-2 pr-3">{channel.code || "—"}</td>
-								<td className="py-2">
-									{workflowName ? (
-										<span className="text-emerald-700">{workflowName}</span>
-									) : (
-										<span className="text-amber-700">No workflow assigned</span>
-									)}
-								</td>
-							</tr>
-						))}
-					</tbody>
-				</table>
-			</section>
-		</>
-	);
+	const addParameter = (planIndex: number) => {
+		updatePlan(planIndex, (current) => ({
+			...current,
+			config: {
+				parameters: [
+					...(current.config?.parameters ?? []),
+					{ name: "", value: 0, interestRate: current.baseRate },
+				],
+			},
+		}));
+	};
+
+	const updateParameter = (
+		planIndex: number,
+		paramIndex: number,
+		field: "name" | "value" | "interestRate",
+		value: string,
+	) => {
+		updatePlan(planIndex, (current) => {
+			const nextParameters = [...(current.config.parameters ?? [])];
+			const targetParameter = nextParameters[paramIndex];
+			if (!targetParameter) return current;
+			if (field === "name") {
+				nextParameters[paramIndex] = { ...targetParameter, name: value };
+			} else {
+				const parsed = Number(value);
+				nextParameters[paramIndex] = {
+					...targetParameter,
+					[field]: Number.isFinite(parsed) ? parsed : targetParameter[field],
+				};
+			}
+			return {
+				...current,
+				config: { parameters: nextParameters },
+			};
+		});
+	};
+
+	const removeParameter = (planIndex: number, paramIndex: number) => {
+		updatePlan(planIndex, (current) => ({
+			...current,
+			config: {
+				parameters: (current.config.parameters ?? []).filter(
+					(_, index) => index !== paramIndex,
+				),
+			},
+		}));
+	};
+
+	const addPolicy = (planIndex: number) => {
+		updatePlan(planIndex, (current) => ({
+			...current,
+			policies: [
+				...(current.policies ?? []),
+				{ interestCategory: "", interestRate: 0 },
+			],
+		}));
+	};
+
+	const updatePolicy = (
+		planIndex: number,
+		policyIndex: number,
+		field: "interestCategory" | "interestRate",
+		value: string,
+	) => {
+		updatePlan(planIndex, (current) => {
+			const nextPolicies = [...(current.policies ?? [])];
+			const targetPolicy = nextPolicies[policyIndex];
+			if (!targetPolicy) return current;
+			if (field === "interestCategory") {
+				nextPolicies[policyIndex] = {
+					...targetPolicy,
+					interestCategory: value,
+				};
+			} else {
+				const parsed = Number(value);
+				nextPolicies[policyIndex] = {
+					...targetPolicy,
+					interestRate: Number.isFinite(parsed)
+						? parsed
+						: targetPolicy.interestRate,
+				};
+			}
+			return { ...current, policies: nextPolicies };
+		});
+	};
+
+	const removePolicy = (planIndex: number, policyIndex: number) => {
+		updatePlan(planIndex, (current) => ({
+			...current,
+			policies: (current.policies ?? []).filter(
+				(_, index) => index !== policyIndex,
+			),
+		}));
+	};
+
+	const handleChangeDecisionRule = (
+		grade: keyof DecisionRuleByGrade,
+		action: DecisionRuleAction,
+	) => {
+		setDecisionRules((current) => ({
+			...current,
+			[grade]: action,
+		}));
+	};
+
+	const canGoBack = currentStep > 0;
+	const canGoNext = currentStep < steps.length - 1;
+
+	let stepContent: ReactNode;
+	if (currentStep === 0) {
+		stepContent = (
+			<ProductSetupTab
+				productSetup={productSetup}
+				channels={channels}
+				workflowList={workflowList}
+				mappedChannelWorkflows={mappedChannelWorkflows}
+				updateProductField={updateProductField}
+				addTenorValue={addTenorValue}
+				updateTenorValue={updateTenorValue}
+				removeTenorValue={removeTenorValue}
+				addChannel={addChannel}
+				updateChannelField={updateChannelField}
+				removeChannel={removeChannel}
+			/>
+		);
+	} else if (currentStep === 1) {
+		stepContent = (
+			<InterestEngineTab
+				interestRatePlans={interestRatePlans}
+				updateInterestConfig={updateInterestConfig}
+				addPlan={addPlan}
+				removePlan={removePlan}
+				addParameter={addParameter}
+				updateParameter={updateParameter}
+				removeParameter={removeParameter}
+				addPolicy={addPolicy}
+				updatePolicy={updatePolicy}
+				removePolicy={removePolicy}
+			/>
+		);
+	} else if (currentStep === 2) {
+		stepContent = <RepaymentSetupTab />;
+	} else if (currentStep === 3) {
+		stepContent = (
+			<CreditScoreEngineTab
+				bureauRequired={bureauRequired}
+				bureauProvider={bureauProvider}
+				bureauPurpose={bureauPurpose}
+				bureauConsentRequired={bureauConsentRequired}
+				setBureauRequired={setBureauRequired}
+				setBureauProvider={setBureauProvider}
+				setBureauPurpose={setBureauPurpose}
+				setBureauConsentRequired={setBureauConsentRequired}
+			/>
+		);
+	} else if (currentStep === 4) {
+		stepContent = <DocumentSetupTab loanSecurity={productSetup.loanSecurity} />;
+	} else if (currentStep === 5) {
+		stepContent = (
+			<DecisionRuleSetupTab
+				decisionRules={decisionRules}
+				onChangeDecisionRule={handleChangeDecisionRule}
+			/>
+		);
+	} else {
+		stepContent = <DisbursementSetupTab />;
+	}
 
 	return (
 		<div className="min-h-screen bg-slate-100 p-6">
-			<div className="mx-auto max-w-6xl bg-white rounded-3xl border overflow-hidden flex flex-col md:flex-row min-h-180">
+			<div className="w-full bg-white rounded-3xl border overflow-hidden flex flex-col md:flex-row min-h-180">
 				<aside className="w-full md:w-72 bg-slate-950 p-6 md:p-8 text-white">
 					<div className="mb-8">
 						<div className="text-xl font-semibold">Setup Flow</div>
@@ -488,7 +421,9 @@ function LoanProductSetup() {
 										</div>
 										<div>
 											<div className="text-sm font-medium">{step.title}</div>
-											<div className="text-xs text-slate-300">{step.description}</div>
+											<div className="text-xs text-slate-300">
+												{step.description}
+											</div>
 										</div>
 									</div>
 								</button>
@@ -509,17 +444,42 @@ function LoanProductSetup() {
 							<span className="text-xs text-gray-500">
 								Step {currentStep + 1} / {steps.length}
 							</span>
-							<Link
+							{/* <Link
 								to="/workflow"
 								className="inline-flex items-center gap-2 border rounded px-3 py-2 text-sm hover:bg-gray-50"
 							>
 								<Workflow className="h-4 w-4" />
 								Manage workflows
-							</Link>
+							</Link> */}
 						</div>
 					</header>
 
 					<div className="flex-1 space-y-4">{stepContent}</div>
+
+					<footer className="mt-6 flex items-center justify-between">
+						<button
+							type="button"
+							onClick={() => canGoBack && setCurrentStep((prev) => prev - 1)}
+							disabled={!canGoBack}
+							className={`rounded px-4 py-2 text-sm border ${
+								canGoBack ? "hover:bg-gray-50" : "opacity-50 cursor-not-allowed"
+							}`}
+						>
+							Back
+						</button>
+						<button
+							type="button"
+							onClick={() => canGoNext && setCurrentStep((prev) => prev + 1)}
+							disabled={!canGoNext}
+							className={`rounded px-5 py-2 text-sm text-white ${
+								canGoNext
+									? "bg-slate-900 hover:bg-slate-800"
+									: "bg-emerald-600 opacity-70 cursor-default"
+							}`}
+						>
+							{canGoNext ? "Next" : "Completed"}
+						</button>
+					</footer>
 				</div>
 			</div>
 		</div>

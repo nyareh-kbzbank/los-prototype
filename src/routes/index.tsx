@@ -11,6 +11,7 @@ import {
 	Receipt,
 	Table,
 } from "lucide-react";
+import { useAuthStore } from "@/lib/auth-store";
 
 export const Route = createFileRoute("/")({ component: HomePage });
 
@@ -57,6 +58,10 @@ const configureCards = [
 ];
 
 function HomePage() {
+	const session = useAuthStore((state) => state.session);
+	const isAdmin = session?.role === "admin";
+	const isCustomer = session?.role === "customer";
+
 	const libraryCards = [
 		{
 			title: "Loan Setup Library",
@@ -186,7 +191,9 @@ function HomePage() {
 					<p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-700 mb-2">
 						Smart Lending Solution
 					</p>
-					<h1 className="text-3xl font-bold mb-2">Welcome back</h1>
+					<h1 className="text-3xl font-bold mb-2">
+						Welcome back{session ? `, ${session.role}` : ""}
+					</h1>
 					<p className="text-slate-600 text-base leading-relaxed mb-8">
 						Set up loan products, tune scorecards, and manage applications from
 						one spot.
@@ -195,50 +202,60 @@ function HomePage() {
 					<div className="space-y-8">
 						<div className="space-y-3">
 							<h2 className="text-sm font-semibold text-slate-700">
-								Configure
-							</h2>
-							<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-								{configureCards.map(renderCard)}
-							</div>
-						</div>
-
-						<div className="space-y-3">
-							<h2 className="text-sm font-semibold text-slate-700">
-								Libraries & Lists
-							</h2>
-							<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-								{libraryCards.map(renderCard)}
-							</div>
-						</div>
-
-						<div className="space-y-3">
-							<h2 className="text-sm font-semibold text-slate-700">
-								Applications
+								{isAdmin ? "Applications" : "Apply for Loans"}
 							</h2>
 							<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 								{actionCards.map(renderCard)}
 							</div>
 						</div>
 
-						<div className="space-y-3">
-							<h2 className="text-sm font-semibold text-slate-700">Inboxes</h2>
-							<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-								{inboxCards.map(renderCard)}
-							</div>
-						</div>
+						{isAdmin ? (
+							<>
+								<div className="space-y-3">
+									<h2 className="text-sm font-semibold text-slate-700">
+										Configure
+									</h2>
+									<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+										{configureCards.map(renderCard)}
+									</div>
+								</div>
 
-						<div className="space-y-3">
-							<h2 className="text-sm font-semibold text-slate-700">Tools</h2>
-							<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-								{toolCards.map(renderCard)}
-							</div>
-						</div>
-						<div className="space-y-3">
-							<h2 className="text-sm font-semibold text-slate-700">V2</h2>
-							<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-								{requetCards.map(renderCard)}
-							</div>
-						</div>
+								<div className="space-y-3">
+									<h2 className="text-sm font-semibold text-slate-700">
+										Libraries & Lists
+									</h2>
+									<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+										{libraryCards.map(renderCard)}
+									</div>
+								</div>
+
+								<div className="space-y-3">
+									<h2 className="text-sm font-semibold text-slate-700">Inboxes</h2>
+									<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+										{inboxCards.map(renderCard)}
+									</div>
+								</div>
+
+								<div className="space-y-3">
+									<h2 className="text-sm font-semibold text-slate-700">Tools</h2>
+									<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+										{toolCards.map(renderCard)}
+									</div>
+								</div>
+								<div className="space-y-3">
+									<h2 className="text-sm font-semibold text-slate-700">V2</h2>
+									<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+										{requetCards.map(renderCard)}
+									</div>
+								</div>
+							</>
+						) : null}
+
+						{isCustomer ? (
+							<p className="text-sm text-slate-600">
+								Customer accounts can create and review loan applications.
+							</p>
+						) : null}
 					</div>
 				</div>
 			</section>
