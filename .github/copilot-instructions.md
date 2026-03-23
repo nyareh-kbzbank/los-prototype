@@ -2,6 +2,7 @@
 
 - Stack: TanStack Start + Vite + React 19 + TypeScript; file-based routing via TanStack Router; Tailwind CSS v4 plugin; Zustand for client state; React Flow (@xyflow) for workflow canvas; TanStack Query wired for SSR.
 - Working rules: no manual reformatting; do not reorder/sort imports or cull unused code; do not run Biome—user handles lint/format.
+- Componentization: when building or updating a page/route, separate code into manageable focused components/hooks instead of creating or expanding monolithic page files.
 - Commands: prefer package scripts (README start is outdated). `npm run dev` (Vite, port 3000), `npm run build`, `npm run preview`, `npm run test` (vitest run), `npm run lint|format|check` (Biome).
 - Env: set `ANTHROPIC_API_KEY` (used by TanStack AI hooks).
 - Routing shell: [src/routes/__root.tsx](src/routes/__root.tsx) defines head tags, mounts global CSS, renders the shared Header, and hosts TanStack Devtools plugins (router panel, query, store, AI). Do not touch `routeTree.gen.ts`; add/modify routes under [src/routes](src/routes).
