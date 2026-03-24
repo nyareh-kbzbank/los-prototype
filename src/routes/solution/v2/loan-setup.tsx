@@ -1,23 +1,39 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import { useMemo, useState } from "react";
-import { CreditScoreEngineTab } from "@/components/loan/v2/CreditScoreEngineTab";
+import type { DocumentRequirementItem } from "@/components/loan/DocumentRequirementsSection";
+import { createDocumentRequirementItem } from "@/components/loan/DocumentRequirementsSection";
+import type { CreditScoreEngineState } from "@/components/loan/v2/CreditScoreEngineTab";
+import {
+	CreditScoreEngineTab,
+	createDefaultCreditScoreEngineState,
+} from "@/components/loan/v2/CreditScoreEngineTab";
 import {
 	createDefaultDecisionRules,
 	type DecisionRuleAction,
 	type DecisionRuleByGrade,
 	DecisionRuleSetupTab,
 } from "@/components/loan/v2/DecisionRuleSetupTab";
-import { DisbursementSetupTab } from "@/components/loan/v2/DisbursementSetupTab";
+import type { DisbursementSetupTabState } from "@/components/loan/v2/DisbursementSetupTab";
+import {
+	createDefaultDisbursementSetupTabState,
+	DisbursementSetupTab,
+} from "@/components/loan/v2/DisbursementSetupTab";
 import { DocumentSetupTab } from "@/components/loan/v2/DocumentSetupTab";
 import { InterestEngineTab } from "@/components/loan/v2/InterestEngineTab";
 import { ProductSetupTab } from "@/components/loan/v2/ProductSetupTab";
-import { RepaymentSetupTab } from "@/components/loan/v2/RepaymentSetupTab";
+import type { RepaymentSetupTabState } from "@/components/loan/v2/RepaymentSetupTab";
+import {
+	createDefaultRepaymentSetupTabState,
+	RepaymentSetupTab,
+} from "@/components/loan/v2/RepaymentSetupTab";
 import type {
 	ChannelConfig,
 	ProductSetupForm,
 	V2InterestConfig,
 } from "@/components/loan/v2/setup-types";
+import { DEFAULT_REQUIRED_DOCUMENTS } from "@/lib/loan-setup-store";
+import { useLoanSetupV2Store } from "@/lib/loan-setup-v2-store";
 import { getWorkflowList, useWorkflowStore } from "@/lib/workflow-store";
 
 export const Route = createFileRoute("/solution/v2/loan-setup")({
@@ -47,9 +63,13 @@ function createInterestConfig(baseRate = 18.5): V2InterestConfig {
 }
 
 function LoanProductSetup() {
+	const navigate = useNavigate();
 	const workflows = useWorkflowStore((state) => state.workflows);
 	const workflowList = useMemo(() => getWorkflowList(workflows), [workflows]);
+	const addLoanSetup = useLoanSetupV2Store((state) => state.addSetup);
+	const updateLoanSetup = useLoanSetupV2Store((state) => state.updateSetup);
 	const [currentStep, setCurrentStep] = useState(0);
+	const [savedSetupId, setSavedSetupId] = useState<string | null>(null);
 
 	const steps = [
 		{
@@ -121,6 +141,20 @@ function LoanProductSetup() {
 	const [decisionRules, setDecisionRules] = useState<DecisionRuleByGrade>(() =>
 		createDefaultDecisionRules(),
 	);
+	const [repaymentSetup, setRepaymentSetup] = useState<RepaymentSetupTabState>(
+		() => createDefaultRepaymentSetupTabState(),
+	);
+	const [creditScoreSetup, setCreditScoreSetup] =
+		useState<CreditScoreEngineState>(() =>
+			createDefaultCreditScoreEngineState(),
+		);
+	const [documentSetup, setDocumentSetup] = useState<DocumentRequirementItem[]>(
+		() => [createDocumentRequirementItem("LOW", DEFAULT_REQUIRED_DOCUMENTS)],
+	);
+	const [disbursementSetup, setDisbursementSetup] =
+		useState<DisbursementSetupTabState>(() =>
+			createDefaultDisbursementSetupTabState(),
+		);
 
 	const mappedChannelWorkflows = useMemo(
 		() =>
@@ -207,7 +241,7 @@ function LoanProductSetup() {
 
 	const addPlan = () => {
 		setInterestRatePlans((current) => {
-			const fallbackRate = current[current.length - 1]?.baseRate ?? 18.5;
+			const fallbackRate = current.at(-1)?.baseRate ?? 18.5;
 			return [...current, createInterestConfig(fallbackRate)];
 		});
 	};
@@ -327,7 +361,34 @@ function LoanProductSetup() {
 	};
 
 	const canGoBack = currentStep > 0;
-	const canGoNext = currentStep < steps.length - 1;
+	const canGoNext = currentStep + 1 < steps.length;
+
+	const handleSaveCompleted = () => {
+		const payload = {
+			productSetup,
+			channels,
+			interestRatePlans,
+			repaymentSetup,
+			creditScoreSetup,
+			documentSetup,
+			bureauRequired,
+			bureauProvider,
+			bureauPurpose,
+			bureauConsentRequired,
+			decisionRules,
+			disbursementSetup,
+		};
+
+		if (savedSetupId) {
+			updateLoanSetup(savedSetupId, payload);
+			navigate({ to: "/solution/v2/list" });
+			return;
+		}
+
+		const saved = addLoanSetup(payload);
+		setSavedSetupId(saved.id);
+		navigate({ to: "/solution/v2/list" });
+	};
 
 	let stepContent: ReactNode;
 	if (currentStep === 0) {
@@ -362,10 +423,17 @@ function LoanProductSetup() {
 			/>
 		);
 	} else if (currentStep === 2) {
-		stepContent = <RepaymentSetupTab />;
+		stepContent = (
+			<RepaymentSetupTab
+				state={repaymentSetup}
+				onStateChange={setRepaymentSetup}
+			/>
+		);
 	} else if (currentStep === 3) {
 		stepContent = (
 			<CreditScoreEngineTab
+				state={creditScoreSetup}
+				onStateChange={setCreditScoreSetup}
 				bureauRequired={bureauRequired}
 				bureauProvider={bureauProvider}
 				bureauPurpose={bureauPurpose}
@@ -377,7 +445,13 @@ function LoanProductSetup() {
 			/>
 		);
 	} else if (currentStep === 4) {
-		stepContent = <DocumentSetupTab loanSecurity={productSetup.loanSecurity} />;
+		stepContent = (
+			<DocumentSetupTab
+				loanSecurity={productSetup.loanSecurity}
+				state={documentSetup}
+				onStateChange={setDocumentSetup}
+			/>
+		);
 	} else if (currentStep === 5) {
 		stepContent = (
 			<DecisionRuleSetupTab
@@ -386,7 +460,12 @@ function LoanProductSetup() {
 			/>
 		);
 	} else {
-		stepContent = <DisbursementSetupTab />;
+		stepContent = (
+			<DisbursementSetupTab
+				state={disbursementSetup}
+				onStateChange={setDisbursementSetup}
+			/>
+		);
 	}
 
 	return (
@@ -402,18 +481,19 @@ function LoanProductSetup() {
 						{steps.map((step, index) => {
 							const isActive = index === currentStep;
 							const isDone = index < currentStep;
+							let buttonStyle =
+								"bg-transparent border-slate-800 hover:bg-slate-900";
+							if (isActive) {
+								buttonStyle = "bg-blue-600 border-blue-500";
+							} else if (isDone) {
+								buttonStyle = "bg-slate-900 border-slate-700";
+							}
 							return (
 								<button
 									type="button"
 									key={step.id}
 									onClick={() => setCurrentStep(index)}
-									className={`w-full text-left rounded-xl p-3 border transition ${
-										isActive
-											? "bg-blue-600 border-blue-500"
-											: isDone
-												? "bg-slate-900 border-slate-700"
-												: "bg-transparent border-slate-800 hover:bg-slate-900"
-									}`}
+									className={`w-full text-left rounded-xl p-3 border transition ${buttonStyle}`}
 								>
 									<div className="flex items-start gap-3">
 										<div className="mt-0.5 h-6 w-6 rounded-full border border-white/40 flex items-center justify-center text-xs font-semibold">
@@ -441,6 +521,18 @@ function LoanProductSetup() {
 							</p>
 						</div>
 						<div className="flex items-center gap-3">
+							<Link
+								to="/solution/v2/loan-applications/create"
+								className="inline-flex items-center gap-2 border rounded px-3 py-2 text-sm hover:bg-gray-50"
+							>
+								Create Application
+							</Link>
+							<Link
+								to="/solution/v2/loan-setup/list"
+								className="inline-flex items-center gap-2 border rounded px-3 py-2 text-sm hover:bg-gray-50"
+							>
+								Saved List
+							</Link>
 							<span className="text-xs text-gray-500">
 								Step {currentStep + 1} / {steps.length}
 							</span>
@@ -469,12 +561,18 @@ function LoanProductSetup() {
 						</button>
 						<button
 							type="button"
-							onClick={() => canGoNext && setCurrentStep((prev) => prev + 1)}
-							disabled={!canGoNext}
+							onClick={() => {
+								if (canGoNext) {
+									setCurrentStep((prev) => prev + 1);
+									return;
+								}
+								handleSaveCompleted();
+							}}
+							disabled={false}
 							className={`rounded px-5 py-2 text-sm text-white ${
 								canGoNext
 									? "bg-slate-900 hover:bg-slate-800"
-									: "bg-emerald-600 opacity-70 cursor-default"
+									: "bg-emerald-600 cursor-default"
 							}`}
 						>
 							{canGoNext ? "Next" : "Completed"}

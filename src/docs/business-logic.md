@@ -87,6 +87,11 @@ Sources:
   - `Multiple` enables tranche configuration with columns: Tranche, Amount, Trigger Type, and Timing Meaning.
 - Tranche timing meaning supports `Immediate` and `Based on milestone`.
 - Disbursement Setup includes method selection (`Bank Transfer`, `Wallet`, `Cash`, `Pay to Merchant`) and fee inputs (`Processing Fee`, `Disbursement Fee`).
+- In V2, clicking **Completed** on the final step saves a setup snapshot into a dedicated V2 store (`loan-workflow-setups-v2`) that is separate from the V1 loan setup list/store.
+- V2 saved setups are shown on a separate page (`/solution/v2/loan-setup/list`) and are not mixed with the V1 list route (`/loan`).
+- V2 `Completed` persistence now captures data from all tabs in the same snapshot: Product Setup, Interest Setup, Repayment Setup (including custom formula config), Credit Score Engine setup (scorecard + risk thresholds), Document Rule mappings, Decision Rule mapping, and Disbursement Setup.
+- V2 has a dedicated application-create flow at `/solution/v2/loan-applications/create` that reads from the V2 setup store (`loan-workflow-setups-v2`) rather than the V1 setup store.
+- The V2 application form derives product constraints (amount range, tenor options), channel/workflow references, bureau requirements, risk score inputs/grade (from V2 scorecard + thresholds), and required document uploads from the selected V2 setup snapshot.
 
 ## Scorecards
 

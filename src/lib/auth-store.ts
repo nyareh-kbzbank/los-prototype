@@ -65,19 +65,21 @@ export function canAccessPath(role: AccountRole, pathname: string) {
 		"/loan/maker-inbox",
 		"/loan/checker-inbox",
 		"/solution/v2/loan-setup",
+    "/solution/v2/loan-setup/list",
 	];
-	const adminOnlyExact = ["/loan"];
+  return true;
+	// const adminOnlyExact = ["/loan"];
 
-	if (role === "admin") return true;
+	// if (role === "admin") return true;
 
-	const isAdminOnlyPrefix = adminOnlyPrefixes.some((prefix) =>
-		pathname.startsWith(prefix),
-	);
-	if (isAdminOnlyPrefix) return false;
-	if (adminOnlyExact.includes(pathname)) return false;
+	// const isAdminOnlyPrefix = adminOnlyPrefixes.some((prefix) =>
+	// 	pathname.startsWith(prefix),
+	// );
+	// if (isAdminOnlyPrefix) return false;
+	// if (adminOnlyExact.includes(pathname)) return false;
 
-	if (pathname.startsWith("/loan/applications")) return true;
-	if (pathname === "/") return true;
-	if (pathname === "/login") return true;
-	return false;
+	// if (pathname.startsWith("/loan/applications")) return true;
+	// if (pathname === "/") return true;
+	// if (pathname === "/login") return true;
+	// return false;
 }

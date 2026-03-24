@@ -1,5 +1,5 @@
 import { Plus, Trash2, X } from "lucide-react";
-import { type ChangeEvent, useMemo, useState } from "react";
+import { type ChangeEvent, useEffect, useMemo, useState } from "react";
 import {
 	evaluateScoreCard,
 	inferFieldKind,
@@ -23,19 +23,35 @@ type CreditScoreEngineTabProps = {
 	setBureauProvider: (value: string) => void;
 	setBureauPurpose: (value: string) => void;
 	setBureauConsentRequired: (value: boolean) => void;
+	state?: CreditScoreEngineState;
+	onStateChange?: (value: CreditScoreEngineState) => void;
 };
 
-type RiskGradeThresholds = {
+export type RiskGradeThresholds = {
 	lowMin: number;
 	mediumMin: number;
 	highMin: number;
 };
 
+export type CreditScoreEngineState = {
+	scoreCard: ScoreCard;
+	riskThresholds: RiskGradeThresholds;
+};
+
+export const createDefaultCreditScoreEngineState = (): CreditScoreEngineState => ({
+	scoreCard: createEmptyScoreCard(),
+	riskThresholds: {
+		lowMin: 60,
+		mediumMin: 40,
+		highMin: 0,
+	},
+});
+
 const humanizeFieldName = (field: string): string => {
 	return field
-		.replace(/[_-]+/g, " ")
-		.replace(/([a-z0-9])([A-Z])/g, "$1 $2")
-		.replace(/\s+/g, " ")
+		.replaceAll(/[_-]+/g, " ")
+		.replaceAll(/([a-z0-9])([A-Z])/g, "$1 $2")
+		.replaceAll(/\s+/g, " ")
 		.trim()
 		.replace(/^./, (c) => c.toUpperCase());
 };
@@ -117,17 +133,30 @@ export function CreditScoreEngineTab({
 	setBureauProvider,
 	setBureauPurpose,
 	setBureauConsentRequired,
-}: CreditScoreEngineTabProps) {
-	const [scoreCard, setScoreCard] = useState<ScoreCard>(createEmptyScoreCard());
+	state,
+	onStateChange,
+}: Readonly<CreditScoreEngineTabProps>) {
+	const [scoreCard, setScoreCard] = useState<ScoreCard>(
+		state?.scoreCard ?? createEmptyScoreCard(),
+	);
 	const [newFieldName, setNewFieldName] = useState("");
 	const [isTestOpen, setIsTestOpen] = useState(false);
 	const [testInputs, setTestInputs] = useState<Record<string, string>>({});
 	const [testResult, setTestResult] = useState<ScoreEngineResult | null>(null);
-	const [riskThresholds, setRiskThresholds] = useState<RiskGradeThresholds>({
-		lowMin: 60,
-		mediumMin: 40,
-		highMin: 0,
-	});
+	const [riskThresholds, setRiskThresholds] = useState<RiskGradeThresholds>(
+		state?.riskThresholds ?? {
+			lowMin: 60,
+			mediumMin: 40,
+			highMin: 0,
+		},
+	);
+
+	useEffect(() => {
+		onStateChange?.({
+			scoreCard,
+			riskThresholds,
+		});
+	}, [onStateChange, riskThresholds, scoreCard]);
 
 	const allRules = useMemo(() => {
 		return scoreCard.fields.flatMap((f) => f.rules ?? []);

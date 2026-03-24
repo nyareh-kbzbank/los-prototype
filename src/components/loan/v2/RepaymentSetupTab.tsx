@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 type FieldDefinition = {
 	id: string;
@@ -8,7 +8,7 @@ type FieldDefinition = {
 	defaultValue: number;
 };
 
-type RepaymentSetupForm = {
+export type RepaymentSetupForm = {
 	methodName: string;
 	frequency: "WEEKLY" | "BIWEEKLY" | "MONTHLY" | "QUARTERLY";
 	dueDayOfMonth: number | null;
@@ -23,10 +23,15 @@ type RepaymentSetupForm = {
 	description: string;
 };
 
-type FormulaSetup = {
+export type FormulaSetup = {
 	principalFormula: string;
 	interestFormula: string;
 	fieldDefinitions: FieldDefinition[];
+};
+
+export type RepaymentSetupTabState = {
+	form: RepaymentSetupForm;
+	formulaSetup: FormulaSetup;
 };
 
 type FormulaTestResult = {
@@ -204,7 +209,7 @@ function evaluateFormulaExpression(
 	if (!trimmed) throw new Error("Formula is required.");
 	const keys = Object.keys(context).filter(isValidFieldKey);
 	const values = keys.map((key) => context[key] ?? 0);
-	const fn = Function(
+	const fn = new Function(
 		...keys,
 		"const min=Math.min; const max=Math.max; const abs=Math.abs; const round=Math.round; const floor=Math.floor; const ceil=Math.ceil; const pow=Math.pow; const sqrt=Math.sqrt; const log=Math.log; const exp=Math.exp; return (" +
 			trimmed +
@@ -212,7 +217,7 @@ function evaluateFormulaExpression(
 	) as (...args: number[]) => number;
 	const result = Number(fn(...values));
 	if (!Number.isFinite(result)) {
-		throw new Error("Formula result is invalid.");
+		throw new TypeError("Formula result is invalid.");
 	}
 	return result;
 }
@@ -384,13 +389,34 @@ const emptyForm: RepaymentSetupForm = {
 	description: "",
 };
 
-export function RepaymentSetupTab() {
-	const [form, setForm] = useState<RepaymentSetupForm>(emptyForm);
-	const [formulaSetup, setFormulaSetup] = useState<FormulaSetup>({
+export const createDefaultRepaymentSetupTabState = (): RepaymentSetupTabState => ({
+	form: emptyForm,
+	formulaSetup: {
 		principalFormula: "max(0, baseEmi - (balance * rateMonthly))",
 		interestFormula: "balance * rateMonthly",
 		fieldDefinitions: [],
-	});
+	},
+});
+
+type RepaymentSetupTabProps = {
+	state?: RepaymentSetupTabState;
+	onStateChange?: (value: RepaymentSetupTabState) => void;
+};
+
+export function RepaymentSetupTab({
+	state,
+	onStateChange,
+}: Readonly<RepaymentSetupTabProps>) {
+	const [form, setForm] = useState<RepaymentSetupForm>(
+		state?.form ?? emptyForm,
+	);
+	const [formulaSetup, setFormulaSetup] = useState<FormulaSetup>(
+		state?.formulaSetup ?? {
+			principalFormula: "max(0, baseEmi - (balance * rateMonthly))",
+			interestFormula: "balance * rateMonthly",
+			fieldDefinitions: [],
+		},
+	);
 	const [isTestDialogOpen, setIsTestDialogOpen] = useState(false);
 	const [testAmount, setTestAmount] = useState(500000);
 	const [testRate, setTestRate] = useState(18.5);
@@ -407,6 +433,13 @@ export function RepaymentSetupTab() {
 	>({});
 	const [testResult, setTestResult] = useState<FormulaTestResult | null>(null);
 	const [showPredefinedFields, setShowPredefinedFields] = useState(false);
+
+	useEffect(() => {
+		onStateChange?.({
+			form,
+			formulaSetup,
+		});
+	}, [form, formulaSetup, onStateChange]);
 
 	const formatNumber = (value: number) =>
 		value.toLocaleString(undefined, { maximumFractionDigits: 2 });

@@ -1,4 +1,4 @@
-import { TanStackDevtools } from "@tanstack/react-devtools";
+
 import type { QueryClient } from "@tanstack/react-query";
 import {
 	createRootRouteWithContext,
@@ -6,12 +6,8 @@ import {
 	redirect,
 	Scripts,
 } from "@tanstack/react-router";
-import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
 import { canAccessPath, getRoleHomePath, useAuthStore } from "@/lib/auth-store";
 import Header from "../components/Header";
-import TanStackQueryDevtools from "../integrations/tanstack-query/devtools";
-import AiDevtools from "../lib/ai-devtools";
-import StoreDevtools from "../lib/demo-store-devtools";
 import appCss from "../styles.css?url";
 
 interface MyRouterContext {

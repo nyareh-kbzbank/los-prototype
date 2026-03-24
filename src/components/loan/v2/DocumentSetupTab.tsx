@@ -1,5 +1,5 @@
 import type { SetStateAction } from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import DocumentRequirementsSection, {
 	createDocumentRequirementDocument,
 	createDocumentRequirementItem,
@@ -10,6 +10,8 @@ import type { LoanSecurityType } from "./setup-types";
 
 type DocumentSetupTabProps = {
 	loanSecurity: LoanSecurityType;
+	state?: DocumentRequirementItem[];
+	onStateChange?: (value: DocumentRequirementItem[]) => void;
 };
 
 const collateralDocumentType = "COLLATERAL";
@@ -66,15 +68,27 @@ const enforceSecuredCollateral = (
 
 export function DocumentSetupTab({
 	loanSecurity,
+	state,
+	onStateChange,
 }: Readonly<DocumentSetupTabProps>) {
 	const [documentRequirements, setDocumentRequirements] = useState<
 		DocumentRequirementItem[]
 	>(() =>
 		enforceSecuredCollateral(
-			[createDocumentRequirementItem("LOW", DEFAULT_REQUIRED_DOCUMENTS)],
+			state ?? [createDocumentRequirementItem("LOW", DEFAULT_REQUIRED_DOCUMENTS)],
 			loanSecurity,
 		),
 	);
+
+	useEffect(() => {
+		setDocumentRequirements((current) =>
+			enforceSecuredCollateral(current, loanSecurity),
+		);
+	}, [loanSecurity]);
+
+	useEffect(() => {
+		onStateChange?.(documentRequirements);
+	}, [documentRequirements, onStateChange]);
 
 	const handleChangeRequirements = (
 		updater: SetStateAction<DocumentRequirementItem[]>,

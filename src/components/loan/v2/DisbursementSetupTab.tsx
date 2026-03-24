@@ -1,14 +1,23 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
-type DisbursementType = "SINGLE" | "MULTIPLE";
-type DisbursementTiming = "IMMEDIATE" | "MILESTONE";
+export type DisbursementType = "SINGLE" | "MULTIPLE";
+export type DisbursementTiming = "IMMEDIATE" | "MILESTONE";
 
-type TrancheItem = {
+export type TrancheItem = {
 	id: string;
 	tranche: string;
 	amount: number;
 	triggerType: string;
 	timingMeaning: DisbursementTiming;
+};
+
+export type DisbursementSetupTabState = {
+	disbursementType: DisbursementType;
+	releaseFullAmountAtOnce: boolean;
+	method: string;
+	processingFee: number;
+	disbursementFee: number;
+	tranches: TrancheItem[];
 };
 
 const createId = () =>
@@ -24,14 +33,58 @@ const createTranche = (index: number): TrancheItem => ({
 	timingMeaning: "IMMEDIATE",
 });
 
-export function DisbursementSetupTab() {
+export const createDefaultDisbursementSetupTabState = (): DisbursementSetupTabState => ({
+	disbursementType: "SINGLE",
+	releaseFullAmountAtOnce: true,
+	method: "BANK_TRANSFER",
+	processingFee: 0,
+	disbursementFee: 0,
+	tranches: [createTranche(1)],
+});
+
+type DisbursementSetupTabProps = {
+	state?: DisbursementSetupTabState;
+	onStateChange?: (value: DisbursementSetupTabState) => void;
+};
+
+export function DisbursementSetupTab({
+	state,
+	onStateChange,
+}: Readonly<DisbursementSetupTabProps>) {
 	const [disbursementType, setDisbursementType] =
-		useState<DisbursementType>("SINGLE");
-	const [releaseFullAmountAtOnce, setReleaseFullAmountAtOnce] = useState(true);
-	const [method, setMethod] = useState("BANK_TRANSFER");
-	const [processingFee, setProcessingFee] = useState<number>(0);
-	const [disbursementFee, setDisbursementFee] = useState<number>(0);
-	const [tranches, setTranches] = useState<TrancheItem[]>([createTranche(1)]);
+		useState<DisbursementType>(state?.disbursementType ?? "SINGLE");
+	const [releaseFullAmountAtOnce, setReleaseFullAmountAtOnce] = useState(
+		state?.releaseFullAmountAtOnce ?? true,
+	);
+	const [method, setMethod] = useState(state?.method ?? "BANK_TRANSFER");
+	const [processingFee, setProcessingFee] = useState<number>(
+		state?.processingFee ?? 0,
+	);
+	const [disbursementFee, setDisbursementFee] = useState<number>(
+		state?.disbursementFee ?? 0,
+	);
+	const [tranches, setTranches] = useState<TrancheItem[]>(
+		state?.tranches ?? [createTranche(1)],
+	);
+
+	useEffect(() => {
+		onStateChange?.({
+			disbursementType,
+			releaseFullAmountAtOnce,
+			method,
+			processingFee,
+			disbursementFee,
+			tranches,
+		});
+	}, [
+		disbursementType,
+		disbursementFee,
+		method,
+		onStateChange,
+		processingFee,
+		releaseFullAmountAtOnce,
+		tranches,
+	]);
 
 	const handleDisbursementTypeChange = (value: DisbursementType) => {
 		setDisbursementType(value);

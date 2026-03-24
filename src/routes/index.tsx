@@ -6,6 +6,7 @@ import {
 	FilePlus2,
 	LayoutTemplate,
 	ListChecks,
+	ListChevronsUpDownIcon,
 	Network,
 	Package,
 	Receipt,
@@ -147,12 +148,26 @@ function HomePage() {
 		},
 	];
 
-	const requetCards = [
+	const v2 = [
 		{
 			title: "Loan Setup Page",
 			description: "Loan setup page V2",
 			to: "/solution/v2/loan-setup",
 			icon: Package,
+			accent: "bg-rose-500/15 text-rose-300",
+		},
+		{
+			title: "Loan Setup List",
+			description: "Loan Setup List",
+			to: "/solution/v2/list",
+			icon: ListChevronsUpDownIcon,
+			accent: "bg-rose-500/15 text-rose-300",
+		},
+		{
+			title: "Loan Application",
+			description: "Loan Application",
+			to: "/solution/v2/loan-applications/create",
+			icon: ListChevronsUpDownIcon,
 			accent: "bg-rose-500/15 text-rose-300",
 		},
 	];
@@ -230,14 +245,18 @@ function HomePage() {
 								</div>
 
 								<div className="space-y-3">
-									<h2 className="text-sm font-semibold text-slate-700">Inboxes</h2>
+									<h2 className="text-sm font-semibold text-slate-700">
+										Inboxes
+									</h2>
 									<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 										{inboxCards.map(renderCard)}
 									</div>
 								</div>
 
 								<div className="space-y-3">
-									<h2 className="text-sm font-semibold text-slate-700">Tools</h2>
+									<h2 className="text-sm font-semibold text-slate-700">
+										Tools
+									</h2>
 									<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 										{toolCards.map(renderCard)}
 									</div>
@@ -245,7 +264,7 @@ function HomePage() {
 								<div className="space-y-3">
 									<h2 className="text-sm font-semibold text-slate-700">V2</h2>
 									<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-										{requetCards.map(renderCard)}
+										{v2.map(renderCard)}
 									</div>
 								</div>
 							</>
