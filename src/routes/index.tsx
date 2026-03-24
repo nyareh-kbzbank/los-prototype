@@ -12,7 +12,7 @@ import {
 	Receipt,
 	Table,
 } from "lucide-react";
-import { useAuthStore } from "@/lib/auth-store";
+import { type AccountRole, useAuthStore } from "@/lib/auth-store";
 
 export const Route = createFileRoute("/")({ component: HomePage });
 
@@ -62,6 +62,8 @@ function HomePage() {
 	const session = useAuthStore((state) => state.session);
 	const isAdmin = session?.role === "admin";
 	const isCustomer = session?.role === "customer";
+	const isMaker = session?.role === "maker";
+	const isChecker = session?.role === "checker";
 
 	const libraryCards = [
 		{
@@ -170,7 +172,61 @@ function HomePage() {
 			icon: ListChevronsUpDownIcon,
 			accent: "bg-rose-500/15 text-rose-300",
 		},
+		{
+			title: "Loan Application List",
+			description: "Loan Application List V2",
+			to: "/solution/v2/loan-applications",
+			icon: ListChevronsUpDownIcon,
+			accent: "bg-rose-500/15 text-rose-300",
+		},
+		{
+			title: "Maker Inbox",
+			description: "Maker Inbox V2",
+			to: "/solution/v2/loan-applications/maker-inbox",
+			icon: ListChevronsUpDownIcon,
+			accent: "bg-rose-500/15 text-rose-300",
+		},
+		{
+			title: "Checker Inbox",
+			description: "Checker Inbox V2",
+			to: "/solution/v2/loan-applications/checker-inbox",
+			icon: ListChevronsUpDownIcon,
+			accent: "bg-rose-500/15 text-rose-300",
+		},
 	];
+
+	const roleV2Cards = [
+		{
+			title: "Loan Application List",
+			description: "Loan Application List V2",
+			to: "/solution/v2/loan-applications",
+			icon: ListChevronsUpDownIcon,
+			accent: "bg-rose-500/15 text-rose-300",
+		},
+		{
+			title: "Maker Inbox",
+			description: "Maker Inbox V2",
+			to: "/solution/v2/loan-applications/maker-inbox",
+			icon: ListChevronsUpDownIcon,
+			accent: "bg-rose-500/15 text-rose-300",
+			roles: ["admin", "maker"],
+		},
+		{
+			title: "Checker Inbox",
+			description: "Checker Inbox V2",
+			to: "/solution/v2/loan-applications/checker-inbox",
+			icon: ListChevronsUpDownIcon,
+			accent: "bg-rose-500/15 text-rose-300",
+			roles: ["admin", "checker"],
+		},
+	] as Array<{
+		title: string;
+		description: string;
+		to: string;
+		icon: typeof LayoutTemplate;
+		accent: string;
+		roles?: AccountRole[];
+	}>;
 
 	const renderCard = (card: {
 		title: string;
@@ -215,14 +271,16 @@ function HomePage() {
 					</p>
 
 					<div className="space-y-8">
-						<div className="space-y-3">
-							<h2 className="text-sm font-semibold text-slate-700">
-								{isAdmin ? "Applications" : "Apply for Loans"}
-							</h2>
-							<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-								{actionCards.map(renderCard)}
+						{isAdmin || isCustomer ? (
+							<div className="space-y-3">
+								<h2 className="text-sm font-semibold text-slate-700">
+									{isAdmin ? "Applications" : "Apply for Loans"}
+								</h2>
+								<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+									{actionCards.map(renderCard)}
+								</div>
 							</div>
-						</div>
+						) : null}
 
 						{isAdmin ? (
 							<>
@@ -274,6 +332,24 @@ function HomePage() {
 							<p className="text-sm text-slate-600">
 								Customer accounts can create and review loan applications.
 							</p>
+						) : null}
+
+						{isMaker || isChecker ? (
+							<div className="space-y-3">
+								<h2 className="text-sm font-semibold text-slate-700">V2 Work Queue</h2>
+								<p className="text-sm text-slate-600">
+									Maker and checker accounts can only process documents from inbox queues and review loan application lists.
+								</p>
+								<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+									{roleV2Cards
+										.filter((card) => {
+											if (!("roles" in card) || !card.roles) return true;
+											if (!session) return false;
+											return card.roles.includes(session.role);
+										})
+										.map(renderCard)}
+								</div>
+							</div>
 						) : null}
 					</div>
 				</div>

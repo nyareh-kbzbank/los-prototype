@@ -89,9 +89,26 @@ Sources:
 - Disbursement Setup includes method selection (`Bank Transfer`, `Wallet`, `Cash`, `Pay to Merchant`) and fee inputs (`Processing Fee`, `Disbursement Fee`).
 - In V2, clicking **Completed** on the final step saves a setup snapshot into a dedicated V2 store (`loan-workflow-setups-v2`) that is separate from the V1 loan setup list/store.
 - V2 saved setups are shown on a separate page (`/solution/v2/loan-setup/list`) and are not mixed with the V1 list route (`/loan`).
+- V2 saved setup lists at `/solution/v2/list` and `/solution/v2/loan-setup/list` expose row-level `Edit` and `Delete` actions against the same V2 snapshot store.
+- `Edit` opens the existing V2 setup wizard with the selected snapshot hydrated into all steps, and final submit updates the same snapshot instead of creating a new one.
+- V2 edit hydration includes the full Decision Rule setup state, including configured conditional rules, not only the fallback risk-grade action map.
+- `Delete` removes the selected V2 setup snapshot from `loan-workflow-setups-v2` after confirmation.
 - V2 `Completed` persistence now captures data from all tabs in the same snapshot: Product Setup, Interest Setup, Repayment Setup (including custom formula config), Credit Score Engine setup (scorecard + risk thresholds), Document Rule mappings, Decision Rule mapping, and Disbursement Setup.
 - V2 has a dedicated application-create flow at `/solution/v2/loan-applications/create` that reads from the V2 setup store (`loan-workflow-setups-v2`) rather than the V1 setup store.
 - The V2 application form derives product constraints (amount range, tenor options), channel/workflow references, bureau requirements, risk score inputs/grade (from V2 scorecard + thresholds), and required document uploads from the selected V2 setup snapshot.
+- V2 application listing is now separated from V1: `/solution/v2/loan-applications` shows only applications created from V2 setup snapshots and is independent from `/loan/applications`.
+- V2 application detail is also separated from V1: V2 list rows navigate to `/solution/v2/loan-applications/$applicationId`, while V1 detail remains under `/loan/applications/$applicationId`.
+- V2 application creation now uses the workflow linked to the **selected channel code** in V2 channel configuration, not the first available channel workflow.
+- V2 has separate role inboxes for manual-review stages:
+  - Maker inbox: `/solution/v2/loan-applications/maker-inbox`
+  - Checker inbox: `/solution/v2/loan-applications/checker-inbox`
+- V2 maker/checker inboxes and detail pages operate only on V2 applications (applications whose `setupId` exists in the V2 setup store).
+- Maker actions for V2: `APPROVE`, `REJECT`, or `SUBMIT TO CHECKER` (status to `CHECKER_PENDING`).
+- Checker actions for V2: `APPROVE` or `REJECT` for applications in `CHECKER_PENDING`.
+- The V2 application form now renders any non-native scorecard fields directly from the selected setup's Credit Score Engine configuration, requires those values before score evaluation, and uses the resulting credit score plus threshold-based risk grade to determine which document uploads are required.
+- For V2 scorecard matching, core scoring inputs are normalized to align with setup keywords: `age`, `gender` (`male`/`female`), `maritalstatus` (`single`/`married`/`divorced`), `education` (`graduate`/`under graduate`), `dti`, `income`, and `isburaeucheck` (`true`/`false`).
+- The V2 application page installment preview uses the saved V2 repayment setup directly: repayment frequency and due-day rules come from the setup, while amount, tenure, start date, and custom formula field values come from the application page inputs.
+- The V2 application form also captures applicant `gender`, `marital status`, `education`, and `income`; it derives `DTI` in the background from the selected product's repayment preview and income, and passes all of these into scorecard evaluation when the chosen product's scorecard references those fields.
 
 ## Scorecards
 

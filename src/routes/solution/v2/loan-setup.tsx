@@ -1,6 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import type { ReactNode } from "react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { z } from "zod";
 import type { DocumentRequirementItem } from "@/components/loan/DocumentRequirementsSection";
 import { createDocumentRequirementItem } from "@/components/loan/DocumentRequirementsSection";
 import type { CreditScoreEngineState } from "@/components/loan/v2/CreditScoreEngineTab";
@@ -9,9 +10,8 @@ import {
 	createDefaultCreditScoreEngineState,
 } from "@/components/loan/v2/CreditScoreEngineTab";
 import {
-	createDefaultDecisionRules,
-	type DecisionRuleAction,
-	type DecisionRuleByGrade,
+	createDefaultDecisionRuleSetup,
+	type DecisionRuleSetupState,
 	DecisionRuleSetupTab,
 } from "@/components/loan/v2/DecisionRuleSetupTab";
 import type { DisbursementSetupTabState } from "@/components/loan/v2/DisbursementSetupTab";
@@ -36,7 +36,12 @@ import { DEFAULT_REQUIRED_DOCUMENTS } from "@/lib/loan-setup-store";
 import { useLoanSetupV2Store } from "@/lib/loan-setup-v2-store";
 import { getWorkflowList, useWorkflowStore } from "@/lib/workflow-store";
 
+const loanSetupSearchSchema = z.object({
+	setupId: z.string().optional(),
+});
+
 export const Route = createFileRoute("/solution/v2/loan-setup")({
+	validateSearch: loanSetupSearchSchema,
 	component: LoanProductSetup,
 });
 
@@ -62,14 +67,54 @@ function createInterestConfig(baseRate = 18.5): V2InterestConfig {
 	};
 }
 
+function getDefaultProductSetup(): ProductSetupForm {
+	return {
+		productName: "",
+		productCode: "",
+		description: "",
+		loanSecurity: "UNSECURED",
+		minAmount: 500000,
+		maxAmount: 10000000,
+		serviceFees: null,
+		adminFees: null,
+		stampDuty: null,
+		commissionFees: null,
+		insuranceFees: null,
+		tenorUnit: "MONTH",
+		tenorValues: [
+			createTenorValue(6),
+			createTenorValue(12),
+			createTenorValue(18),
+		],
+	};
+}
+
+function getDefaultChannels(): ChannelConfig[] {
+	return [createChannelConfig()];
+}
+
+function getDefaultInterestRatePlans(): V2InterestConfig[] {
+	return [createInterestConfig()];
+}
+
+function getDefaultDocumentSetup(): DocumentRequirementItem[] {
+	return [createDocumentRequirementItem("LOW", DEFAULT_REQUIRED_DOCUMENTS)];
+}
+
 function LoanProductSetup() {
+	const { setupId } = Route.useSearch();
 	const navigate = useNavigate();
 	const workflows = useWorkflowStore((state) => state.workflows);
 	const workflowList = useMemo(() => getWorkflowList(workflows), [workflows]);
+	const setups = useLoanSetupV2Store((state) => state.setups);
 	const addLoanSetup = useLoanSetupV2Store((state) => state.addSetup);
 	const updateLoanSetup = useLoanSetupV2Store((state) => state.updateSetup);
 	const [currentStep, setCurrentStep] = useState(0);
-	const [savedSetupId, setSavedSetupId] = useState<string | null>(null);
+	const editingSetup = useMemo(
+		() => (setupId ? setups[setupId] : undefined),
+		[setupId, setups],
+	);
+	const isEditing = Boolean(editingSetup);
 
 	const steps = [
 		{
@@ -109,37 +154,22 @@ function LoanProductSetup() {
 		},
 	] as const;
 
-	const [productSetup, setProductSetup] = useState<ProductSetupForm>({
-		productName: "",
-		productCode: "",
-		description: "",
-		loanSecurity: "UNSECURED",
-		minAmount: 500000,
-		maxAmount: 10000000,
-		serviceFees: null,
-		adminFees: null,
-		stampDuty: null,
-		commissionFees: null,
-		insuranceFees: null,
-		tenorUnit: "MONTH",
-		tenorValues: [
-			createTenorValue(6),
-			createTenorValue(12),
-			createTenorValue(18),
-		],
-	});
-	const [channels, setChannels] = useState<ChannelConfig[]>([
-		createChannelConfig(),
-	]);
+	const [productSetup, setProductSetup] = useState<ProductSetupForm>(() =>
+		getDefaultProductSetup(),
+	);
+	const [channels, setChannels] = useState<ChannelConfig[]>(() =>
+		getDefaultChannels(),
+	);
 	const [interestRatePlans, setInterestRatePlans] = useState<
 		V2InterestConfig[]
-	>([createInterestConfig()]);
+	>(() => getDefaultInterestRatePlans());
 	const [bureauRequired, setBureauRequired] = useState(false);
 	const [bureauProvider, setBureauProvider] = useState("MMCB");
 	const [bureauPurpose, setBureauPurpose] = useState("Credit assessment");
 	const [bureauConsentRequired, setBureauConsentRequired] = useState(true);
-	const [decisionRules, setDecisionRules] = useState<DecisionRuleByGrade>(() =>
-		createDefaultDecisionRules(),
+	const [decisionRuleSetup, setDecisionRuleSetup] =
+		useState<DecisionRuleSetupState>(() =>
+			createDefaultDecisionRuleSetup(),
 	);
 	const [repaymentSetup, setRepaymentSetup] = useState<RepaymentSetupTabState>(
 		() => createDefaultRepaymentSetupTabState(),
@@ -149,12 +179,62 @@ function LoanProductSetup() {
 			createDefaultCreditScoreEngineState(),
 		);
 	const [documentSetup, setDocumentSetup] = useState<DocumentRequirementItem[]>(
-		() => [createDocumentRequirementItem("LOW", DEFAULT_REQUIRED_DOCUMENTS)],
+		() => getDefaultDocumentSetup(),
 	);
 	const [disbursementSetup, setDisbursementSetup] =
 		useState<DisbursementSetupTabState>(() =>
 			createDefaultDisbursementSetupTabState(),
 		);
+
+	useEffect(() => {
+		if (!editingSetup) {
+			setProductSetup(getDefaultProductSetup());
+			setChannels(getDefaultChannels());
+			setInterestRatePlans(getDefaultInterestRatePlans());
+			setBureauRequired(false);
+			setBureauProvider("MMCB");
+			setBureauPurpose("Credit assessment");
+			setBureauConsentRequired(true);
+			setDecisionRuleSetup(createDefaultDecisionRuleSetup());
+			setRepaymentSetup(createDefaultRepaymentSetupTabState());
+			setCreditScoreSetup(createDefaultCreditScoreEngineState());
+			setDocumentSetup(getDefaultDocumentSetup());
+			setDisbursementSetup(createDefaultDisbursementSetupTabState());
+			setCurrentStep(0);
+			return;
+		}
+
+		setProductSetup(structuredClone(editingSetup.productSetup));
+		setChannels(
+			editingSetup.channels.length
+				? structuredClone(editingSetup.channels)
+				: getDefaultChannels(),
+		);
+		setInterestRatePlans(
+			editingSetup.interestRatePlans.length
+				? structuredClone(editingSetup.interestRatePlans)
+				: getDefaultInterestRatePlans(),
+		);
+		setBureauRequired(editingSetup.bureauRequired);
+		setBureauProvider(editingSetup.bureauProvider || "MMCB");
+		setBureauPurpose(editingSetup.bureauPurpose || "Credit assessment");
+		setBureauConsentRequired(editingSetup.bureauConsentRequired);
+		setDecisionRuleSetup(
+			structuredClone(
+				editingSetup.decisionRuleSetup ??
+					createDefaultDecisionRuleSetup(editingSetup.decisionRules),
+			),
+		);
+		setRepaymentSetup(structuredClone(editingSetup.repaymentSetup));
+		setCreditScoreSetup(structuredClone(editingSetup.creditScoreSetup));
+		setDocumentSetup(
+			editingSetup.documentSetup.length
+				? structuredClone(editingSetup.documentSetup)
+				: getDefaultDocumentSetup(),
+		);
+		setDisbursementSetup(structuredClone(editingSetup.disbursementSetup));
+		setCurrentStep(0);
+	}, [editingSetup]);
 
 	const mappedChannelWorkflows = useMemo(
 		() =>
@@ -350,18 +430,23 @@ function LoanProductSetup() {
 		}));
 	};
 
-	const handleChangeDecisionRule = (
-		grade: keyof DecisionRuleByGrade,
-		action: DecisionRuleAction,
-	) => {
-		setDecisionRules((current) => ({
-			...current,
-			[grade]: action,
-		}));
-	};
-
 	const canGoBack = currentStep > 0;
 	const canGoNext = currentStep + 1 < steps.length;
+	const editingProductName = editingSetup?.productSetup.productName ?? "";
+	let editingStateLabel = "Create a new V2 loan setup snapshot.";
+	if (isEditing) {
+		editingStateLabel = "Editing saved setup";
+		if (editingProductName) {
+			editingStateLabel += `: ${editingProductName}`;
+		}
+	}
+
+	let completionButtonLabel = "Completed";
+	if (canGoNext) {
+		completionButtonLabel = "Next";
+	} else if (isEditing) {
+		completionButtonLabel = "Update Setup";
+	}
 
 	const handleSaveCompleted = () => {
 		const payload = {
@@ -375,18 +460,18 @@ function LoanProductSetup() {
 			bureauProvider,
 			bureauPurpose,
 			bureauConsentRequired,
-			decisionRules,
+			decisionRules: decisionRuleSetup.decisionRules,
+			decisionRuleSetup,
 			disbursementSetup,
 		};
 
-		if (savedSetupId) {
-			updateLoanSetup(savedSetupId, payload);
+		if (editingSetup) {
+			updateLoanSetup(editingSetup.id, payload);
 			navigate({ to: "/solution/v2/list" });
 			return;
 		}
 
-		const saved = addLoanSetup(payload);
-		setSavedSetupId(saved.id);
+		addLoanSetup(payload);
 		navigate({ to: "/solution/v2/list" });
 	};
 
@@ -455,8 +540,8 @@ function LoanProductSetup() {
 	} else if (currentStep === 5) {
 		stepContent = (
 			<DecisionRuleSetupTab
-				decisionRules={decisionRules}
-				onChangeDecisionRule={handleChangeDecisionRule}
+				state={decisionRuleSetup}
+				onStateChange={setDecisionRuleSetup}
 			/>
 		);
 	} else {
@@ -519,6 +604,9 @@ function LoanProductSetup() {
 							<p className="text-sm text-gray-600 mt-1">
 								{steps[currentStep].description}
 							</p>
+							<p className="text-xs text-gray-500 mt-2">
+								{editingStateLabel}
+							</p>
 						</div>
 						<div className="flex items-center gap-3">
 							<Link
@@ -575,7 +663,7 @@ function LoanProductSetup() {
 									: "bg-emerald-600 cursor-default"
 							}`}
 						>
-							{canGoNext ? "Next" : "Completed"}
+							{completionButtonLabel}
 						</button>
 					</footer>
 				</div>

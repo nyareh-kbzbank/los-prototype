@@ -3,7 +3,10 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { DocumentRequirementItem } from "@/components/loan/DocumentRequirementsSection";
 import type { CreditScoreEngineState } from "@/components/loan/v2/CreditScoreEngineTab";
-import type { DecisionRuleByGrade } from "@/components/loan/v2/DecisionRuleSetupTab";
+import type {
+	DecisionRuleByGrade,
+	DecisionRuleSetupState,
+} from "@/components/loan/v2/DecisionRuleSetupTab";
 import type { DisbursementSetupTabState } from "@/components/loan/v2/DisbursementSetupTab";
 import type { RepaymentSetupTabState } from "@/components/loan/v2/RepaymentSetupTab";
 import type {
@@ -26,6 +29,7 @@ export type V2LoanSetupSnapshot = {
 	bureauPurpose: string;
 	bureauConsentRequired: boolean;
 	decisionRules: DecisionRuleByGrade;
+	decisionRuleSetup?: DecisionRuleSetupState;
 	disbursementSetup: DisbursementSetupTabState;
 };
 
@@ -41,6 +45,7 @@ type V2LoanSetupInput = {
 	bureauPurpose: string;
 	bureauConsentRequired: boolean;
 	decisionRules: DecisionRuleByGrade;
+	decisionRuleSetup: DecisionRuleSetupState;
 	disbursementSetup: DisbursementSetupTabState;
 };
 
@@ -48,6 +53,7 @@ type V2LoanSetupState = {
 	setups: Record<string, V2LoanSetupSnapshot>;
 	addSetup: (input: V2LoanSetupInput) => V2LoanSetupSnapshot;
 	updateSetup: (id: string, input: V2LoanSetupInput) => void;
+	removeSetup: (id: string) => void;
 	resetStore: () => void;
 };
 
@@ -106,6 +112,23 @@ const cloneDecisionRules = (
 	LOW: decisionRules.LOW,
 	MEDIUM: decisionRules.MEDIUM,
 	HIGH: decisionRules.HIGH,
+});
+
+const cloneDecisionRuleSetup = (
+	decisionRuleSetup: DecisionRuleSetupState,
+): DecisionRuleSetupState => ({
+	decisionRules: cloneDecisionRules(decisionRuleSetup.decisionRules),
+	rules: decisionRuleSetup.rules.map((rule) => ({
+		id: rule.id,
+		name: rule.name.trim(),
+		outcome: rule.outcome,
+		conditions: rule.conditions.map((condition) => ({
+			id: condition.id,
+			keyField: condition.keyField.trim(),
+			operator: condition.operator,
+			value: condition.value.trim(),
+		})),
+	})),
 });
 
 const cloneRepaymentSetup = (
@@ -221,6 +244,7 @@ const createSnapshot = (
 	bureauPurpose: input.bureauPurpose.trim(),
 	bureauConsentRequired: Boolean(input.bureauConsentRequired),
 	decisionRules: cloneDecisionRules(input.decisionRules),
+	decisionRuleSetup: cloneDecisionRuleSetup(input.decisionRuleSetup),
 	disbursementSetup: cloneDisbursementSetup(input.disbursementSetup),
 });
 
@@ -245,6 +269,13 @@ export const useLoanSetupV2Store = create<V2LoanSetupState>()(
 				set((prev) => ({
 					setups: { ...prev.setups, [id]: updated },
 				}));
+			},
+			removeSetup: (id) => {
+				set((prev) => {
+					const nextSetups = { ...prev.setups };
+					delete nextSetups[id];
+					return { setups: nextSetups };
+				});
 			},
 			resetStore: () => set({ setups: {} }),
 		}),

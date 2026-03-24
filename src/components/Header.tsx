@@ -48,6 +48,24 @@ const navItems: NavItem[] = [
 		icon: ClipboardType,
 		roles: ["admin", "customer"],
 	},
+	{
+		to: "/solution/v2/loan-applications",
+		label: "V2 Loan Applications",
+		icon: Table,
+		roles: ["admin", "maker", "checker"],
+	},
+	{
+		to: "/solution/v2/loan-applications/maker-inbox",
+		label: "V2 Maker Inbox",
+		icon: Table,
+		roles: ["admin", "maker"],
+	},
+	{
+		to: "/solution/v2/loan-applications/checker-inbox",
+		label: "V2 Checker Inbox",
+		icon: Table,
+		roles: ["admin", "checker"],
+	},
 	{ to: "/workflow", label: "Workflows", icon: Network, roles: ["admin"] },
 ];
 
@@ -115,6 +133,7 @@ export default function Header() {
 				<div className="flex items-center justify-between p-4 border-b border-gray-700">
 					<h2 className="text-xl font-bold">Navigation</h2>
 					<button
+						type="button"
 						onClick={() => setIsOpen(false)}
 						className="p-2 hover:bg-gray-800 rounded-lg transition-colors"
 						aria-label="Close menu"

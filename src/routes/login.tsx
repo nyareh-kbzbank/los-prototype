@@ -52,14 +52,20 @@ function LoginPage() {
 			<p className="mt-2 text-sm text-slate-600">
 				Use one of the prototype accounts below.
 			</p>
-			{/* <div className="mt-4 rounded border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+			<div className="mt-4 rounded border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700 space-y-1">
 				<p>
 					<span className="font-semibold">Admin:</span> admin / admin123
 				</p>
 				<p>
 					<span className="font-semibold">Customer:</span> customer / customer123
 				</p>
-			</div> */}
+				<p>
+					<span className="font-semibold">Maker:</span> maker / maker123
+				</p>
+				<p>
+					<span className="font-semibold">Checker:</span> checker / checker123
+				</p>
+			</div>
 
 			<form onSubmit={onSubmit} className="mt-5 space-y-4">
 				<label className="block">

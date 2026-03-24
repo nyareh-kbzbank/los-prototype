@@ -17,25 +17,37 @@ export const createDefaultDecisionRules = (): DecisionRuleByGrade => ({
 	HIGH: "AUTO_REJECT",
 });
 
-type DecisionConditionOperator = "=" | "!=" | ">" | ">=" | "<" | "<=" | "IN";
+export type DecisionConditionOperator =
+	| "="
+	| "!="
+	| ">"
+	| ">="
+	| "<"
+	| "<="
+	| "IN";
 
-type DecisionRuleCondition = {
+export type DecisionRuleCondition = {
 	id: string;
 	keyField: string;
 	operator: DecisionConditionOperator;
 	value: string;
 };
 
-type DecisionRuleItem = {
+export type DecisionRuleItem = {
 	id: string;
 	name: string;
 	outcome: DecisionRuleAction;
 	conditions: DecisionRuleCondition[];
 };
 
-type DecisionRuleSetupTabProps = {
+export type DecisionRuleSetupState = {
 	decisionRules: DecisionRuleByGrade;
-	onChangeDecisionRule: (grade: RiskGrade, action: DecisionRuleAction) => void;
+	rules: DecisionRuleItem[];
+};
+
+type DecisionRuleSetupTabProps = {
+	state: DecisionRuleSetupState;
+	onStateChange: (state: DecisionRuleSetupState) => void;
 };
 
 const decisionActionLabel: Record<DecisionRuleAction, string> = {
@@ -96,6 +108,13 @@ const createDefaultRuleItems = (
 		]),
 	);
 
+export const createDefaultDecisionRuleSetup = (
+	decisionRules: DecisionRuleByGrade = createDefaultDecisionRules(),
+): DecisionRuleSetupState => ({
+	decisionRules,
+	rules: createDefaultRuleItems(decisionRules),
+});
+
 function DecisionActionTag({
 	action,
 }: Readonly<{ action: DecisionRuleAction }>) {
@@ -109,12 +128,9 @@ function DecisionActionTag({
 }
 
 export function DecisionRuleSetupTab({
-	decisionRules,
-	onChangeDecisionRule: _onChangeDecisionRule,
+	state,
+	onStateChange,
 }: Readonly<DecisionRuleSetupTabProps>) {
-	const [rules, setRules] = useState<DecisionRuleItem[]>(() =>
-		createDefaultRuleItems(decisionRules),
-	);
 	const [draftName, setDraftName] = useState("Custom Decision Rule");
 	const [draftOutcome, setDraftOutcome] =
 		useState<DecisionRuleAction>("MANUAL_REVIEW");
@@ -174,7 +190,10 @@ export function DecisionRuleSetupTab({
 	};
 
 	const removeRule = (ruleId: string) => {
-		setRules((current) => current.filter((rule) => rule.id !== ruleId));
+		onStateChange({
+			...state,
+			rules: state.rules.filter((rule) => rule.id !== ruleId),
+		});
 		if (editingRuleId === ruleId) {
 			resetDraftRule();
 		}
@@ -202,13 +221,17 @@ export function DecisionRuleSetupTab({
 		);
 
 		if (editingRuleId) {
-			setRules((current) =>
-				current.map((rule) =>
+			onStateChange({
+				...state,
+				rules: state.rules.map((rule) =>
 					rule.id === editingRuleId ? { ...nextRule, id: editingRuleId } : rule,
 				),
-			);
+			});
 		} else {
-			setRules((current) => [...current, nextRule]);
+			onStateChange({
+				...state,
+				rules: [...state.rules, nextRule],
+			});
 		}
 
 		resetDraftRule();
@@ -218,7 +241,7 @@ export function DecisionRuleSetupTab({
 		<section className="border rounded-lg p-5 space-y-5">
 			<div className="flex items-center justify-between gap-2">
 				<div className="text-sm font-semibold">Conditional decision rules</div>
-				<span className="text-xs text-gray-600">{rules.length} rule(s)</span>
+				<span className="text-xs text-gray-600">{state.rules.length} rule(s)</span>
 			</div>
 
 			<div className="grid grid-cols-1 gap-3 md:grid-cols-2">
@@ -340,12 +363,12 @@ export function DecisionRuleSetupTab({
 				) : null}
 			</div>
 
-			{rules.length === 0 ? (
+			{state.rules.length === 0 ? (
 				<div className="text-xs text-gray-600">No configured rules yet.</div>
 			) : (
 				<div className="space-y-3 border rounded-lg bg-gray-50 p-3">
 					<div className="text-sm font-semibold">Configured rules</div>
-					{rules.map((rule) => (
+					{state.rules.map((rule) => (
 						<div key={rule.id} className="rounded border bg-white p-3">
 							<div className="flex flex-wrap items-center justify-between gap-2">
 								<div>

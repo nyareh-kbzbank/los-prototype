@@ -13,7 +13,12 @@ import {
 	useLoanSetupV2Store,
 	type V2LoanSetupSnapshot,
 } from "@/lib/loan-setup-v2-store";
-import { evaluateScoreCard, type RiskGrade } from "@/lib/scorecard-engine";
+import {
+	evaluateScoreCard,
+	inferFieldKind,
+	type RiskGrade,
+} from "@/lib/scorecard-engine";
+import { buildV2RepaymentSchedulePreview } from "@/lib/v2-repayment-preview";
 import { getWorkflowList, useWorkflowStore } from "@/lib/workflow-store";
 
 export const Route = createFileRoute("/solution/v2/loan-applications/create")({
@@ -30,14 +35,6 @@ type OtherDocumentUpload = {
 	file: File | null;
 };
 
-type ScheduleRow = {
-	period: number;
-	payment: number;
-	principal: number;
-	interest: number;
-	balance: number;
-};
-
 const normalizeScoreFieldKey = (value: string) =>
 	value
 		.trim()
@@ -46,6 +43,47 @@ const normalizeScoreFieldKey = (value: string) =>
 
 const includesAny = (value: string, parts: string[]) =>
 	parts.some((part) => value.includes(part));
+
+const isBuiltInScoreField = (normalizedField: string) => {
+	if (
+		normalizedField === "age" ||
+		(normalizedField.includes("age") && !normalizedField.includes("average"))
+	) {
+		return true;
+	}
+
+	return scoreInputResolvers.some((resolver) =>
+		includesAny(normalizedField, resolver.keys),
+	);
+};
+
+const getSelectableScoreFieldOptions = (rules: Parameters<typeof inferFieldKind>[0]) => {
+	const kind = inferFieldKind(rules);
+	if (kind === "boolean") {
+		return ["true", "false"];
+	}
+	if (kind !== "string") {
+		return [];
+	}
+
+	const values = new Set<string>();
+	for (const rule of rules) {
+		if (rule.operator === "==") {
+			const value = rule.value.trim();
+			if (value) values.add(value);
+		}
+		if (rule.operator === "in") {
+			for (const value of rule.value
+				.split(",")
+				.map((item) => item.trim())
+				.filter(Boolean)) {
+				values.add(value);
+			}
+		}
+	}
+
+	return Array.from(values);
+};
 
 const formatDocumentTypeLabel = (documentTypeId: string) => {
 	const value = documentTypeId.startsWith("DOC-")
@@ -62,46 +100,9 @@ const formatAmountWithTwoDecimals = (value: number) => {
 	});
 };
 
-const calculateReducingEmi = (
-	principal: number,
-	annualRatePercent: number,
-	tenureMonths: number,
-) => {
-	if (principal <= 0 || tenureMonths <= 0) return 0;
-	const monthlyRate = annualRatePercent / 12 / 100;
-	if (monthlyRate <= 0) return principal / tenureMonths;
-	const factor = (1 + monthlyRate) ** tenureMonths;
-	return (principal * monthlyRate * factor) / (factor - 1);
-};
-
-const buildReducingSchedulePreview = (
-	principal: number,
-	annualRatePercent: number,
-	tenureMonths: number,
-): ScheduleRow[] => {
-	if (principal <= 0 || tenureMonths <= 0) return [];
-	const emi = calculateReducingEmi(principal, annualRatePercent, tenureMonths);
-	const monthlyRate = annualRatePercent / 12 / 100;
-	let balance = principal;
-	const schedule: ScheduleRow[] = [];
-	for (let period = 1; period <= tenureMonths; period += 1) {
-		const interest = balance * monthlyRate;
-		let principalPart = emi - interest;
-		if (period === tenureMonths) {
-			principalPart = balance;
-		}
-		const payment = principalPart + interest;
-		balance = Math.max(0, balance - principalPart);
-		schedule.push({
-			period,
-			payment,
-			principal: principalPart,
-			interest,
-			balance,
-		});
-	}
-	return schedule;
-};
+const genderOptions = ["male", "female"] as const;
+const maritalStatusOptions = ["single", "married", "divorced"] as const;
+const educationOptions = ["graduate", "under graduate"] as const;
 
 const toTenorUnit = (unit: "DAY" | "MONTH" | "YEAR"): TenorUnit => {
 	if (unit === "DAY") return TenorUnit.DAY;
@@ -109,13 +110,30 @@ const toTenorUnit = (unit: "DAY" | "MONTH" | "YEAR"): TenorUnit => {
 	return TenorUnit.MONTH;
 };
 
+const toTenureMonths = (unit: "DAY" | "MONTH" | "YEAR", value: number) => {
+	if (unit === "YEAR") return value * 12;
+	if (unit === "DAY") return Math.max(1, Math.round(value / 30));
+	return value;
+};
+
+const formatDateForInput = (date: Date) => {
+	const yyyy = date.getFullYear();
+	const mm = String(date.getMonth() + 1).padStart(2, "0");
+	const dd = String(date.getDate()).padStart(2, "0");
+	return `${yyyy}-${mm}-${dd}`;
+};
+
 type ScoreInputContext = {
 	beneficiaryName: string;
 	nationalId: string;
+	gender: string;
+	maritalStatus: string;
+	education: string;
 	phone: string;
 	bankAccountNo: string;
 	age: number | null;
 	monthlyIncome: number | null;
+	debtToIncomeRatio: number | null;
 	requestedAmount: number | null;
 	tenureValue: number | null;
 	channelCode: string;
@@ -123,6 +141,7 @@ type ScoreInputContext = {
 	bureauProvider: string;
 	bureauPurpose: string;
 	bureauConsent: boolean;
+	isBureauCheck: boolean;
 	notes: string;
 };
 
@@ -154,8 +173,27 @@ const scoreInputResolvers: Array<{
 		resolve: (input) => input.nationalId.trim(),
 	},
 	{
+		keys: ["gender", "sex"],
+		resolve: (input) => input.gender.trim().toLowerCase(),
+	},
+	{
+		keys: ["maritalstatus", "marital", "civilstatus"],
+		resolve: (input) => input.maritalStatus.trim().toLowerCase(),
+	},
+	{
+		keys: ["education", "educationlevel", "schooling"],
+		resolve: (input) => input.education.trim().toLowerCase(),
+	},
+	{
 		keys: ["mobile", "phone", "phoneno", "mobileno"],
 		resolve: (input) => input.phone.trim(),
+	},
+	{
+		keys: ["dti", "debttoincome", "debttoincomeratio", "debtincome"],
+		resolve: (input) =>
+			input.debtToIncomeRatio === null
+				? ""
+				: String(input.debtToIncomeRatio),
 	},
 	{
 		keys: ["bankaccount", "accountno", "accountnumber"],
@@ -182,6 +220,10 @@ const scoreInputResolvers: Array<{
 		resolve: (input) => String(input.bureauConsent),
 	},
 	{
+		keys: ["isburaeucheck", "isbureaucheck", "bureaucheck"],
+		resolve: (input) => String(input.isBureauCheck),
+	},
+	{
 		keys: ["remark", "remarks", "note", "notes"],
 		resolve: (input) => input.notes.trim(),
 	},
@@ -195,28 +237,33 @@ const getApplicationStatusFromRiskGrade = (
 	return "SUBMITTED";
 };
 
+const resolveBuiltInScoreInput = (
+	normalizedField: string,
+	input: ScoreInputContext,
+) => {
+	if (
+		normalizedField === "age" ||
+		(normalizedField.includes("age") && !normalizedField.includes("average"))
+	) {
+		return input.age === null ? "" : String(input.age);
+	}
+	for (const resolver of scoreInputResolvers) {
+		if (includesAny(normalizedField, resolver.keys)) {
+			return resolver.resolve(input);
+		}
+	}
+	return null;
+};
+
 const buildScoreInputsFromApplication = (
 	fields: Array<{ field: string }>,
 	input: ScoreInputContext,
+	customFieldValues: Record<string, string>,
 ) => {
-	const resolveFieldValue = (normalizedField: string): string => {
-		if (
-			normalizedField === "age" ||
-			(normalizedField.includes("age") && !normalizedField.includes("average"))
-		) {
-			return input.age === null ? "" : String(input.age);
-		}
-		for (const resolver of scoreInputResolvers) {
-			if (includesAny(normalizedField, resolver.keys)) {
-				return resolver.resolve(input);
-			}
-		}
-		return "";
-	};
-
 	return fields.reduce<Record<string, string>>((acc, field) => {
 		const normalizedKey = normalizeScoreFieldKey(field.field);
-		acc[field.field] = resolveFieldValue(normalizedKey);
+		const builtInValue = resolveBuiltInScoreInput(normalizedKey, input);
+		acc[field.field] = builtInValue ?? (customFieldValues[field.field] ?? "");
 		return acc;
 	}, {});
 };
@@ -229,6 +276,9 @@ const gradeFromThresholds = (
 	if (score >= thresholds.mediumMin) return "MEDIUM";
 	return "HIGH";
 };
+
+const scoreCardHasField = (fields: Array<{ field: string }>, aliases: string[]) =>
+	fields.some((field) => includesAny(normalizeScoreFieldKey(field.field), aliases));
 
 const buildV2DocumentUploadFields = (
 	activeSetup: V2LoanSetupSnapshot,
@@ -399,6 +449,9 @@ function V2LoanApplicationCreate() {
 
 	const [beneficiaryName, setBeneficiaryName] = useState("");
 	const [nationalId, setNationalId] = useState("");
+	const [gender, setGender] = useState("");
+	const [maritalStatus, setMaritalStatus] = useState("");
+	const [education, setEducation] = useState("");
 	const [phone, setPhone] = useState("");
 	const [bankAccountNo, setBankAccountNo] = useState("");
 	const [ageInput, setAgeInput] = useState("");
@@ -422,6 +475,15 @@ function V2LoanApplicationCreate() {
 	const [notes, setNotes] = useState("");
 	const [formError, setFormError] = useState<string | null>(null);
 	const [currentStep, setCurrentStep] = useState<1 | 2>(1);
+	const [repaymentStartDateIso, setRepaymentStartDateIso] = useState(() =>
+		formatDateForInput(new Date()),
+	);
+	const [customFormulaFieldValues, setCustomFormulaFieldValues] = useState<
+		Record<string, number>
+	>({});
+	const [dynamicScoreFieldValues, setDynamicScoreFieldValues] = useState<
+		Record<string, string>
+	>({});
 	const [documentFiles, setDocumentFiles] = useState<
 		Record<string, File | null>
 	>({});
@@ -441,16 +503,53 @@ function V2LoanApplicationCreate() {
 	const tenorOptions =
 		activeSetup?.productSetup.tenorValues.map((item) => item.value) ?? [];
 	const channelOptions = activeSetup?.channels ?? [];
-	const firstWorkflowId =
-		activeSetup?.channels.find((channel) => channel.workflowId)?.workflowId ??
-		null;
-	const workflowName = firstWorkflowId
-		? (workflowNameById[firstWorkflowId] ?? firstWorkflowId)
+	const selectedChannel = useMemo(
+		() =>
+			channelOptions.find((channel) => channel.code === channelCode) ??
+			channelOptions[0] ??
+			null,
+		[channelCode, channelOptions],
+	);
+	const selectedWorkflowId = selectedChannel?.workflowId ?? null;
+	const workflowName = selectedWorkflowId
+		? (workflowNameById[selectedWorkflowId] ?? selectedWorkflowId)
 		: null;
+	const activeScoreFields = activeSetup?.creditScoreSetup.scoreCard.fields ?? [];
+	const requiresGenderInput = scoreCardHasField(activeScoreFields, [
+		"gender",
+		"sex",
+	]);
+	const requiresMaritalStatusInput = scoreCardHasField(activeScoreFields, [
+		"maritalstatus",
+		"marital",
+		"civilstatus",
+	]);
+	const requiresEducationInput = scoreCardHasField(activeScoreFields, [
+		"education",
+		"educationlevel",
+		"schooling",
+	]);
+	const dynamicScoreFields = useMemo(
+		() =>
+			activeScoreFields.filter(
+				(field) => !isBuiltInScoreField(normalizeScoreFieldKey(field.field)),
+			),
+		[activeScoreFields],
+	);
+	const missingDynamicScoreField = useMemo(
+		() =>
+			dynamicScoreFields.find(
+				(field) => !(dynamicScoreFieldValues[field.field] ?? "").trim(),
+			) ?? null,
+		[dynamicScoreFieldValues, dynamicScoreFields],
+	);
 
 	useEffect(() => {
 		setTenureValue(activeSetup?.productSetup.tenorValues[0]?.value ?? null);
 		setChannelCode(activeSetup?.channels[0]?.code ?? "");
+		setGender("");
+		setMaritalStatus("");
+		setEducation("");
 		setDocumentFiles({});
 		setOtherDocumentFiles([createOtherDocumentUpload()]);
 		setBureauProvider(activeSetup?.bureauProvider ?? "");
@@ -461,7 +560,116 @@ function V2LoanApplicationCreate() {
 		} else {
 			setDestinationType("BANK");
 		}
+		setRepaymentStartDateIso(formatDateForInput(new Date()));
+		setCustomFormulaFieldValues(() => {
+			const next: Record<string, number> = {};
+			for (const field of activeSetup?.repaymentSetup.formulaSetup
+				.fieldDefinitions ?? []) {
+				next[field.key] = field.defaultValue;
+			}
+			return next;
+		});
+		setDynamicScoreFieldValues(() => {
+			const next: Record<string, string> = {};
+			for (const field of activeSetup?.creditScoreSetup.scoreCard.fields ?? []) {
+				if (!isBuiltInScoreField(normalizeScoreFieldKey(field.field))) {
+					next[field.field] = "";
+				}
+			}
+			return next;
+		});
 	}, [activeSetup, createOtherDocumentUpload]);
+
+	const riskEvaluationReady = useMemo(() => {
+		if (!activeSetup) return false;
+		const parsedAge = Number(ageInput);
+		const parsedMonthlyIncome = Number(monthlyIncomeInput);
+		const parsedRequestedAmount = Number(amountInput);
+		if (!beneficiaryName.trim()) return false;
+		if (!nationalId.trim()) return false;
+		if (!Number.isFinite(parsedAge) || parsedAge <= 0) return false;
+		if (!Number.isFinite(parsedMonthlyIncome) || parsedMonthlyIncome < 0)
+			return false;
+		if (!Number.isFinite(parsedRequestedAmount)) return false;
+		if (tenureValue === null || tenureValue <= 0) return false;
+		if (requiresGenderInput && !gender.trim()) return false;
+		if (requiresMaritalStatusInput && !maritalStatus.trim()) return false;
+		if (requiresEducationInput && !education.trim()) return false;
+		if (missingDynamicScoreField) return false;
+		if (activeSetup.bureauRequired && activeSetup.bureauConsentRequired) {
+			if (!bureauProvider.trim()) return false;
+			if (!bureauPurpose.trim()) return false;
+			if (!bureauConsent) return false;
+		}
+		return true;
+	}, [
+		activeSetup,
+		ageInput,
+		amountInput,
+		beneficiaryName,
+		bureauConsent,
+		bureauProvider,
+		bureauPurpose,
+		education,
+		gender,
+		monthlyIncomeInput,
+		missingDynamicScoreField,
+		maritalStatus,
+		nationalId,
+		requiresEducationInput,
+		requiresGenderInput,
+		requiresMaritalStatusInput,
+		tenureValue,
+	]);
+	const scoreEvaluationPending = !riskEvaluationReady;
+
+	const schedulePreview = useMemo(() => {
+		if (!activeSetup) {
+			return { schedule: [], error: "No active V2 setup selected." };
+		}
+		const parsedAmount = Number(amountInput);
+		const selectedTenure = tenureValue ?? 0;
+		const months = toTenureMonths(
+			activeSetup.productSetup.tenorUnit,
+			selectedTenure,
+		);
+		const annualRate = activeSetup.interestRatePlans[0]?.baseRate ?? 0;
+		return buildV2RepaymentSchedulePreview(
+			parsedAmount,
+			annualRate,
+			months,
+			repaymentStartDateIso,
+			{
+				frequency: activeSetup.repaymentSetup.form.frequency,
+				dueDayOfMonth: activeSetup.repaymentSetup.form.dueDayOfMonth,
+				firstDueAfterDays: activeSetup.repaymentSetup.form.firstDueAfterDays,
+				firstDueAfterDueDayDays:
+					activeSetup.repaymentSetup.form.firstDueAfterDueDayDays,
+			},
+			activeSetup.repaymentSetup.formulaSetup,
+			customFormulaFieldValues,
+		);
+	}, [
+		activeSetup,
+		amountInput,
+		customFormulaFieldValues,
+		repaymentStartDateIso,
+		tenureValue,
+	]);
+
+	const computedDebtToIncomeRatio = useMemo(() => {
+		const parsedMonthlyIncome = Number(monthlyIncomeInput);
+		const firstPayment = schedulePreview.schedule[0]?.payment ?? null;
+		if (
+			!Number.isFinite(parsedMonthlyIncome) ||
+			parsedMonthlyIncome <= 0 ||
+			firstPayment === null ||
+			!Number.isFinite(firstPayment)
+		) {
+			return null;
+		}
+		return Number(((firstPayment / parsedMonthlyIncome) * 100).toFixed(2));
+	}, [monthlyIncomeInput, schedulePreview.schedule]);
 
 	const computedScoreInputs = useMemo(() => {
 		if (!activeSetup) return null;
@@ -473,12 +681,16 @@ function V2LoanApplicationCreate() {
 		return buildScoreInputsFromApplication(fields, {
 			beneficiaryName,
 			nationalId,
+			gender,
+			maritalStatus,
+			education,
 			phone: destinationType === "WALLET" ? phone : "",
 			bankAccountNo: destinationType === "BANK" ? bankAccountNo : "",
 			age: Number.isFinite(parsedAge) ? parsedAge : null,
 			monthlyIncome: Number.isFinite(parsedMonthlyIncome)
 				? parsedMonthlyIncome
 				: null,
+			debtToIncomeRatio: computedDebtToIncomeRatio,
 			requestedAmount: Number.isFinite(parsedRequestedAmount)
 				? parsedRequestedAmount
 				: null,
@@ -488,8 +700,9 @@ function V2LoanApplicationCreate() {
 			bureauProvider,
 			bureauPurpose,
 			bureauConsent,
+			isBureauCheck: activeSetup.bureauRequired,
 			notes,
-		});
+		}, dynamicScoreFieldValues);
 	}, [
 		activeSetup,
 		ageInput,
@@ -500,8 +713,13 @@ function V2LoanApplicationCreate() {
 		bureauProvider,
 		bureauPurpose,
 		channelCode,
+		computedDebtToIncomeRatio,
 		destinationType,
+		dynamicScoreFieldValues,
+		education,
+		gender,
 		monthlyIncomeInput,
+		maritalStatus,
 		nationalId,
 		notes,
 		phone,
@@ -521,49 +739,6 @@ function V2LoanApplicationCreate() {
 			riskGrade,
 		};
 	}, [activeSetup, computedScoreInputs]);
-
-	const riskEvaluationReady = useMemo(() => {
-		if (!activeSetup) return false;
-		const parsedAge = Number(ageInput);
-		const parsedMonthlyIncome = Number(monthlyIncomeInput);
-		const parsedRequestedAmount = Number(amountInput);
-		if (!beneficiaryName.trim()) return false;
-		if (!nationalId.trim()) return false;
-		if (!Number.isFinite(parsedAge) || parsedAge <= 0) return false;
-		if (!Number.isFinite(parsedMonthlyIncome) || parsedMonthlyIncome < 0)
-			return false;
-		if (!Number.isFinite(parsedRequestedAmount)) return false;
-		if (tenureValue === null || tenureValue <= 0) return false;
-		if (activeSetup.bureauRequired && activeSetup.bureauConsentRequired) {
-			if (!bureauProvider.trim()) return false;
-			if (!bureauPurpose.trim()) return false;
-			if (!bureauConsent) return false;
-		}
-		return true;
-	}, [
-		activeSetup,
-		ageInput,
-		amountInput,
-		beneficiaryName,
-		bureauConsent,
-		bureauProvider,
-		bureauPurpose,
-		monthlyIncomeInput,
-		nationalId,
-		tenureValue,
-	]);
-
-	const schedulePreview = useMemo(() => {
-		if (!activeSetup) return [];
-		const parsedAmount = Number(amountInput);
-		if (!Number.isFinite(parsedAmount)) return [];
-		const baseRate = activeSetup.interestRatePlans[0]?.baseRate ?? 0;
-		const months = tenureValue ?? 0;
-		return buildReducingSchedulePreview(parsedAmount, baseRate, months).slice(
-			0,
-			6,
-		);
-	}, [activeSetup, amountInput, tenureValue]);
 
 	const documentUploadFields = useMemo<DocumentUploadField[]>(() => {
 		if (!activeSetup) return [];
@@ -608,6 +783,24 @@ function V2LoanApplicationCreate() {
 		});
 		if (validation.error) {
 			setFormError(validation.error);
+			return null;
+		}
+		if (requiresGenderInput && !gender.trim()) {
+			setFormError("Select gender.");
+			return null;
+		}
+		if (requiresMaritalStatusInput && !maritalStatus.trim()) {
+			setFormError("Select marital status.");
+			return null;
+		}
+		if (requiresEducationInput && !education.trim()) {
+			setFormError("Select education.");
+			return null;
+		}
+		if (missingDynamicScoreField) {
+			setFormError(
+				`${missingDynamicScoreField.description || missingDynamicScoreField.field} is required for score calculation.`,
+			);
 			return null;
 		}
 		setFormError(null);
@@ -670,8 +863,8 @@ function V2LoanApplicationCreate() {
 			computedRisk?.riskGrade ?? null,
 		);
 		const workflowId =
-			activeSetup.channels.find((channel) => channel.workflowId)?.workflowId ??
-			null;
+			activeSetup.channels.find((channel) => channel.code === channelCode)
+				?.workflowId ?? null;
 		const resolvedWorkflowName = workflowId
 			? (workflowNameById[workflowId] ?? workflowId)
 			: null;
@@ -680,11 +873,15 @@ function V2LoanApplicationCreate() {
 			status,
 			beneficiaryName,
 			nationalId,
+			gender,
+			maritalStatus,
+			education,
 			phone: destinationType === "WALLET" ? phone : "",
 			bankAccountNo: destinationType === "BANK" ? bankAccountNo : "",
 			kpayPhoneNo: destinationType === "WALLET" ? phone : "",
 			age: validated.parsedAge,
 			monthlyIncome: validated.parsedMonthlyIncome,
+			debtToIncomeRatio: computedDebtToIncomeRatio,
 			requestedAmount: validated.parsedAmount,
 			tenureValue,
 			tenureUnit: toTenorUnit(activeSetup.productSetup.tenorUnit),
@@ -703,7 +900,7 @@ function V2LoanApplicationCreate() {
 			bureauConsent,
 		});
 
-		navigate({ to: "/loan/applications" });
+		navigate({ to: ".." });
 	};
 
 	return (
@@ -715,6 +912,24 @@ function V2LoanApplicationCreate() {
 						<h1 className="text-2xl font-semibold">Create application</h1>
 					</div>
 					<div className="flex gap-2">
+						<Link
+							to=".."
+							className="px-4 py-2 rounded border text-sm hover:bg-gray-50"
+						>
+							V2 Application List
+						</Link>
+						<Link
+							to="/solution/v2/loan-applications/maker-inbox"
+							className="px-4 py-2 rounded border text-sm hover:bg-gray-50"
+						>
+							Maker Inbox
+						</Link>
+						<Link
+							to="/solution/v2/loan-applications/checker-inbox"
+							className="px-4 py-2 rounded border text-sm hover:bg-gray-50"
+						>
+							Checker Inbox
+						</Link>
 						<Link
 							to="/solution/v2/loan-setup/list"
 							className="px-4 py-2 rounded border text-sm hover:bg-gray-50"
@@ -854,7 +1069,7 @@ function V2LoanApplicationCreate() {
 										/>
 									</label>
 									<label className="flex flex-col gap-1 text-sm">
-										<span>Monthly income</span>
+										<span>Income</span>
 										<input
 											type="number"
 											min={0}
@@ -864,7 +1079,61 @@ function V2LoanApplicationCreate() {
 												setMonthlyIncomeInput(event.target.value)
 											}
 										/>
+									<span className="text-xs text-gray-600">
+										Used for scorecard income rules and background DTI calculation.
+									</span>
 									</label>
+								<label className="flex flex-col gap-1 text-sm">
+									<span>
+										Gender{requiresGenderInput ? " *" : ""}
+									</span>
+									<select
+										className="border px-2 py-2 rounded"
+										value={gender}
+										onChange={(event) => setGender(event.target.value)}
+									>
+										<option value="">Select gender</option>
+										{genderOptions.map((option) => (
+											<option key={option} value={option}>
+												{option}
+											</option>
+										))}
+									</select>
+								</label>
+								<label className="flex flex-col gap-1 text-sm">
+									<span>
+										Marital status{requiresMaritalStatusInput ? " *" : ""}
+									</span>
+									<select
+										className="border px-2 py-2 rounded"
+										value={maritalStatus}
+										onChange={(event) => setMaritalStatus(event.target.value)}
+									>
+										<option value="">Select marital status</option>
+										{maritalStatusOptions.map((option) => (
+											<option key={option} value={option}>
+												{option}
+											</option>
+										))}
+									</select>
+								</label>
+								<label className="flex flex-col gap-1 text-sm">
+									<span>
+										Education{requiresEducationInput ? " *" : ""}
+									</span>
+									<select
+										className="border px-2 py-2 rounded"
+										value={education}
+										onChange={(event) => setEducation(event.target.value)}
+									>
+										<option value="">Select education</option>
+										{educationOptions.map((option) => (
+											<option key={option} value={option}>
+												{option}
+											</option>
+										))}
+									</select>
+								</label>
 									<label className="flex flex-col gap-1 text-sm">
 										<span>Requested amount</span>
 										<input
@@ -956,7 +1225,160 @@ function V2LoanApplicationCreate() {
 											}}
 										/>
 									</label>
+									<label className="flex flex-col gap-1 text-sm">
+										<span>Repayment start date</span>
+										<input
+											type="date"
+											className="border px-2 py-2 rounded"
+											value={repaymentStartDateIso}
+											onChange={(event) =>
+												setRepaymentStartDateIso(event.target.value)
+											}
+										/>
+										<span className="text-xs text-gray-600">
+											Preview dates use the repayment setup frequency and
+											due-day rules.
+										</span>
+									</label>
+									<label className="flex flex-col gap-1 text-sm">
+										<span>DTI</span>
+										<input
+											readOnly
+											value={
+												computedDebtToIncomeRatio === null
+													? ""
+													: `${formatAmountWithTwoDecimals(computedDebtToIncomeRatio)}%`
+											}
+											placeholder="Calculated automatically"
+											className="border px-2 py-2 rounded bg-gray-50"
+										/>
+										<span className="text-xs text-gray-600">
+											Calculated in the background from the selected product's repayment preview and income.
+										</span>
+									</label>
 								</div>
+
+								{dynamicScoreFields.length ? (
+									<div className="space-y-3 border rounded p-3 bg-white text-sm">
+										<div>
+											<div className="text-sm font-medium">
+												Credit score inputs
+											</div>
+											<div className="text-xs text-gray-600">
+												These fields come directly from the selected loan setup scorecard and are required before risk grade and document uploads can be determined.
+											</div>
+										</div>
+										<div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+											{dynamicScoreFields.map((field) => {
+												const inputKind = inferFieldKind(field.rules ?? []);
+												const selectableOptions = getSelectableScoreFieldOptions(
+													field.rules ?? [],
+												);
+												const value = dynamicScoreFieldValues[field.field] ?? "";
+
+												const inputId = `score-field-${normalizeScoreFieldKey(field.field)}`;
+
+												return (
+													<div
+														key={field.field}
+														className="flex flex-col gap-1 text-sm"
+													>
+														<label htmlFor={inputId}>
+															{field.description || field.field}
+														</label>
+														{selectableOptions.length > 0 ? (
+															<select
+																id={inputId}
+																className="border px-2 py-2 rounded"
+																value={value}
+																onChange={(event) =>
+																	setDynamicScoreFieldValues((current) => ({
+																		...current,
+																		[field.field]: event.target.value,
+																	}))
+																}
+															>
+																<option value="">Select value</option>
+																{selectableOptions.map((option) => (
+																	<option key={option} value={option}>
+																		{option}
+																	</option>
+																))}
+															</select>
+														) : (
+															<input
+																id={inputId}
+																type={inputKind === "number" ? "number" : "text"}
+																step={inputKind === "number" ? "any" : undefined}
+																className="border px-2 py-2 rounded"
+																value={value}
+																onChange={(event) =>
+																	setDynamicScoreFieldValues((current) => ({
+																		...current,
+																		[field.field]: event.target.value,
+																	}))
+																}
+															/>
+														)}
+														<span className="text-xs text-gray-600">
+															Field key: {field.field}
+														</span>
+													</div>
+												);
+											})}
+										</div>
+									</div>
+								) : null}
+
+								{activeSetup?.repaymentSetup.formulaSetup.fieldDefinitions
+									.length ? (
+									<div className="space-y-3 border rounded p-3 bg-white text-sm">
+										<div>
+											<div className="text-sm font-medium">
+												Custom EMI inputs
+											</div>
+											<div className="text-xs text-gray-600">
+												These values are used directly by the repayment formula
+												in the preview.
+											</div>
+										</div>
+										<div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+											{activeSetup.repaymentSetup.formulaSetup.fieldDefinitions.map(
+												(field) => (
+													<label
+														key={field.id}
+														className="flex flex-col gap-1 text-sm"
+													>
+														<span>
+															{field.label || field.key || "Custom field"}
+														</span>
+														<input
+															type="number"
+															className="border px-2 py-2 rounded"
+															value={
+																customFormulaFieldValues[field.key] ??
+																field.defaultValue
+															}
+															onChange={(event) => {
+																const nextValue = Number(event.target.value);
+																setCustomFormulaFieldValues((current) => ({
+																	...current,
+																	[field.key]: Number.isFinite(nextValue)
+																		? nextValue
+																		: field.defaultValue,
+																}));
+															}}
+														/>
+														<span className="text-xs text-gray-600">
+															{field.description ||
+																`Default: ${field.defaultValue}`}
+														</span>
+													</label>
+												),
+											)}
+										</div>
+									</div>
+								) : null}
 
 								<div className="space-y-3 border rounded p-3 bg-gray-50 text-sm text-gray-700">
 									<div>
@@ -966,19 +1388,24 @@ function V2LoanApplicationCreate() {
 										<div className="text-base font-semibold">
 											Upcoming installments preview
 										</div>
+										<div className="text-xs text-gray-500">
+											{schedulePreview.schedule.length} installment(s) based on the selected tenure.
+										</div>
 									</div>
-									{!activeSetup?.repaymentSetup?.formulaSetup?.principalFormula?.trim() ||
-									!activeSetup?.repaymentSetup?.formulaSetup?.interestFormula?.trim() ? (
+									{schedulePreview.error ? (
 										<div className="text-xs text-red-700">
-											No custom EMI formula selected in the loan setup.
+											{schedulePreview.error}
 										</div>
 									) : null}
-									{schedulePreview.length > 0 ? (
+									{schedulePreview.schedule.length > 0 ? (
 										<div className="border rounded bg-white overflow-x-auto">
 											<table className="min-w-full text-xs text-left">
 												<thead className="bg-gray-100 text-gray-700 font-semibold border-b">
 													<tr>
 														<th className="px-3 py-2 whitespace-nowrap">#</th>
+														<th className="px-3 py-2 whitespace-nowrap">
+															Date
+														</th>
 														<th className="px-3 py-2 text-right whitespace-nowrap">
 															Payment
 														</th>
@@ -994,10 +1421,17 @@ function V2LoanApplicationCreate() {
 													</tr>
 												</thead>
 												<tbody className="divide-y divide-gray-200">
-													{schedulePreview.map((row) => (
+													{schedulePreview.schedule.map((row) => (
 														<tr key={row.period} className="hover:bg-gray-50">
 															<td className="px-3 py-2 text-gray-500">
 																{row.period}
+															</td>
+															<td className="px-3 py-2 text-gray-500 whitespace-nowrap">
+																{new Intl.DateTimeFormat("en-US", {
+																	year: "numeric",
+																	month: "short",
+																	day: "numeric",
+																}).format(row.date)}
 															</td>
 															<td className="px-3 py-2 text-right font-medium">
 																{formatAmountWithTwoDecimals(row.payment)}
@@ -1018,12 +1452,13 @@ function V2LoanApplicationCreate() {
 										</div>
 									) : (
 										<div className="text-xs text-gray-600">
-											Enter amount and tenure to preview the schedule.
+											Enter amount, tenure, and any custom EMI inputs to preview
+											the schedule.
 										</div>
 									)}
 									<div className="text-xs text-gray-500">
-										Schedule preview uses the custom EMI formula saved in the
-										loan setup.
+										Schedule preview uses the saved V2 repayment formula,
+										repayment frequency, and the values entered above.
 									</div>
 								</div>
 
@@ -1079,6 +1514,15 @@ function V2LoanApplicationCreate() {
 									<div>
 										Upload requirements are derived from V2 document rules and
 										evaluated risk grade.
+									</div>
+									{scoreEvaluationPending ? (
+										<div>
+											Complete all scorecard-driven application inputs in step 1 to calculate the credit score, risk grade, and required documents.
+										</div>
+									) : null}
+									<div>
+										Credit score: {computedRisk?.totalScore ?? "Not available"}
+										{computedRisk ? ` / ${computedRisk.maxScore}` : ""}
 									</div>
 									<div>
 										Risk grade: {computedRisk?.riskGrade ?? "Not available"}

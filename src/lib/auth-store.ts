@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
-export type AccountRole = "admin" | "customer";
+export type AccountRole = "admin" | "customer" | "maker" | "checker";
 
 export type AuthSession = {
 	username: string;
@@ -17,6 +17,8 @@ type AuthState = {
 const accounts: Record<string, { password: string; role: AccountRole }> = {
 	admin: { password: "admin123", role: "admin" },
 	customer: { password: "customer123", role: "customer" },
+	maker: { password: "maker123", role: "maker" },
+	checker: { password: "checker123", role: "checker" },
 };
 
 export const useAuthStore = create<AuthState>()(
@@ -26,7 +28,7 @@ export const useAuthStore = create<AuthState>()(
 			login: (username, password) => {
 				const normalized = username.trim().toLowerCase();
 				const account = accounts[normalized];
-				if (!account || account.password !== password) {
+				if (account?.password !== password) {
 					return false;
 				}
 				set({
@@ -48,38 +50,42 @@ export const useAuthStore = create<AuthState>()(
 );
 
 export function getRoleHomePath(role: AccountRole) {
-	return role === "admin"
-		? "/solution/v2/loan-setup"
-		: "/loan/applications/create";
+	if (role === "admin") return "/solution/v2/loan-setup";
+	if (role === "maker") return "/solution/v2/loan-applications/maker-inbox";
+	if (role === "checker") return "/solution/v2/loan-applications/checker-inbox";
+	return "/loan/applications/create";
 }
 
 export function canAccessPath(role: AccountRole, pathname: string) {
-	const adminOnlyPrefixes = [
-		"/loan/setup",
-		"/workflow",
-		"/loan/scorecard-setup",
-		"/loan/scorecard-setup-advanced",
-		"/loan/repayment-setup",
-		"/loan/repayment-plans",
-		"/loan/scorecards",
-		"/loan/maker-inbox",
-		"/loan/checker-inbox",
-		"/solution/v2/loan-setup",
-    "/solution/v2/loan-setup/list",
+	if (role === "admin") return true;
+
+	if (pathname === "/" || pathname === "/login") {
+		return true;
+	}
+
+	const customerPrefixes = [
+		"/loan/applications",
+		"/loan/emi-calculator",
+		"/loan/emi-custom-calculator",
 	];
-  return true;
-	// const adminOnlyExact = ["/loan"];
 
-	// if (role === "admin") return true;
+	if (role === "customer") {
+		return customerPrefixes.some((prefix) => pathname.startsWith(prefix));
+	}
 
-	// const isAdminOnlyPrefix = adminOnlyPrefixes.some((prefix) =>
-	// 	pathname.startsWith(prefix),
-	// );
-	// if (isAdminOnlyPrefix) return false;
-	// if (adminOnlyExact.includes(pathname)) return false;
+	if (role === "maker") {
+		return (
+			pathname.startsWith("/solution/v2/loan-applications") &&
+			!pathname.startsWith("/solution/v2/loan-applications/checker-inbox")
+		);
+	}
 
-	// if (pathname.startsWith("/loan/applications")) return true;
-	// if (pathname === "/") return true;
-	// if (pathname === "/login") return true;
-	// return false;
+	if (role === "checker") {
+		return (
+			pathname.startsWith("/solution/v2/loan-applications") &&
+			!pathname.startsWith("/solution/v2/loan-applications/maker-inbox")
+		);
+	}
+
+	return false;
 }

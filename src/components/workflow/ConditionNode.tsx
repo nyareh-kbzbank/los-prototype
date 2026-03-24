@@ -22,10 +22,6 @@ export function ConditionNode({
 		[id, setNodes],
 	);
 
-	const removeAllEdges = useCallback(() => {
-		setEdges((es) => es.filter((e) => e.source !== id && e.target !== id));
-	}, [id, setEdges]);
-
 	const removeIncomingEdges = useCallback(
 		(event: React.MouseEvent<HTMLButtonElement>) => {
 			event.stopPropagation();
@@ -73,6 +69,7 @@ export function ConditionNode({
 					name="text"
 					type="text"
 					onChange={onChange}
+					value={data?.input?? ""}
 					className="nodrag border rounded px-1"
 				/>
 			</div>

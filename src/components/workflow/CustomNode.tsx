@@ -10,18 +10,18 @@ export function CustomNode({
 	data,
 }: NodeProps<WorkflowJsonNode>) {
 	const { setEdges, setNodes } = useReactFlow<
-  WorkflowJsonNode,
-  WorkflowJsonEdge
+		WorkflowJsonNode,
+		WorkflowJsonEdge
 	>();
-  // Remove current node
-  const removeNode = useCallback(
-    (event: React.MouseEvent<HTMLButtonElement>) => {
-      event.stopPropagation();
-      setNodes((nds) => nds.filter((node) => node.id !== id));
-      setEdges((es) => es.filter((e) => e.source !== id && e.target !== id));
-    },
-    [id, setNodes, setEdges]
-  );
+	// Remove current node
+	const removeNode = useCallback(
+		(event: React.MouseEvent<HTMLButtonElement>) => {
+			event.stopPropagation();
+			setNodes((nds) => nds.filter((node) => node.id !== id));
+			setEdges((es) => es.filter((e) => e.source !== id && e.target !== id));
+		},
+		[id, setNodes, setEdges],
+	);
 
 	const onChange = useCallback(
 		(event: ChangeEvent<HTMLInputElement>) => {
@@ -83,6 +83,7 @@ export function CustomNode({
 				<input
 					name="text"
 					onChange={onChange}
+					value={data?.label ?? ""}
 					className="nodrag border rounded px-1"
 				/>
 			</div>
@@ -92,7 +93,7 @@ export function CustomNode({
 				className="ml-2 size-8 px-2 mt-2 py-1 bg-red-500 text-white rounded hover:bg-red-600"
 				type="button"
 			>
-        X
+				X
 			</button>
 			<button
 				onClick={removeOutgoingEdges}
