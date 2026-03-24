@@ -101,14 +101,14 @@ function HomePage() {
 		{
 			title: "New Application",
 			description: "Capture beneficiary info, calculate scores, and submit.",
-			to: "/loan/applications/create",
+			to: "/solution/v2/loan-applications/create",
 			icon: FilePlus2,
 			accent: "bg-lime-500/15 text-lime-300",
 		},
 		{
 			title: "Loan Applications",
 			description: "Review submitted applications and drill into details.",
-			to: "/loan/applications",
+			to: "/solution/v2/loan-applications",
 			icon: Table,
 			accent: "bg-teal-500/15 text-teal-300",
 		},

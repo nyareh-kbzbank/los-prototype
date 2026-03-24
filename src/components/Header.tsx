@@ -40,19 +40,25 @@ const navItems: NavItem[] = [
 		to: "/loan/applications/",
 		label: "Loan Applications",
 		icon: Table,
-		roles: ["admin", "customer"],
+		roles: ["admin"],
 	},
 	{
 		to: "/loan/applications/create",
 		label: "New Application",
 		icon: ClipboardType,
-		roles: ["admin", "customer"],
+		roles: ["admin"],
 	},
 	{
 		to: "/solution/v2/loan-applications",
 		label: "V2 Loan Applications",
 		icon: Table,
-		roles: ["admin", "maker", "checker"],
+		roles: ["admin", "customer", "maker", "checker"],
+	},
+	{
+		to: "/solution/v2/loan-applications/create",
+		label: "V2 New Application",
+		icon: ClipboardType,
+		roles: ["admin", "customer"],
 	},
 	{
 		to: "/solution/v2/loan-applications/maker-inbox",

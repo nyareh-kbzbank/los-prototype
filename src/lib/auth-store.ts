@@ -51,9 +51,10 @@ export const useAuthStore = create<AuthState>()(
 
 export function getRoleHomePath(role: AccountRole) {
 	if (role === "admin") return "/solution/v2/loan-setup";
+	if (role === "customer") return "/solution/v2/loan-applications/create";
 	if (role === "maker") return "/solution/v2/loan-applications/maker-inbox";
 	if (role === "checker") return "/solution/v2/loan-applications/checker-inbox";
-	return "/loan/applications/create";
+	return "/solution/v2/";
 }
 
 export function canAccessPath(role: AccountRole, pathname: string) {
@@ -64,7 +65,7 @@ export function canAccessPath(role: AccountRole, pathname: string) {
 	}
 
 	const customerPrefixes = [
-		"/loan/applications",
+		"/solution/v2/loan-applications",
 		"/loan/emi-calculator",
 		"/loan/emi-custom-calculator",
 	];
