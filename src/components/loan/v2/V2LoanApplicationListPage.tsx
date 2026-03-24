@@ -28,30 +28,6 @@ export function V2LoanApplicationListPage() {
 					</p>
 				</div>
 				<div className="flex gap-2">
-					<Link
-						to="/solution/v2/loan-applications/create"
-						className="text-sm border px-3 rounded hover:bg-gray-50"
-					>
-						New V2 application
-					</Link>
-					<Link
-						to="/solution/v2/loan-applications/maker-inbox"
-						className="text-sm border px-3 rounded hover:bg-gray-50"
-					>
-						Maker Inbox
-					</Link>
-					<Link
-						to="/solution/v2/loan-applications/checker-inbox"
-						className="text-sm border px-3 rounded hover:bg-gray-50"
-					>
-						Checker Inbox
-					</Link>
-					<Link
-						to="/solution/v2/loan-setup/list"
-						className="text-sm border px-3 rounded hover:bg-gray-50"
-					>
-						V2 setup list
-					</Link>
 				</div>
 			</div>
 

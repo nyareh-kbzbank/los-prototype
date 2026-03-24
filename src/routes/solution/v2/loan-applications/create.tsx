@@ -911,32 +911,6 @@ function V2LoanApplicationCreate() {
 						<div className="text-sm text-gray-600">V2 loan applications</div>
 						<h1 className="text-2xl font-semibold">Create application</h1>
 					</div>
-					<div className="flex gap-2">
-						<Link
-							to=".."
-							className="px-4 py-2 rounded border text-sm hover:bg-gray-50"
-						>
-							V2 Application List
-						</Link>
-						<Link
-							to="/solution/v2/loan-applications/maker-inbox"
-							className="px-4 py-2 rounded border text-sm hover:bg-gray-50"
-						>
-							Maker Inbox
-						</Link>
-						<Link
-							to="/solution/v2/loan-applications/checker-inbox"
-							className="px-4 py-2 rounded border text-sm hover:bg-gray-50"
-						>
-							Checker Inbox
-						</Link>
-						<Link
-							to="/solution/v2/loan-setup/list"
-							className="px-4 py-2 rounded border text-sm hover:bg-gray-50"
-						>
-							Back to V2 Setup List
-						</Link>
-					</div>
 				</div>
 
 				{disabled ? (

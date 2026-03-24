@@ -38,12 +38,6 @@ function V2MakerInboxPage() {
 					>
 						V2 applications
 					</Link>
-					<Link
-						to="/solution/v2/loan-applications/checker-inbox"
-						className="text-sm border px-3 py-2 rounded hover:bg-gray-50"
-					>
-						Checker Inbox
-					</Link>
 				</div>
 			</div>
 
