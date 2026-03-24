@@ -1,1 +1,0 @@
-import{V as o}from"./V2LoanSetupListPage-CO0SHAtj.js";import"./main-Yhf0sM8o.js";import"./loan-setup-v2-store-etBidWJe.js";import"./v4-EwEgHOG0.js";import"./workflow-store-BA_nqvXk.js";const n=o;export{n as component};
