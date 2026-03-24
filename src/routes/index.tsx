@@ -6,11 +6,13 @@ import {
 	FilePlus2,
 	LayoutTemplate,
 	ListChecks,
+	ListChevronsUpDownIcon,
 	Network,
 	Package,
 	Receipt,
 	Table,
 } from "lucide-react";
+import { type AccountRole, useAuthStore } from "@/lib/auth-store";
 
 export const Route = createFileRoute("/")({ component: HomePage });
 
@@ -57,6 +59,12 @@ const configureCards = [
 ];
 
 function HomePage() {
+	const session = useAuthStore((state) => state.session);
+	const isAdmin = session?.role === "admin";
+	const isCustomer = session?.role === "customer";
+	const isMaker = session?.role === "maker";
+	const isChecker = session?.role === "checker";
+
 	const libraryCards = [
 		{
 			title: "Loan Setup Library",
@@ -93,14 +101,14 @@ function HomePage() {
 		{
 			title: "New Application",
 			description: "Capture beneficiary info, calculate scores, and submit.",
-			to: "/loan/applications/create",
+			to: "/solution/v2/loan-applications/create",
 			icon: FilePlus2,
 			accent: "bg-lime-500/15 text-lime-300",
 		},
 		{
 			title: "Loan Applications",
 			description: "Review submitted applications and drill into details.",
-			to: "/loan/applications",
+			to: "/solution/v2/loan-applications",
 			icon: Table,
 			accent: "bg-teal-500/15 text-teal-300",
 		},
@@ -142,7 +150,7 @@ function HomePage() {
 		},
 	];
 
-	const requetCards = [
+	const v2 = [
 		{
 			title: "Loan Setup Page",
 			description: "Loan setup page V2",
@@ -150,7 +158,75 @@ function HomePage() {
 			icon: Package,
 			accent: "bg-rose-500/15 text-rose-300",
 		},
+		{
+			title: "Loan Setup List",
+			description: "Loan Setup List",
+			to: "/solution/v2/list",
+			icon: ListChevronsUpDownIcon,
+			accent: "bg-rose-500/15 text-rose-300",
+		},
+		{
+			title: "Loan Application",
+			description: "Loan Application",
+			to: "/solution/v2/loan-applications/create",
+			icon: ListChevronsUpDownIcon,
+			accent: "bg-rose-500/15 text-rose-300",
+		},
+		{
+			title: "Loan Application List",
+			description: "Loan Application List V2",
+			to: "/solution/v2/loan-applications",
+			icon: ListChevronsUpDownIcon,
+			accent: "bg-rose-500/15 text-rose-300",
+		},
+		{
+			title: "Maker Inbox",
+			description: "Maker Inbox V2",
+			to: "/solution/v2/loan-applications/maker-inbox",
+			icon: ListChevronsUpDownIcon,
+			accent: "bg-rose-500/15 text-rose-300",
+		},
+		{
+			title: "Checker Inbox",
+			description: "Checker Inbox V2",
+			to: "/solution/v2/loan-applications/checker-inbox",
+			icon: ListChevronsUpDownIcon,
+			accent: "bg-rose-500/15 text-rose-300",
+		},
 	];
+
+	const roleV2Cards = [
+		{
+			title: "Loan Application List",
+			description: "Loan Application List V2",
+			to: "/solution/v2/loan-applications",
+			icon: ListChevronsUpDownIcon,
+			accent: "bg-rose-500/15 text-rose-300",
+		},
+		{
+			title: "Maker Inbox",
+			description: "Maker Inbox V2",
+			to: "/solution/v2/loan-applications/maker-inbox",
+			icon: ListChevronsUpDownIcon,
+			accent: "bg-rose-500/15 text-rose-300",
+			roles: ["admin", "maker"],
+		},
+		{
+			title: "Checker Inbox",
+			description: "Checker Inbox V2",
+			to: "/solution/v2/loan-applications/checker-inbox",
+			icon: ListChevronsUpDownIcon,
+			accent: "bg-rose-500/15 text-rose-300",
+			roles: ["admin", "checker"],
+		},
+	] as Array<{
+		title: string;
+		description: string;
+		to: string;
+		icon: typeof LayoutTemplate;
+		accent: string;
+		roles?: AccountRole[];
+	}>;
 
 	const renderCard = (card: {
 		title: string;
@@ -186,59 +262,95 @@ function HomePage() {
 					<p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-700 mb-2">
 						Smart Lending Solution
 					</p>
-					<h1 className="text-3xl font-bold mb-2">Welcome back</h1>
+					<h1 className="text-3xl font-bold mb-2">
+						Welcome back{session ? `, ${session.role}` : ""}
+					</h1>
 					<p className="text-slate-600 text-base leading-relaxed mb-8">
 						Set up loan products, tune scorecards, and manage applications from
 						one spot.
 					</p>
 
 					<div className="space-y-8">
-						<div className="space-y-3">
-							<h2 className="text-sm font-semibold text-slate-700">
-								Configure
-							</h2>
-							<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-								{configureCards.map(renderCard)}
+						{isAdmin || isCustomer ? (
+							<div className="space-y-3">
+								<h2 className="text-sm font-semibold text-slate-700">
+									{isAdmin ? "Applications" : "Apply for Loans"}
+								</h2>
+								<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+									{actionCards.map(renderCard)}
+								</div>
 							</div>
-						</div>
+						) : null}
 
-						<div className="space-y-3">
-							<h2 className="text-sm font-semibold text-slate-700">
-								Libraries & Lists
-							</h2>
-							<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-								{libraryCards.map(renderCard)}
-							</div>
-						</div>
+						{isAdmin ? (
+							<>
+								<div className="space-y-3">
+									<h2 className="text-sm font-semibold text-slate-700">
+										Configure
+									</h2>
+									<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+										{configureCards.map(renderCard)}
+									</div>
+								</div>
 
-						<div className="space-y-3">
-							<h2 className="text-sm font-semibold text-slate-700">
-								Applications
-							</h2>
-							<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-								{actionCards.map(renderCard)}
-							</div>
-						</div>
+								<div className="space-y-3">
+									<h2 className="text-sm font-semibold text-slate-700">
+										Libraries & Lists
+									</h2>
+									<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+										{libraryCards.map(renderCard)}
+									</div>
+								</div>
 
-						<div className="space-y-3">
-							<h2 className="text-sm font-semibold text-slate-700">Inboxes</h2>
-							<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-								{inboxCards.map(renderCard)}
-							</div>
-						</div>
+								<div className="space-y-3">
+									<h2 className="text-sm font-semibold text-slate-700">
+										Inboxes
+									</h2>
+									<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+										{inboxCards.map(renderCard)}
+									</div>
+								</div>
 
-						<div className="space-y-3">
-							<h2 className="text-sm font-semibold text-slate-700">Tools</h2>
-							<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-								{toolCards.map(renderCard)}
+								<div className="space-y-3">
+									<h2 className="text-sm font-semibold text-slate-700">
+										Tools
+									</h2>
+									<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+										{toolCards.map(renderCard)}
+									</div>
+								</div>
+								<div className="space-y-3">
+									<h2 className="text-sm font-semibold text-slate-700">V2</h2>
+									<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+										{v2.map(renderCard)}
+									</div>
+								</div>
+							</>
+						) : null}
+
+						{isCustomer ? (
+							<p className="text-sm text-slate-600">
+								Customer accounts can create and review loan applications.
+							</p>
+						) : null}
+
+						{isMaker || isChecker ? (
+							<div className="space-y-3">
+								<h2 className="text-sm font-semibold text-slate-700">V2 Work Queue</h2>
+								<p className="text-sm text-slate-600">
+									Maker and checker accounts can only process documents from inbox queues and review loan application lists.
+								</p>
+								<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+									{roleV2Cards
+										.filter((card) => {
+											if (!("roles" in card) || !card.roles) return true;
+											if (!session) return false;
+											return card.roles.includes(session.role);
+										})
+										.map(renderCard)}
+								</div>
 							</div>
-						</div>
-						<div className="space-y-3">
-							<h2 className="text-sm font-semibold text-slate-700">V2</h2>
-							<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-								{requetCards.map(renderCard)}
-							</div>
-						</div>
+						) : null}
 					</div>
 				</div>
 			</section>

@@ -1,7 +1,8 @@
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import {
 	ClipboardType,
 	Home,
+	LogOut,
 	Menu,
 	Network,
 	Receipt,
@@ -11,9 +12,86 @@ import {
 } from "lucide-react";
 
 import { useState } from "react";
+import { type AccountRole, useAuthStore } from "@/lib/auth-store";
+
+type NavItem = {
+	to: string;
+	label: string;
+	icon: typeof Home;
+	roles?: AccountRole[];
+};
+
+const navItems: NavItem[] = [
+	{ to: "/", label: "Home", icon: Home },
+	{ to: "/loan/setup", label: "Loan Setup", icon: ClipboardType, roles: ["admin"] },
+	{
+		to: "/loan/scorecard-setup",
+		label: "Scorecard Setup",
+		icon: SquareFunction,
+		roles: ["admin"],
+	},
+	{
+		to: "/loan/repayment-setup",
+		label: "Repayment Setup",
+		icon: Receipt,
+		roles: ["admin"],
+	},
+	{
+		to: "/loan/applications/",
+		label: "Loan Applications",
+		icon: Table,
+		roles: ["admin"],
+	},
+	{
+		to: "/loan/applications/create",
+		label: "New Application",
+		icon: ClipboardType,
+		roles: ["admin"],
+	},
+	{
+		to: "/solution/v2/loan-applications",
+		label: "V2 Loan Applications",
+		icon: Table,
+		roles: ["admin", "customer", "maker", "checker"],
+	},
+	{
+		to: "/solution/v2/loan-applications/create",
+		label: "V2 New Application",
+		icon: ClipboardType,
+		roles: ["admin", "customer"],
+	},
+	{
+		to: "/solution/v2/loan-applications/maker-inbox",
+		label: "V2 Maker Inbox",
+		icon: Table,
+		roles: ["admin", "maker"],
+	},
+	{
+		to: "/solution/v2/loan-applications/checker-inbox",
+		label: "V2 Checker Inbox",
+		icon: Table,
+		roles: ["admin", "checker"],
+	},
+	{ to: "/workflow", label: "Workflows", icon: Network, roles: ["admin"] },
+];
 
 export default function Header() {
 	const [isOpen, setIsOpen] = useState(false);
+	const navigate = useNavigate();
+	const session = useAuthStore((state) => state.session);
+	const logout = useAuthStore((state) => state.logout);
+
+	const visibleItems = navItems.filter((item) => {
+		if (!item.roles) return true;
+		if (!session) return false;
+		return item.roles.includes(session.role);
+	});
+
+	const handleLogout = () => {
+		logout();
+		setIsOpen(false);
+		navigate({ to: "/login" });
+	};
 
 	return (
 		<>
@@ -31,6 +109,26 @@ export default function Header() {
 						Smart Lending Solution
 					</Link>
 				</h1>
+				<div className="ml-auto flex items-center gap-3 text-sm">
+					{session ? (
+						<>
+							<span className="rounded bg-gray-700 px-2 py-1">
+								{session.username} ({session.role})
+							</span>
+							<button
+								type="button"
+								onClick={handleLogout}
+								className="rounded border border-gray-500 px-2 py-1 hover:bg-gray-700"
+							>
+								Logout
+							</button>
+						</>
+					) : (
+						<Link to="/login" className="rounded border border-gray-500 px-2 py-1 hover:bg-gray-700">
+							Login
+						</Link>
+					)}
+				</div>
 			</header>
 
 			<aside
@@ -41,6 +139,7 @@ export default function Header() {
 				<div className="flex items-center justify-between p-4 border-b border-gray-700">
 					<h2 className="text-xl font-bold">Navigation</h2>
 					<button
+						type="button"
 						onClick={() => setIsOpen(false)}
 						className="p-2 hover:bg-gray-800 rounded-lg transition-colors"
 						aria-label="Close menu"
@@ -50,96 +149,35 @@ export default function Header() {
 				</div>
 
 				<nav className="flex-1 p-4 overflow-y-auto">
-					<Link
-						to="/"
-						onClick={() => setIsOpen(false)}
-						className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-800 transition-colors mb-2"
-						activeProps={{
-							className:
-								"flex items-center gap-3 p-3 rounded-lg bg-cyan-600 hover:bg-cyan-700 transition-colors mb-2",
-						}}
-					>
-						<Home size={20} />
-						<span className="font-medium">Home</span>
-					</Link>
+					{visibleItems.map((item) => {
+						const Icon = item.icon;
+						return (
+							<Link
+								key={item.to}
+								to={item.to}
+								onClick={() => setIsOpen(false)}
+								className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-800 transition-colors mb-2"
+								activeProps={{
+									className:
+										"flex items-center gap-3 p-3 rounded-lg bg-cyan-600 hover:bg-cyan-700 transition-colors mb-2",
+								}}
+							>
+								<Icon size={20} />
+								<span className="font-medium">{item.label}</span>
+							</Link>
+						);
+					})}
 
-					<Link
-						to="/loan/setup"
-						onClick={() => setIsOpen(false)}
-						className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-800 transition-colors mb-2"
-						activeProps={{
-							className:
-								"flex items-center gap-3 p-3 rounded-lg bg-cyan-600 hover:bg-cyan-700 transition-colors mb-2",
-						}}
-					>
-						<ClipboardType size={20} />
-						<span className="font-medium">Loan Setup</span>
-					</Link>
-
-					<Link
-						to="/loan/scorecard-setup"
-						onClick={() => setIsOpen(false)}
-						className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-800 transition-colors mb-2"
-						activeProps={{
-							className:
-								"flex items-center gap-3 p-3 rounded-lg bg-cyan-600 hover:bg-cyan-700 transition-colors mb-2",
-						}}
-					>
-						<SquareFunction size={20} />
-						<span className="font-medium">Scorecard Setup</span>
-					</Link>
-
-					<Link
-						to="/loan/repayment-setup"
-						onClick={() => setIsOpen(false)}
-						className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-800 transition-colors mb-2"
-						activeProps={{
-							className:
-								"flex items-center gap-3 p-3 rounded-lg bg-cyan-600 hover:bg-cyan-700 transition-colors mb-2",
-						}}
-					>
-						<Receipt size={20} />
-						<span className="font-medium">Repayment Setup</span>
-					</Link>
-
-					<Link
-						to="/loan/applications/"
-						onClick={() => setIsOpen(false)}
-						className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-800 transition-colors mb-2"
-						activeProps={{
-							className:
-								"flex items-center gap-3 p-3 rounded-lg bg-cyan-600 hover:bg-cyan-700 transition-colors mb-2",
-						}}
-					>
-						<Table size={20} />
-						<span className="font-medium">Loan Applications</span>
-					</Link>
-
-					<Link
-						to="/loan/applications/create"
-						onClick={() => setIsOpen(false)}
-						className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-800 transition-colors mb-2"
-						activeProps={{
-							className:
-								"flex items-center gap-3 p-3 rounded-lg bg-cyan-600 hover:bg-cyan-700 transition-colors mb-2",
-						}}
-					>
-						<ClipboardType size={20} />
-						<span className="font-medium">New Application</span>
-					</Link>
-
-					<Link
-						to="/workflow"
-						onClick={() => setIsOpen(false)}
-						className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-800 transition-colors mb-2"
-						activeProps={{
-							className:
-								"flex items-center gap-3 p-3 rounded-lg bg-cyan-600 hover:bg-cyan-700 transition-colors mb-2",
-						}}
-					>
-						<Network size={20} />
-						<span className="font-medium">Workflows</span>
-					</Link>
+					{session ? (
+						<button
+							type="button"
+							onClick={handleLogout}
+							className="mt-3 flex w-full items-center gap-3 p-3 rounded-lg border border-gray-700 hover:bg-gray-800 transition-colors"
+						>
+							<LogOut size={20} />
+							<span className="font-medium">Logout</span>
+						</button>
+					) : null}
 				</nav>
 
 				{/* <div className="p-4 border-t border-gray-700 bg-gray-800 flex flex-col gap-2">

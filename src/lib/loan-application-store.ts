@@ -35,11 +35,15 @@ export type LoanApplication = {
   status: LoanApplicationStatus;
   beneficiaryName: string;
   nationalId: string;
+  gender: string;
+  maritalStatus: string;
+  education: string;
   phone: string;
   bankAccountNo: string;
   kpayPhoneNo: string;
   age: number | null;
   monthlyIncome: number | null;
+  debtToIncomeRatio: number | null;
   requestedAmount: number;
   tenureValue: number | null;
   tenureUnit: TenorUnit | null;
@@ -67,11 +71,15 @@ export type LoanApplicationInput = {
   status?: LoanApplicationStatus;
   beneficiaryName: string;
   nationalId: string;
+  gender?: string;
+  maritalStatus?: string;
+  education?: string;
   phone: string;
   bankAccountNo?: string;
   kpayPhoneNo?: string;
   age?: number | null;
   monthlyIncome?: number | null;
+  debtToIncomeRatio?: number | null;
   requestedAmount: number;
   tenureValue: number | null;
   tenureUnit?: TenorUnit | null;
@@ -116,6 +124,11 @@ export const useLoanApplicationStore = create<LoanApplicationState>()(
           Number.isFinite(input.monthlyIncome ?? NaN) && input.monthlyIncome !== null
             ? Math.max(0, input.monthlyIncome ?? 0)
             : null;
+        const normalizedDebtToIncomeRatio =
+          Number.isFinite(input.debtToIncomeRatio ?? NaN) &&
+          input.debtToIncomeRatio !== null
+            ? Math.max(0, input.debtToIncomeRatio ?? 0)
+            : null;
         const application: LoanApplication = {
           id: uuidV4(),
           applicationNo,
@@ -124,11 +137,15 @@ export const useLoanApplicationStore = create<LoanApplicationState>()(
           status: initialStatus,
           beneficiaryName: input.beneficiaryName.trim(),
           nationalId: input.nationalId.trim(),
+          gender: input.gender?.trim() ?? "",
+          maritalStatus: input.maritalStatus?.trim() ?? "",
+          education: input.education?.trim() ?? "",
           phone: input.phone.trim(),
           bankAccountNo: input.bankAccountNo?.trim() ?? "",
           kpayPhoneNo: input.kpayPhoneNo?.trim() ?? "",
           age: normalizedAge,
           monthlyIncome: normalizedMonthlyIncome,
+          debtToIncomeRatio: normalizedDebtToIncomeRatio,
           requestedAmount: Number.isFinite(input.requestedAmount)
             ? Math.max(0, input.requestedAmount)
             : 0,
@@ -253,7 +270,7 @@ export const useLoanApplicationStore = create<LoanApplicationState>()(
     }),
     {
       name: "loan-applications",
-      version: 6,
+      version: 7,
       partialize: (state) => ({ applications: state.applications }),
       migrate: (persistedState, version) => {
         const base = persistedState as Partial<LoanApplicationState> &
@@ -263,13 +280,14 @@ export const useLoanApplicationStore = create<LoanApplicationState>()(
         if (version < 2) {
           const patched: Record<string, LoanApplication> = {};
           for (const [id, app] of Object.entries(applications)) {
+            const existing = app as Partial<LoanApplication>;
             patched[id] = {
-              workflowHistory: [],
-              workflowStageIndex: -1,
-              workflowId: null,
-              workflowName: null,
-              ...(app as LoanApplication),
-            };
+              ...existing,
+              workflowHistory: existing.workflowHistory ?? [],
+              workflowStageIndex: existing.workflowStageIndex ?? -1,
+              workflowId: existing.workflowId ?? null,
+              workflowName: existing.workflowName ?? null,
+            } as LoanApplication;
           }
           return {
             ...base,
@@ -280,11 +298,13 @@ export const useLoanApplicationStore = create<LoanApplicationState>()(
         if (version < 3) {
           const patched: Record<string, LoanApplication> = {};
           for (const [id, app] of Object.entries(applications)) {
-            const productCode = (app as LoanApplication).productCode ?? "APP";
+            const existing = app as Partial<LoanApplication>;
+            const productCode = existing.productCode ?? "APP";
             patched[id] = {
-              applicationNo: generateApplicationNo(productCode),
-              ...(app as LoanApplication),
-            };
+              ...existing,
+              applicationNo:
+                existing.applicationNo ?? generateApplicationNo(productCode),
+            } as LoanApplication;
           }
           return { ...base, applications: patched } satisfies Partial<LoanApplicationState>;
         }
@@ -292,14 +312,15 @@ export const useLoanApplicationStore = create<LoanApplicationState>()(
         if (version < 4) {
           const patched: Record<string, LoanApplication> = {};
           for (const [id, app] of Object.entries(applications)) {
+            const existing = app as Partial<LoanApplication>;
             patched[id] = {
-              bureauConsent: false,
-              bureauProvider: "Unknown",
-              bureauPurpose: "",
-              bureauReference: "",
-              bureauRequestedAt: null,
-              ...(app as LoanApplication),
-            };
+              ...existing,
+              bureauConsent: existing.bureauConsent ?? false,
+              bureauProvider: existing.bureauProvider ?? "Unknown",
+              bureauPurpose: existing.bureauPurpose ?? "",
+              bureauReference: existing.bureauReference ?? "",
+              bureauRequestedAt: existing.bureauRequestedAt ?? null,
+            } as LoanApplication;
           }
           return { ...base, applications: patched } satisfies Partial<LoanApplicationState>;
         }
@@ -307,10 +328,11 @@ export const useLoanApplicationStore = create<LoanApplicationState>()(
         if (version < 5) {
           const patched: Record<string, LoanApplication> = {};
           for (const [id, app] of Object.entries(applications)) {
+            const existing = app as Partial<LoanApplication>;
             patched[id] = {
-              decisionHistory: [],
-              ...(app as LoanApplication),
-            };
+              ...existing,
+              decisionHistory: existing.decisionHistory ?? [],
+            } as LoanApplication;
           }
           return { ...base, applications: patched } satisfies Partial<LoanApplicationState>;
         }
@@ -318,15 +340,30 @@ export const useLoanApplicationStore = create<LoanApplicationState>()(
         if (version < 6) {
           const patched: Record<string, LoanApplication> = {};
           for (const [id, app] of Object.entries(applications)) {
-            const existing = app as LoanApplication;
+            const existing = app as Partial<LoanApplication>;
             patched[id] = {
               ...existing,
               bankAccountNo: existing.bankAccountNo ?? "",
               kpayPhoneNo: existing.kpayPhoneNo ?? "",
-            };
+            } as LoanApplication;
           }
           return { ...base, applications: patched } satisfies Partial<LoanApplicationState>;
         }
+
+		if (version < 7) {
+			const patched: Record<string, LoanApplication> = {};
+			for (const [id, app] of Object.entries(applications)) {
+				const existing = app as Partial<LoanApplication>;
+				patched[id] = {
+					...existing,
+					gender: existing.gender ?? "",
+					maritalStatus: existing.maritalStatus ?? "",
+					education: existing.education ?? "",
+					debtToIncomeRatio: existing.debtToIncomeRatio ?? null,
+        } as LoanApplication;
+			}
+			return { ...base, applications: patched } satisfies Partial<LoanApplicationState>;
+		}
 
         return base as LoanApplicationState;
       },

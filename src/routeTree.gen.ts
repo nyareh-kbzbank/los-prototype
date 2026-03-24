@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as LoginRouteImport } from './routes/login'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as WorkflowIndexRouteImport } from './routes/workflow/index'
 import { Route as LoanIndexRouteImport } from './routes/loan/index'
@@ -26,12 +27,26 @@ import { Route as LoanMakerInboxIndexRouteImport } from './routes/loan/maker-inb
 import { Route as LoanCheckerInboxIndexRouteImport } from './routes/loan/checker-inbox/index'
 import { Route as LoanApplicationsIndexRouteImport } from './routes/loan/applications/index'
 import { Route as SolutionV2LoanSetupRouteImport } from './routes/solution/v2/loan-setup'
+import { Route as SolutionV2ListRouteImport } from './routes/solution/v2/list'
 import { Route as LoanSetupSetupIdRouteImport } from './routes/loan/setup/$setupId'
 import { Route as LoanMakerInboxApplicationIdRouteImport } from './routes/loan/maker-inbox/$applicationId'
 import { Route as LoanCheckerInboxApplicationIdRouteImport } from './routes/loan/checker-inbox/$applicationId'
 import { Route as LoanApplicationsCreateRouteImport } from './routes/loan/applications/create'
 import { Route as LoanApplicationsApplicationIdRouteImport } from './routes/loan/applications/$applicationId'
+import { Route as SolutionV2LoanApplicationsIndexRouteImport } from './routes/solution/v2/loan-applications/index'
+import { Route as SolutionV2LoanSetupListRouteImport } from './routes/solution/v2/loan-setup/list'
+import { Route as SolutionV2LoanApplicationsCreateRouteImport } from './routes/solution/v2/loan-applications/create'
+import { Route as SolutionV2LoanApplicationsApplicationIdRouteImport } from './routes/solution/v2/loan-applications/$applicationId'
+import { Route as SolutionV2LoanApplicationsMakerInboxIndexRouteImport } from './routes/solution/v2/loan-applications/maker-inbox/index'
+import { Route as SolutionV2LoanApplicationsCheckerInboxIndexRouteImport } from './routes/solution/v2/loan-applications/checker-inbox/index'
+import { Route as SolutionV2LoanApplicationsMakerInboxApplicationIdRouteImport } from './routes/solution/v2/loan-applications/maker-inbox/$applicationId'
+import { Route as SolutionV2LoanApplicationsCheckerInboxApplicationIdRouteImport } from './routes/solution/v2/loan-applications/checker-inbox/$applicationId'
 
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -118,6 +133,11 @@ const SolutionV2LoanSetupRoute = SolutionV2LoanSetupRouteImport.update({
   path: '/solution/v2/loan-setup',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SolutionV2ListRoute = SolutionV2ListRouteImport.update({
+  id: '/solution/v2/list',
+  path: '/solution/v2/list',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LoanSetupSetupIdRoute = LoanSetupSetupIdRouteImport.update({
   id: '/loan/setup/$setupId',
   path: '/loan/setup/$setupId',
@@ -146,9 +166,57 @@ const LoanApplicationsApplicationIdRoute =
     path: '/loan/applications/$applicationId',
     getParentRoute: () => rootRouteImport,
   } as any)
+const SolutionV2LoanApplicationsIndexRoute =
+  SolutionV2LoanApplicationsIndexRouteImport.update({
+    id: '/solution/v2/loan-applications/',
+    path: '/solution/v2/loan-applications/',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const SolutionV2LoanSetupListRoute = SolutionV2LoanSetupListRouteImport.update({
+  id: '/list',
+  path: '/list',
+  getParentRoute: () => SolutionV2LoanSetupRoute,
+} as any)
+const SolutionV2LoanApplicationsCreateRoute =
+  SolutionV2LoanApplicationsCreateRouteImport.update({
+    id: '/solution/v2/loan-applications/create',
+    path: '/solution/v2/loan-applications/create',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const SolutionV2LoanApplicationsApplicationIdRoute =
+  SolutionV2LoanApplicationsApplicationIdRouteImport.update({
+    id: '/solution/v2/loan-applications/$applicationId',
+    path: '/solution/v2/loan-applications/$applicationId',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const SolutionV2LoanApplicationsMakerInboxIndexRoute =
+  SolutionV2LoanApplicationsMakerInboxIndexRouteImport.update({
+    id: '/solution/v2/loan-applications/maker-inbox/',
+    path: '/solution/v2/loan-applications/maker-inbox/',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const SolutionV2LoanApplicationsCheckerInboxIndexRoute =
+  SolutionV2LoanApplicationsCheckerInboxIndexRouteImport.update({
+    id: '/solution/v2/loan-applications/checker-inbox/',
+    path: '/solution/v2/loan-applications/checker-inbox/',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const SolutionV2LoanApplicationsMakerInboxApplicationIdRoute =
+  SolutionV2LoanApplicationsMakerInboxApplicationIdRouteImport.update({
+    id: '/solution/v2/loan-applications/maker-inbox/$applicationId',
+    path: '/solution/v2/loan-applications/maker-inbox/$applicationId',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const SolutionV2LoanApplicationsCheckerInboxApplicationIdRoute =
+  SolutionV2LoanApplicationsCheckerInboxApplicationIdRouteImport.update({
+    id: '/solution/v2/loan-applications/checker-inbox/$applicationId',
+    path: '/solution/v2/loan-applications/checker-inbox/$applicationId',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/login': typeof LoginRoute
   '/loan/emi-calculator': typeof LoanEmiCalculatorRoute
   '/loan/emi-custom-calculator': typeof LoanEmiCustomCalculatorRoute
   '/loan/repayment-plans': typeof LoanRepaymentPlansRoute
@@ -165,14 +233,24 @@ export interface FileRoutesByFullPath {
   '/loan/checker-inbox/$applicationId': typeof LoanCheckerInboxApplicationIdRoute
   '/loan/maker-inbox/$applicationId': typeof LoanMakerInboxApplicationIdRoute
   '/loan/setup/$setupId': typeof LoanSetupSetupIdRoute
-  '/solution/v2/loan-setup': typeof SolutionV2LoanSetupRoute
+  '/solution/v2/list': typeof SolutionV2ListRoute
+  '/solution/v2/loan-setup': typeof SolutionV2LoanSetupRouteWithChildren
   '/loan/applications': typeof LoanApplicationsIndexRoute
   '/loan/checker-inbox': typeof LoanCheckerInboxIndexRoute
   '/loan/maker-inbox': typeof LoanMakerInboxIndexRoute
   '/loan/setup': typeof LoanSetupIndexRoute
+  '/solution/v2/loan-applications/$applicationId': typeof SolutionV2LoanApplicationsApplicationIdRoute
+  '/solution/v2/loan-applications/create': typeof SolutionV2LoanApplicationsCreateRoute
+  '/solution/v2/loan-setup/list': typeof SolutionV2LoanSetupListRoute
+  '/solution/v2/loan-applications': typeof SolutionV2LoanApplicationsIndexRoute
+  '/solution/v2/loan-applications/checker-inbox/$applicationId': typeof SolutionV2LoanApplicationsCheckerInboxApplicationIdRoute
+  '/solution/v2/loan-applications/maker-inbox/$applicationId': typeof SolutionV2LoanApplicationsMakerInboxApplicationIdRoute
+  '/solution/v2/loan-applications/checker-inbox': typeof SolutionV2LoanApplicationsCheckerInboxIndexRoute
+  '/solution/v2/loan-applications/maker-inbox': typeof SolutionV2LoanApplicationsMakerInboxIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/login': typeof LoginRoute
   '/loan/emi-calculator': typeof LoanEmiCalculatorRoute
   '/loan/emi-custom-calculator': typeof LoanEmiCustomCalculatorRoute
   '/loan/repayment-plans': typeof LoanRepaymentPlansRoute
@@ -189,15 +267,25 @@ export interface FileRoutesByTo {
   '/loan/checker-inbox/$applicationId': typeof LoanCheckerInboxApplicationIdRoute
   '/loan/maker-inbox/$applicationId': typeof LoanMakerInboxApplicationIdRoute
   '/loan/setup/$setupId': typeof LoanSetupSetupIdRoute
-  '/solution/v2/loan-setup': typeof SolutionV2LoanSetupRoute
+  '/solution/v2/list': typeof SolutionV2ListRoute
+  '/solution/v2/loan-setup': typeof SolutionV2LoanSetupRouteWithChildren
   '/loan/applications': typeof LoanApplicationsIndexRoute
   '/loan/checker-inbox': typeof LoanCheckerInboxIndexRoute
   '/loan/maker-inbox': typeof LoanMakerInboxIndexRoute
   '/loan/setup': typeof LoanSetupIndexRoute
+  '/solution/v2/loan-applications/$applicationId': typeof SolutionV2LoanApplicationsApplicationIdRoute
+  '/solution/v2/loan-applications/create': typeof SolutionV2LoanApplicationsCreateRoute
+  '/solution/v2/loan-setup/list': typeof SolutionV2LoanSetupListRoute
+  '/solution/v2/loan-applications': typeof SolutionV2LoanApplicationsIndexRoute
+  '/solution/v2/loan-applications/checker-inbox/$applicationId': typeof SolutionV2LoanApplicationsCheckerInboxApplicationIdRoute
+  '/solution/v2/loan-applications/maker-inbox/$applicationId': typeof SolutionV2LoanApplicationsMakerInboxApplicationIdRoute
+  '/solution/v2/loan-applications/checker-inbox': typeof SolutionV2LoanApplicationsCheckerInboxIndexRoute
+  '/solution/v2/loan-applications/maker-inbox': typeof SolutionV2LoanApplicationsMakerInboxIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/login': typeof LoginRoute
   '/loan/emi-calculator': typeof LoanEmiCalculatorRoute
   '/loan/emi-custom-calculator': typeof LoanEmiCustomCalculatorRoute
   '/loan/repayment-plans': typeof LoanRepaymentPlansRoute
@@ -214,16 +302,26 @@ export interface FileRoutesById {
   '/loan/checker-inbox/$applicationId': typeof LoanCheckerInboxApplicationIdRoute
   '/loan/maker-inbox/$applicationId': typeof LoanMakerInboxApplicationIdRoute
   '/loan/setup/$setupId': typeof LoanSetupSetupIdRoute
-  '/solution/v2/loan-setup': typeof SolutionV2LoanSetupRoute
+  '/solution/v2/list': typeof SolutionV2ListRoute
+  '/solution/v2/loan-setup': typeof SolutionV2LoanSetupRouteWithChildren
   '/loan/applications/': typeof LoanApplicationsIndexRoute
   '/loan/checker-inbox/': typeof LoanCheckerInboxIndexRoute
   '/loan/maker-inbox/': typeof LoanMakerInboxIndexRoute
   '/loan/setup/': typeof LoanSetupIndexRoute
+  '/solution/v2/loan-applications/$applicationId': typeof SolutionV2LoanApplicationsApplicationIdRoute
+  '/solution/v2/loan-applications/create': typeof SolutionV2LoanApplicationsCreateRoute
+  '/solution/v2/loan-setup/list': typeof SolutionV2LoanSetupListRoute
+  '/solution/v2/loan-applications/': typeof SolutionV2LoanApplicationsIndexRoute
+  '/solution/v2/loan-applications/checker-inbox/$applicationId': typeof SolutionV2LoanApplicationsCheckerInboxApplicationIdRoute
+  '/solution/v2/loan-applications/maker-inbox/$applicationId': typeof SolutionV2LoanApplicationsMakerInboxApplicationIdRoute
+  '/solution/v2/loan-applications/checker-inbox/': typeof SolutionV2LoanApplicationsCheckerInboxIndexRoute
+  '/solution/v2/loan-applications/maker-inbox/': typeof SolutionV2LoanApplicationsMakerInboxIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/login'
     | '/loan/emi-calculator'
     | '/loan/emi-custom-calculator'
     | '/loan/repayment-plans'
@@ -240,14 +338,24 @@ export interface FileRouteTypes {
     | '/loan/checker-inbox/$applicationId'
     | '/loan/maker-inbox/$applicationId'
     | '/loan/setup/$setupId'
+    | '/solution/v2/list'
     | '/solution/v2/loan-setup'
     | '/loan/applications'
     | '/loan/checker-inbox'
     | '/loan/maker-inbox'
     | '/loan/setup'
+    | '/solution/v2/loan-applications/$applicationId'
+    | '/solution/v2/loan-applications/create'
+    | '/solution/v2/loan-setup/list'
+    | '/solution/v2/loan-applications'
+    | '/solution/v2/loan-applications/checker-inbox/$applicationId'
+    | '/solution/v2/loan-applications/maker-inbox/$applicationId'
+    | '/solution/v2/loan-applications/checker-inbox'
+    | '/solution/v2/loan-applications/maker-inbox'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/login'
     | '/loan/emi-calculator'
     | '/loan/emi-custom-calculator'
     | '/loan/repayment-plans'
@@ -264,14 +372,24 @@ export interface FileRouteTypes {
     | '/loan/checker-inbox/$applicationId'
     | '/loan/maker-inbox/$applicationId'
     | '/loan/setup/$setupId'
+    | '/solution/v2/list'
     | '/solution/v2/loan-setup'
     | '/loan/applications'
     | '/loan/checker-inbox'
     | '/loan/maker-inbox'
     | '/loan/setup'
+    | '/solution/v2/loan-applications/$applicationId'
+    | '/solution/v2/loan-applications/create'
+    | '/solution/v2/loan-setup/list'
+    | '/solution/v2/loan-applications'
+    | '/solution/v2/loan-applications/checker-inbox/$applicationId'
+    | '/solution/v2/loan-applications/maker-inbox/$applicationId'
+    | '/solution/v2/loan-applications/checker-inbox'
+    | '/solution/v2/loan-applications/maker-inbox'
   id:
     | '__root__'
     | '/'
+    | '/login'
     | '/loan/emi-calculator'
     | '/loan/emi-custom-calculator'
     | '/loan/repayment-plans'
@@ -288,15 +406,25 @@ export interface FileRouteTypes {
     | '/loan/checker-inbox/$applicationId'
     | '/loan/maker-inbox/$applicationId'
     | '/loan/setup/$setupId'
+    | '/solution/v2/list'
     | '/solution/v2/loan-setup'
     | '/loan/applications/'
     | '/loan/checker-inbox/'
     | '/loan/maker-inbox/'
     | '/loan/setup/'
+    | '/solution/v2/loan-applications/$applicationId'
+    | '/solution/v2/loan-applications/create'
+    | '/solution/v2/loan-setup/list'
+    | '/solution/v2/loan-applications/'
+    | '/solution/v2/loan-applications/checker-inbox/$applicationId'
+    | '/solution/v2/loan-applications/maker-inbox/$applicationId'
+    | '/solution/v2/loan-applications/checker-inbox/'
+    | '/solution/v2/loan-applications/maker-inbox/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  LoginRoute: typeof LoginRoute
   LoanEmiCalculatorRoute: typeof LoanEmiCalculatorRoute
   LoanEmiCustomCalculatorRoute: typeof LoanEmiCustomCalculatorRoute
   LoanRepaymentPlansRoute: typeof LoanRepaymentPlansRoute
@@ -313,15 +441,30 @@ export interface RootRouteChildren {
   LoanCheckerInboxApplicationIdRoute: typeof LoanCheckerInboxApplicationIdRoute
   LoanMakerInboxApplicationIdRoute: typeof LoanMakerInboxApplicationIdRoute
   LoanSetupSetupIdRoute: typeof LoanSetupSetupIdRoute
-  SolutionV2LoanSetupRoute: typeof SolutionV2LoanSetupRoute
+  SolutionV2ListRoute: typeof SolutionV2ListRoute
+  SolutionV2LoanSetupRoute: typeof SolutionV2LoanSetupRouteWithChildren
   LoanApplicationsIndexRoute: typeof LoanApplicationsIndexRoute
   LoanCheckerInboxIndexRoute: typeof LoanCheckerInboxIndexRoute
   LoanMakerInboxIndexRoute: typeof LoanMakerInboxIndexRoute
   LoanSetupIndexRoute: typeof LoanSetupIndexRoute
+  SolutionV2LoanApplicationsApplicationIdRoute: typeof SolutionV2LoanApplicationsApplicationIdRoute
+  SolutionV2LoanApplicationsCreateRoute: typeof SolutionV2LoanApplicationsCreateRoute
+  SolutionV2LoanApplicationsIndexRoute: typeof SolutionV2LoanApplicationsIndexRoute
+  SolutionV2LoanApplicationsCheckerInboxApplicationIdRoute: typeof SolutionV2LoanApplicationsCheckerInboxApplicationIdRoute
+  SolutionV2LoanApplicationsMakerInboxApplicationIdRoute: typeof SolutionV2LoanApplicationsMakerInboxApplicationIdRoute
+  SolutionV2LoanApplicationsCheckerInboxIndexRoute: typeof SolutionV2LoanApplicationsCheckerInboxIndexRoute
+  SolutionV2LoanApplicationsMakerInboxIndexRoute: typeof SolutionV2LoanApplicationsMakerInboxIndexRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -441,6 +584,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SolutionV2LoanSetupRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/solution/v2/list': {
+      id: '/solution/v2/list'
+      path: '/solution/v2/list'
+      fullPath: '/solution/v2/list'
+      preLoaderRoute: typeof SolutionV2ListRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/loan/setup/$setupId': {
       id: '/loan/setup/$setupId'
       path: '/loan/setup/$setupId'
@@ -476,11 +626,79 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LoanApplicationsApplicationIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/solution/v2/loan-applications/': {
+      id: '/solution/v2/loan-applications/'
+      path: '/solution/v2/loan-applications'
+      fullPath: '/solution/v2/loan-applications'
+      preLoaderRoute: typeof SolutionV2LoanApplicationsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/solution/v2/loan-setup/list': {
+      id: '/solution/v2/loan-setup/list'
+      path: '/list'
+      fullPath: '/solution/v2/loan-setup/list'
+      preLoaderRoute: typeof SolutionV2LoanSetupListRouteImport
+      parentRoute: typeof SolutionV2LoanSetupRoute
+    }
+    '/solution/v2/loan-applications/create': {
+      id: '/solution/v2/loan-applications/create'
+      path: '/solution/v2/loan-applications/create'
+      fullPath: '/solution/v2/loan-applications/create'
+      preLoaderRoute: typeof SolutionV2LoanApplicationsCreateRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/solution/v2/loan-applications/$applicationId': {
+      id: '/solution/v2/loan-applications/$applicationId'
+      path: '/solution/v2/loan-applications/$applicationId'
+      fullPath: '/solution/v2/loan-applications/$applicationId'
+      preLoaderRoute: typeof SolutionV2LoanApplicationsApplicationIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/solution/v2/loan-applications/maker-inbox/': {
+      id: '/solution/v2/loan-applications/maker-inbox/'
+      path: '/solution/v2/loan-applications/maker-inbox'
+      fullPath: '/solution/v2/loan-applications/maker-inbox'
+      preLoaderRoute: typeof SolutionV2LoanApplicationsMakerInboxIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/solution/v2/loan-applications/checker-inbox/': {
+      id: '/solution/v2/loan-applications/checker-inbox/'
+      path: '/solution/v2/loan-applications/checker-inbox'
+      fullPath: '/solution/v2/loan-applications/checker-inbox'
+      preLoaderRoute: typeof SolutionV2LoanApplicationsCheckerInboxIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/solution/v2/loan-applications/maker-inbox/$applicationId': {
+      id: '/solution/v2/loan-applications/maker-inbox/$applicationId'
+      path: '/solution/v2/loan-applications/maker-inbox/$applicationId'
+      fullPath: '/solution/v2/loan-applications/maker-inbox/$applicationId'
+      preLoaderRoute: typeof SolutionV2LoanApplicationsMakerInboxApplicationIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/solution/v2/loan-applications/checker-inbox/$applicationId': {
+      id: '/solution/v2/loan-applications/checker-inbox/$applicationId'
+      path: '/solution/v2/loan-applications/checker-inbox/$applicationId'
+      fullPath: '/solution/v2/loan-applications/checker-inbox/$applicationId'
+      preLoaderRoute: typeof SolutionV2LoanApplicationsCheckerInboxApplicationIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
+interface SolutionV2LoanSetupRouteChildren {
+  SolutionV2LoanSetupListRoute: typeof SolutionV2LoanSetupListRoute
+}
+
+const SolutionV2LoanSetupRouteChildren: SolutionV2LoanSetupRouteChildren = {
+  SolutionV2LoanSetupListRoute: SolutionV2LoanSetupListRoute,
+}
+
+const SolutionV2LoanSetupRouteWithChildren =
+  SolutionV2LoanSetupRoute._addFileChildren(SolutionV2LoanSetupRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  LoginRoute: LoginRoute,
   LoanEmiCalculatorRoute: LoanEmiCalculatorRoute,
   LoanEmiCustomCalculatorRoute: LoanEmiCustomCalculatorRoute,
   LoanRepaymentPlansRoute: LoanRepaymentPlansRoute,
@@ -497,11 +715,24 @@ const rootRouteChildren: RootRouteChildren = {
   LoanCheckerInboxApplicationIdRoute: LoanCheckerInboxApplicationIdRoute,
   LoanMakerInboxApplicationIdRoute: LoanMakerInboxApplicationIdRoute,
   LoanSetupSetupIdRoute: LoanSetupSetupIdRoute,
-  SolutionV2LoanSetupRoute: SolutionV2LoanSetupRoute,
+  SolutionV2ListRoute: SolutionV2ListRoute,
+  SolutionV2LoanSetupRoute: SolutionV2LoanSetupRouteWithChildren,
   LoanApplicationsIndexRoute: LoanApplicationsIndexRoute,
   LoanCheckerInboxIndexRoute: LoanCheckerInboxIndexRoute,
   LoanMakerInboxIndexRoute: LoanMakerInboxIndexRoute,
   LoanSetupIndexRoute: LoanSetupIndexRoute,
+  SolutionV2LoanApplicationsApplicationIdRoute:
+    SolutionV2LoanApplicationsApplicationIdRoute,
+  SolutionV2LoanApplicationsCreateRoute: SolutionV2LoanApplicationsCreateRoute,
+  SolutionV2LoanApplicationsIndexRoute: SolutionV2LoanApplicationsIndexRoute,
+  SolutionV2LoanApplicationsCheckerInboxApplicationIdRoute:
+    SolutionV2LoanApplicationsCheckerInboxApplicationIdRoute,
+  SolutionV2LoanApplicationsMakerInboxApplicationIdRoute:
+    SolutionV2LoanApplicationsMakerInboxApplicationIdRoute,
+  SolutionV2LoanApplicationsCheckerInboxIndexRoute:
+    SolutionV2LoanApplicationsCheckerInboxIndexRoute,
+  SolutionV2LoanApplicationsMakerInboxIndexRoute:
+    SolutionV2LoanApplicationsMakerInboxIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
