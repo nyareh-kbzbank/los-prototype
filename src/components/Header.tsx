@@ -106,7 +106,7 @@ export default function Header() {
 				</button>
 				<h1 className="ml-4 text-xl font-semibold">
 					<Link to="/" className="text-4xl font-bold">
-						Smart Lending Solution
+						F21 Smart Lending Solution
 					</Link>
 				</h1>
 				<div className="ml-auto flex items-center gap-3 text-sm">

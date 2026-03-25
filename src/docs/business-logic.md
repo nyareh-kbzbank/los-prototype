@@ -65,7 +65,10 @@ Sources:
 - V2 uses a sidebar stepper; each step is edited inline in the same page flow.
 - V2 step 2 is an **Interest Setup** section that configures interest rate plans.
 - Interest setup includes the same plan fields as the main setup interest section: interest type, rate type, base rate, parameter overrides, and policies.
+- V2 Interest Setup also persists its own custom interest formula configuration (principal formula, interest formula, and custom field definitions) independently from repayment setup.
+- For backward compatibility, older V2 snapshots hydrate the new interest formula state from the formula data previously stored under repayment setup.
 - V2 Interest Setup intentionally does not use an accordion; all fields are always visible in this step.
+- V2 Interest Setup allows multiple interest plans to be added and removed within the same setup snapshot.
 - V2 step 3 is a **Repayment Setup** section inserted between Interest Setup and Credit Score Engine.
 - V2 Repayment Setup is local to the V2 flow (not reusable/global), so it does not include reusable plan naming or saved-plan config selection.
 - V2 Repayment Setup also includes inline custom formula fields based on the Custom EMI calculator format (principal formula, interest formula, and custom field definitions).
@@ -78,6 +81,9 @@ Sources:
 - V2 step 5 is a **Document Rule** section that reuses the existing document-requirements configuration pattern from the main loan setup flow.
 - V2 Document Rule maps required documents by risk grade and starts with default required documents for `LOW` risk.
 - In V2 Document Rule, when loan security is set to `SECURED`, collateral (`DOC-COLLATERAL`) is automatically enforced as `isMandatory=true` and `collateralRequired=true` for all configured risk grades.
+- In V2 Product Setup, when `loanSecurity` is `SECURED`, additional collateral controls are required: collateral type, minimum collateral value, maximum LTV percentage, haircut percentage, valuation-required toggle, and valuation-validity days (when valuation is required).
+- V2 Product Setup for secured loans also includes a **Run Test** dialog that evaluates sample loan amount/collateral value (and valuation age, when applicable) against the configured minimum collateral, LTV limit, haircut-adjusted collateral value, and valuation-validity rules.
+- V2 Product Setup allows `maxAmount` to be configured as either a `FLAT` value or a `PERCENTAGE` rate (`maxAmountRateType`) to support product-specific maximum-amount interpretation.
 - V2 step 6 is a **Decision Rule** section where users can configure decision outcomes (`AUTO_APPROVE`, `MANUAL_REVIEW`, `AUTO_REJECT`) using conditional rules.
 - Decision rules support flexible key fields (for example `creditScore`, `riskGrade`, and other custom fields) with operators and values.
 - Decision Rule setup also keeps a default mapping by risk grade as a fallback outcome.
@@ -97,14 +103,19 @@ Sources:
 - V2 has a dedicated application-create flow at `/solution/v2/loan-applications/create` that reads from the V2 setup store (`loan-workflow-setups-v2`) rather than the V1 setup store.
 - The V2 application form derives product constraints (amount range, tenor options), channel/workflow references, bureau requirements, risk score inputs/grade (from V2 scorecard + thresholds), and required document uploads from the selected V2 setup snapshot.
 - V2 application listing is now separated from V1: `/solution/v2/loan-applications` shows only applications created from V2 setup snapshots and is independent from `/loan/applications`.
-- V2 application detail is also separated from V1: V2 list rows navigate to `/solution/v2/loan-applications/$applicationId`, while V1 detail remains under `/loan/applications/$applicationId`.
+- V2 application detail is also separated from V1: V2 list rows navigate to `/solution/v2/loan-applications/$applicationId`, while V1 detail remains under `/loan/applications/$applicationId`
 - V2 application creation now uses the workflow linked to the **selected channel code** in V2 channel configuration, not the first available channel workflow.
 - V2 has separate role inboxes for manual-review stages:
   - Maker inbox: `/solution/v2/loan-applications/maker-inbox`
   - Checker inbox: `/solution/v2/loan-applications/checker-inbox`
 - V2 maker/checker inboxes and detail pages operate only on V2 applications (applications whose `setupId` exists in the V2 setup store).
-- Maker actions for V2: `APPROVE`, `REJECT`, or `SUBMIT TO CHECKER` (status to `CHECKER_PENDING`).
-- Checker actions for V2: `APPROVE` or `REJECT` for applications in `CHECKER_PENDING`.
+- V2 maker/checker detail pages execute transitions from the linked saved workflow graph (from `loan-workflows`) rather than fixed action buttons.
+- Workflow transitions are resolved from the current stage node to outgoing condition branches and next stage/end targets; action button labels come from condition input values.
+- Queue status is derived from workflow transition outcome:
+  - transition to a stage label containing `checker` → `CHECKER_PENDING`
+  - transition to any other non-terminal stage → `SUBMITTED`
+  - transition to `end` with reject-like action label (`reject`/`decline`/`deny`/`fail`) → `REJECTED`; otherwise `APPROVED`
+- V2 application creation initializes workflow stage history at the linked workflow's first reachable custom stage after `start` when initial status is manual review (`SUBMITTED`).
 - The V2 application form now renders any non-native scorecard fields directly from the selected setup's Credit Score Engine configuration, requires those values before score evaluation, and uses the resulting credit score plus threshold-based risk grade to determine which document uploads are required.
 - For V2 scorecard matching, core scoring inputs are normalized to align with setup keywords: `age`, `gender` (`male`/`female`), `maritalstatus` (`single`/`married`/`divorced`), `education` (`graduate`/`under graduate`), `dti`, `income`, and `isburaeucheck` (`true`/`false`).
 - The V2 application page installment preview uses the saved V2 repayment setup directly: repayment frequency and due-day rules come from the setup, while amount, tenure, start date, and custom formula field values come from the application page inputs.
@@ -159,10 +170,11 @@ Source: src/lib/loan-application-store.ts
     - `MEDIUM` or missing risk grade → `SUBMITTED` (manual review)
 - Manual review queue flow:
   - `SUBMITTED` applications appear in Maker Inbox.
-  - Maker can `APPROVE`, `REJECT`, or `SUBMIT TO CHECKER`.
-  - Submitting to checker sets status to `CHECKER_PENDING`.
   - `CHECKER_PENDING` applications appear in Checker Inbox.
-  - Checker can only `APPROVE` or `REJECT` (no submit-to-checker action).
+  - For V2 flows, maker/checker actions are workflow-driven from the linked graph's current stage transitions (not hardcoded).
+  - Transition target stage determines queue status (`SUBMITTED` for non-checker stages, `CHECKER_PENDING` for checker stages).
+  - End-node transitions determine final status (`APPROVED` or `REJECTED`) using transition label semantics.
+  - Checker-to-maker loopbacks are supported through workflow transitions and are captured in decision history as `Returned to maker`.
   - `REJECTED` is source-aware in decision history:
     - Auto-rejected from setup decision engine is system-driven.
     - Rejected by maker/checker is manual-review-driven and tracked with actor + transition.

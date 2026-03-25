@@ -1,12 +1,6 @@
 import { useEffect, useState } from "react";
-
-type FieldDefinition = {
-	id: string;
-	key: string;
-	label: string;
-	description: string;
-	defaultValue: number;
-};
+import { buildV2RepaymentSchedulePreview } from "@/lib/v2-repayment-preview";
+import { createDefaultFormulaSetup, type FormulaSetup } from "./setup-types";
 
 export type RepaymentSetupForm = {
 	methodName: string;
@@ -23,356 +17,10 @@ export type RepaymentSetupForm = {
 	description: string;
 };
 
-export type FormulaSetup = {
-	principalFormula: string;
-	interestFormula: string;
-	fieldDefinitions: FieldDefinition[];
-};
-
 export type RepaymentSetupTabState = {
 	form: RepaymentSetupForm;
 	formulaSetup: FormulaSetup;
 };
-
-type FormulaTestResult = {
-	installment: number;
-	totalInterest: number;
-	totalPayment: number;
-	schedule: Array<{
-		period: number;
-		date: Date;
-		payment: number;
-		principal: number;
-		interest: number;
-		balance: number;
-	}>;
-	error: string | null;
-};
-
-const createId = () =>
-	`${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
-
-const isValidFieldKey = (key: string) => /^[A-Za-z_]\w*$/.test(key);
-
-const coreFieldDefinitions: Array<{
-	key: string;
-	label: string;
-	description: string;
-}> = [
-	{
-		key: "principal",
-		label: "Principal",
-		description: "Original loan amount.",
-	},
-	{
-		key: "balance",
-		label: "Balance",
-		description: "Outstanding balance before current payment.",
-	},
-	{
-		key: "rateMonthly",
-		label: "Monthly Rate",
-		description: "Monthly interest rate in decimal (annualRate/12/100).",
-	},
-	{
-		key: "rateAnnual",
-		label: "Annual Rate",
-		description: "Annual interest rate in decimal (annualRate/100).",
-	},
-	{
-		key: "period",
-		label: "Period",
-		description: "Current installment number starting at 1.",
-	},
-	{
-		key: "tenureMonths",
-		label: "Tenure Months",
-		description: "Total tenure converted to months.",
-	},
-	{
-		key: "remainingMonths",
-		label: "Remaining Months",
-		description: "Installments left including current period.",
-	},
-	{
-		key: "baseEmi",
-		label: "Base EMI",
-		description: "Standard reducing-balance EMI reference value.",
-	},
-	{
-		key: "prevPayment",
-		label: "Previous Payment",
-		description: "Previous period payment amount.",
-	},
-	{
-		key: "prevPrincipal",
-		label: "Previous Principal",
-		description: "Previous period principal component.",
-	},
-	{
-		key: "prevInterest",
-		label: "Previous Interest",
-		description: "Previous period interest component.",
-	},
-];
-
-function parseIsoDate(dateString: string) {
-	const parsed = new Date(`${dateString}T00:00:00`);
-	if (Number.isNaN(parsed.getTime())) {
-		return null;
-	}
-	return parsed;
-}
-
-function addDays(baseDate: Date, days: number) {
-	const next = new Date(baseDate);
-	next.setDate(next.getDate() + Math.max(0, days));
-	return next;
-}
-
-function buildDueDateForMonth(year: number, month: number, dueDay: number) {
-	const maxDay = new Date(year, month + 1, 0).getDate();
-	return new Date(year, month, Math.min(Math.max(1, dueDay), maxDay));
-}
-
-function resolveMonthlyLikeDueDate(tentativeDate: Date, dueDay: number) {
-	const sameMonthDueDate = buildDueDateForMonth(
-		tentativeDate.getFullYear(),
-		tentativeDate.getMonth(),
-		dueDay,
-	);
-
-	if (tentativeDate.getTime() <= sameMonthDueDate.getTime()) {
-		return sameMonthDueDate;
-	}
-
-	return buildDueDateForMonth(
-		tentativeDate.getFullYear(),
-		tentativeDate.getMonth() + 1,
-		dueDay,
-	);
-}
-
-function buildPaymentDates(
-	startDate: Date,
-	installments: number,
-	repaymentSetup: Pick<
-		RepaymentSetupForm,
-		"frequency" | "dueDayOfMonth" | "firstDueAfterDays" | "firstDueAfterDueDayDays"
-	>,
-) {
-	const paymentDates: Date[] = [];
-	const dueDay = repaymentSetup.dueDayOfMonth ?? 1;
-
-	if (installments <= 0) {
-		return paymentDates;
-	}
-
-	if (
-		repaymentSetup.frequency === "WEEKLY" ||
-		repaymentSetup.frequency === "BIWEEKLY"
-	) {
-		const intervalDays = repaymentSetup.frequency === "WEEKLY" ? 7 : 14;
-		const firstDate = addDays(
-			startDate,
-			repaymentSetup.firstDueAfterDays + repaymentSetup.firstDueAfterDueDayDays,
-		);
-		for (let index = 0; index < installments; index += 1) {
-			paymentDates.push(addDays(firstDate, intervalDays * index));
-		}
-		return paymentDates;
-	}
-
-	const firstTentativeDate = addDays(startDate, repaymentSetup.firstDueAfterDays);
-	const firstBaseDate = resolveMonthlyLikeDueDate(firstTentativeDate, dueDay);
-	const firstDate = addDays(firstBaseDate, repaymentSetup.firstDueAfterDueDayDays);
-	paymentDates.push(firstDate);
-
-	const monthStep = repaymentSetup.frequency === "QUARTERLY" ? 3 : 1;
-	for (let index = 1; index < installments; index += 1) {
-		const targetMonthDate = buildDueDateForMonth(
-			firstBaseDate.getFullYear(),
-			firstBaseDate.getMonth() + monthStep * index,
-			dueDay,
-		);
-		paymentDates.push(targetMonthDate);
-	}
-
-	return paymentDates;
-}
-
-function evaluateFormulaExpression(
-	expression: string,
-	context: Record<string, number>,
-) {
-	const trimmed = expression.trim();
-	if (!trimmed) throw new Error("Formula is required.");
-	const keys = Object.keys(context).filter(isValidFieldKey);
-	const values = keys.map((key) => context[key] ?? 0);
-	const fn = new Function(
-		...keys,
-		"const min=Math.min; const max=Math.max; const abs=Math.abs; const round=Math.round; const floor=Math.floor; const ceil=Math.ceil; const pow=Math.pow; const sqrt=Math.sqrt; const log=Math.log; const exp=Math.exp; return (" +
-			trimmed +
-			");",
-	) as (...args: number[]) => number;
-	const result = Number(fn(...values));
-	if (!Number.isFinite(result)) {
-		throw new TypeError("Formula result is invalid.");
-	}
-	return result;
-}
-
-function runFormulaTest(
-	principalAmount: number,
-	annualRate: number,
-	tenureMonths: number,
-	startDateIso: string,
-	repaymentSetup: Pick<
-		RepaymentSetupForm,
-		"frequency" | "dueDayOfMonth" | "firstDueAfterDays" | "firstDueAfterDueDayDays"
-	>,
-	formulaSetup: FormulaSetup,
-	customFieldValues: Record<string, number>,
-): FormulaTestResult {
-	const scheduleStartDate = parseIsoDate(startDateIso);
-	if (!scheduleStartDate) {
-		return {
-			installment: 0,
-			totalInterest: 0,
-			totalPayment: 0,
-			schedule: [],
-			error: "Start date is required.",
-		};
-	}
-
-	if (principalAmount <= 0 || tenureMonths <= 0) {
-		return {
-			installment: 0,
-			totalInterest: 0,
-			totalPayment: 0,
-			schedule: [],
-			error: "Loan amount and tenure must be positive.",
-		};
-	}
-	if (
-		!formulaSetup.principalFormula.trim() ||
-		!formulaSetup.interestFormula.trim()
-	) {
-		return {
-			installment: 0,
-			totalInterest: 0,
-			totalPayment: 0,
-			schedule: [],
-			error: "Principal and interest formulas are required.",
-		};
-	}
-
-	try {
-		const rateMonthly = annualRate / 12 / 100;
-		const rateAnnual = annualRate / 100;
-		const baseEmi =
-			rateMonthly <= 0
-				? principalAmount / tenureMonths
-				: (principalAmount * rateMonthly * (1 + rateMonthly) ** tenureMonths) /
-					((1 + rateMonthly) ** tenureMonths - 1);
-
-		let remainingBalance = principalAmount;
-		let totalPayment = 0;
-		let totalInterest = 0;
-		let prevPayment = 0;
-		let prevPrincipal = 0;
-		let prevInterest = 0;
-		let firstInstallment = 0;
-		const schedule: FormulaTestResult["schedule"] = [];
-		const paymentDates = buildPaymentDates(
-			scheduleStartDate,
-			tenureMonths,
-			repaymentSetup,
-		);
-
-		for (let period = 1; period <= tenureMonths; period += 1) {
-			const paymentDate =
-				paymentDates[period - 1] ??
-				new Date(
-					scheduleStartDate.getFullYear(),
-					scheduleStartDate.getMonth() + period,
-					scheduleStartDate.getDate(),
-				);
-
-			const context: Record<string, number> = {
-				principal: principalAmount,
-				balance: remainingBalance,
-				rateMonthly,
-				rateAnnual,
-				period,
-				tenureMonths,
-				remainingMonths: tenureMonths - period + 1,
-				baseEmi,
-				prevPayment,
-				prevPrincipal,
-				prevInterest,
-			};
-
-			for (const field of formulaSetup.fieldDefinitions) {
-				if (!isValidFieldKey(field.key)) continue;
-				context[field.key] = customFieldValues[field.key] ?? field.defaultValue;
-			}
-
-			const interestValue = Math.max(
-				0,
-				evaluateFormulaExpression(formulaSetup.interestFormula, context),
-			);
-			let principalValue = Math.max(
-				0,
-				evaluateFormulaExpression(formulaSetup.principalFormula, context),
-			);
-
-			if (principalValue > remainingBalance) {
-				principalValue = remainingBalance;
-			}
-
-			let payment = principalValue + interestValue;
-			if (period === tenureMonths && remainingBalance - principalValue > 0) {
-				const residual = remainingBalance - principalValue;
-				principalValue += residual;
-				payment += residual;
-			}
-
-			remainingBalance -= principalValue;
-			totalPayment += payment;
-			totalInterest += interestValue;
-			prevPayment = payment;
-			prevPrincipal = principalValue;
-			prevInterest = interestValue;
-			schedule.push({
-				period,
-				date: paymentDate,
-				payment,
-				principal: principalValue,
-				interest: interestValue,
-				balance: Math.max(0, remainingBalance),
-			});
-			if (period === 1) firstInstallment = payment;
-		}
-
-		return {
-			installment: firstInstallment,
-			totalInterest,
-			totalPayment,
-			schedule,
-			error: null,
-		};
-	} catch (error) {
-		return {
-			installment: 0,
-			totalInterest: 0,
-			totalPayment: 0,
-			schedule: [],
-			error:
-				error instanceof Error ? error.message : "Unable to evaluate formulas.",
-		};
-	}
-}
 
 const emptyForm: RepaymentSetupForm = {
 	methodName: "",
@@ -391,11 +39,7 @@ const emptyForm: RepaymentSetupForm = {
 
 export const createDefaultRepaymentSetupTabState = (): RepaymentSetupTabState => ({
 	form: emptyForm,
-	formulaSetup: {
-		principalFormula: "max(0, baseEmi - (balance * rateMonthly))",
-		interestFormula: "balance * rateMonthly",
-		fieldDefinitions: [],
-	},
+	formulaSetup: createDefaultFormulaSetup(),
 });
 
 type RepaymentSetupTabProps = {
@@ -409,13 +53,6 @@ export function RepaymentSetupTab({
 }: Readonly<RepaymentSetupTabProps>) {
 	const [form, setForm] = useState<RepaymentSetupForm>(
 		state?.form ?? emptyForm,
-	);
-	const [formulaSetup, setFormulaSetup] = useState<FormulaSetup>(
-		state?.formulaSetup ?? {
-			principalFormula: "max(0, baseEmi - (balance * rateMonthly))",
-			interestFormula: "balance * rateMonthly",
-			fieldDefinitions: [],
-		},
 	);
 	const [isTestDialogOpen, setIsTestDialogOpen] = useState(false);
 	const [testAmount, setTestAmount] = useState(500000);
@@ -431,8 +68,14 @@ export function RepaymentSetupTab({
 	const [testCustomFieldValues, setTestCustomFieldValues] = useState<
 		Record<string, number>
 	>({});
-	const [testResult, setTestResult] = useState<FormulaTestResult | null>(null);
-	const [showPredefinedFields, setShowPredefinedFields] = useState(false);
+	const [testResult, setTestResult] = useState<{
+		installment: number;
+		totalInterest: number;
+		totalPayment: number;
+		schedule: ReturnType<typeof buildV2RepaymentSchedulePreview>["schedule"];
+		error: string | null;
+	} | null>(null);
+	const formulaSetup = state?.formulaSetup ?? createDefaultFormulaSetup();
 
 	useEffect(() => {
 		onStateChange?.({
@@ -443,52 +86,6 @@ export function RepaymentSetupTab({
 
 	const formatNumber = (value: number) =>
 		value.toLocaleString(undefined, { maximumFractionDigits: 2 });
-
-	const addFieldDefinition = () => {
-		setFormulaSetup((prev) => ({
-			...prev,
-			fieldDefinitions: [
-				...prev.fieldDefinitions,
-				{
-					id: createId(),
-					key: "",
-					label: "",
-					description: "",
-					defaultValue: 0,
-				},
-			],
-		}));
-	};
-
-	const updateFieldDefinition = (
-		fieldId: string,
-		field: "key" | "label" | "description" | "defaultValue",
-		value: string,
-	) => {
-		setFormulaSetup((prev) => ({
-			...prev,
-			fieldDefinitions: prev.fieldDefinitions.map((item) => {
-				if (item.id !== fieldId) return item;
-				if (field === "defaultValue") {
-					const parsed = Number(value);
-					return {
-						...item,
-						defaultValue: Number.isFinite(parsed) ? parsed : item.defaultValue,
-					};
-				}
-				return { ...item, [field]: value };
-			}),
-		}));
-	};
-
-	const removeFieldDefinition = (fieldId: string) => {
-		setFormulaSetup((prev) => ({
-			...prev,
-			fieldDefinitions: prev.fieldDefinitions.filter(
-				(item) => item.id !== fieldId,
-			),
-		}));
-	};
 
 	const openTestDialog = () => {
 		setTestCustomFieldValues((prev) => {
@@ -503,7 +100,7 @@ export function RepaymentSetupTab({
 	};
 
 	const runTestCalculation = () => {
-		const result = runFormulaTest(
+		const preview = buildV2RepaymentSchedulePreview(
 			testAmount,
 			testRate,
 			Math.max(1, testTenureMonths),
@@ -517,19 +114,41 @@ export function RepaymentSetupTab({
 			formulaSetup,
 			testCustomFieldValues,
 		);
-		setTestResult(result);
+		const totalInterest = preview.schedule.reduce(
+			(sum, row) => sum + row.interest,
+			0,
+		);
+		const totalPayment = preview.schedule.reduce(
+			(sum, row) => sum + row.payment,
+			0,
+		);
+		setTestResult({
+			installment: preview.schedule[0]?.payment ?? 0,
+			totalInterest,
+			totalPayment,
+			schedule: preview.schedule,
+			error: preview.error,
+		});
 	};
 
 	return (
 		<div className="space-y-4">
 			<section className="border rounded-lg p-5 space-y-4">
 				<div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-					<div>
+					{/* <div>
 						<h2 className="text-lg font-semibold">Repayment Setup</h2>
 						<div className="text-xs text-gray-600">
 							Define repayment rules only for this V2 loan setup.
 						</div>
-					</div>
+					</div> */}
+          <div></div>
+					<button
+						type="button"
+						onClick={openTestDialog}
+						className="text-sm border px-3 py-2 rounded hover:bg-gray-50 float-right"
+					>
+						Test Calculate
+					</button>
 				</div>
 
 				<div className="space-y-3">
@@ -722,173 +341,6 @@ export function RepaymentSetupTab({
 				</div>
 			</section>
 
-			<section className="border rounded-lg p-5 space-y-4">
-				<div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-					<div>
-						<h2 className="text-lg font-semibold">Custom Formula</h2>
-						<div className="text-xs text-gray-600">
-							Custom formula fields based on EMI custom calculator format.
-						</div>
-					</div>
-					<button
-						type="button"
-						onClick={openTestDialog}
-						className="text-sm border px-3 py-2 rounded hover:bg-gray-50"
-					>
-						Test Calculate
-					</button>
-				</div>
-
-				<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-					<label className="flex flex-col gap-1 text-sm">
-						<span>Principal Formula</span>
-						<textarea
-							value={formulaSetup.principalFormula}
-							onChange={(event) =>
-								setFormulaSetup((prev) => ({
-									...prev,
-									principalFormula: event.target.value,
-								}))
-							}
-							rows={4}
-							className="border rounded px-2 py-2 font-mono text-sm"
-						/>
-					</label>
-					<label className="flex flex-col gap-1 text-sm">
-						<span>Interest Formula</span>
-						<textarea
-							value={formulaSetup.interestFormula}
-							onChange={(event) =>
-								setFormulaSetup((prev) => ({
-									...prev,
-									interestFormula: event.target.value,
-								}))
-							}
-							rows={4}
-							className="border rounded px-2 py-2 font-mono text-sm"
-						/>
-					</label>
-				</div>
-
-				<div className="space-y-2">
-					<div className="flex items-center justify-between">
-						<h3 className="text-sm font-medium">Custom Formula Fields</h3>
-						<button
-							type="button"
-							onClick={addFieldDefinition}
-							className="text-sm border px-3 py-1 rounded hover:bg-gray-50"
-						>
-							Add field
-						</button>
-					</div>
-					{formulaSetup.fieldDefinitions.length === 0 ? (
-						<div className="text-xs text-gray-600 border rounded p-2 bg-gray-50">
-							No custom fields yet.
-						</div>
-					) : (
-						<div className="space-y-2">
-							{formulaSetup.fieldDefinitions.map((field) => (
-								<div
-									key={field.id}
-									className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2 items-end"
-								>
-									<input
-										type="text"
-										placeholder="Key"
-										value={field.key}
-										onChange={(event) =>
-											updateFieldDefinition(field.id, "key", event.target.value)
-										}
-										className="border px-2 py-2 rounded min-w-0"
-									/>
-									<input
-										type="text"
-										placeholder="Label"
-										value={field.label}
-										onChange={(event) =>
-											updateFieldDefinition(
-												field.id,
-												"label",
-												event.target.value,
-											)
-										}
-										className="border px-2 py-2 rounded min-w-0"
-									/>
-									<input
-										type="text"
-										placeholder="Description"
-										value={field.description}
-										onChange={(event) =>
-											updateFieldDefinition(
-												field.id,
-												"description",
-												event.target.value,
-											)
-										}
-										className="border px-2 py-2 rounded min-w-0"
-									/>
-									<input
-										type="number"
-										placeholder="Default"
-										value={field.defaultValue}
-										onChange={(event) =>
-											updateFieldDefinition(
-												field.id,
-												"defaultValue",
-												event.target.value,
-											)
-										}
-										className="border px-2 py-2 rounded min-w-0"
-									/>
-									<button
-										type="button"
-										onClick={() => removeFieldDefinition(field.id)}
-										className="border px-2 py-2 rounded hover:bg-gray-50 sm:col-span-2 lg:col-span-1"
-									>
-										Remove
-									</button>
-								</div>
-							))}
-						</div>
-					)}
-				</div>
-
-				<div className="rounded border p-3 bg-gray-50 space-y-2">
-					<button
-						type="button"
-						onClick={() => setShowPredefinedFields((prev) => !prev)}
-						className="w-full flex items-center justify-between text-left"
-					>
-						<h3 className="text-sm font-medium">Predefined Fields</h3>
-						<span className="text-xs text-gray-600">
-							{showPredefinedFields ? "Hide" : "Show"}
-						</span>
-					</button>
-					{showPredefinedFields ? (
-						<div className="overflow-x-auto border rounded bg-white">
-							<table className="min-w-full text-sm text-left">
-								<thead className="bg-gray-100">
-									<tr>
-										<th className="px-3 py-2 font-semibold">Field</th>
-										<th className="px-3 py-2 font-semibold">Meaning</th>
-									</tr>
-								</thead>
-								<tbody>
-									{coreFieldDefinitions.map((field) => (
-										<tr key={field.key} className="border-t">
-											<td className="px-3 py-2 font-mono text-xs">{field.key}</td>
-											<td className="px-3 py-2 text-xs text-gray-700">
-												{field.description}
-											</td>
-										</tr>
-									))}
-								</tbody>
-							</table>
-						</div>
-					) : null}
-				</div>
-			</section>
-
 			{isTestDialogOpen ? (
 				<div className="fixed inset-0 z-50 flex items-center justify-center">
 					<button
@@ -902,7 +354,7 @@ export function RepaymentSetupTab({
 							<div>
 								<div className="text-lg font-semibold">Test Calculate</div>
 								<div className="text-xs text-gray-600">
-									Run sample calculation for current formula fields.
+									Run sample calculation using the current formula and repayment timing.
 								</div>
 							</div>
 							<button
@@ -1018,9 +470,7 @@ export function RepaymentSetupTab({
 											</div>
 										</div>
 										<div>
-											<div className="text-xs text-gray-600">
-												Total Interest
-											</div>
+											<div className="text-xs text-gray-600">Total Interest</div>
 											<div className="text-lg font-semibold">
 												{formatNumber(testResult.totalInterest)}
 											</div>
@@ -1047,29 +497,17 @@ export function RepaymentSetupTab({
 													<thead className="bg-gray-100 text-gray-700 font-semibold border-b">
 														<tr>
 															<th className="px-3 py-2 whitespace-nowrap">#</th>
-															<th className="px-3 py-2 whitespace-nowrap">
-																Payment Date
-															</th>
-															<th className="px-3 py-2 text-right whitespace-nowrap">
-																Payment
-															</th>
-															<th className="px-3 py-2 text-right whitespace-nowrap">
-																Principal
-															</th>
-															<th className="px-3 py-2 text-right whitespace-nowrap">
-																Interest
-															</th>
-															<th className="px-3 py-2 text-right whitespace-nowrap">
-																Outstanding
-															</th>
+															<th className="px-3 py-2 whitespace-nowrap">Payment Date</th>
+															<th className="px-3 py-2 text-right whitespace-nowrap">Payment</th>
+															<th className="px-3 py-2 text-right whitespace-nowrap">Principal</th>
+															<th className="px-3 py-2 text-right whitespace-nowrap">Interest</th>
+															<th className="px-3 py-2 text-right whitespace-nowrap">Outstanding</th>
 														</tr>
 													</thead>
 													<tbody className="divide-y divide-gray-200">
 														{testResult.schedule.map((row) => (
 															<tr key={row.period} className="hover:bg-gray-50">
-																<td className="px-3 py-2 text-gray-500">
-																	{row.period}
-																</td>
+																<td className="px-3 py-2 text-gray-500">{row.period}</td>
 																<td className="px-3 py-2">
 																	{new Intl.DateTimeFormat("en-US", {
 																		year: "numeric",
@@ -1077,18 +515,10 @@ export function RepaymentSetupTab({
 																		day: "numeric",
 																	}).format(row.date)}
 																</td>
-																<td className="px-3 py-2 text-right font-medium">
-																	{formatNumber(row.payment)}
-																</td>
-																<td className="px-3 py-2 text-right text-gray-600">
-																	{formatNumber(row.principal)}
-																</td>
-																<td className="px-3 py-2 text-right text-orange-600">
-																	{formatNumber(row.interest)}
-																</td>
-																<td className="px-3 py-2 text-right text-gray-500">
-																	{formatNumber(row.balance)}
-																</td>
+																<td className="px-3 py-2 text-right font-medium">{formatNumber(row.payment)}</td>
+																<td className="px-3 py-2 text-right text-gray-600">{formatNumber(row.principal)}</td>
+																<td className="px-3 py-2 text-right text-orange-600">{formatNumber(row.interest)}</td>
+																<td className="px-3 py-2 text-right text-gray-500">{formatNumber(row.balance)}</td>
 															</tr>
 														))}
 													</tbody>
@@ -1102,6 +532,7 @@ export function RepaymentSetupTab({
 					</div>
 				</div>
 			) : null}
+
 		</div>
 	);
 }

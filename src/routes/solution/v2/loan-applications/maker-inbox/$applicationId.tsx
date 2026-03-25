@@ -2,6 +2,14 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMemo } from "react";
 import { useLoanApplicationStore } from "@/lib/loan-application-store";
 import { useLoanSetupV2Store } from "@/lib/loan-setup-v2-store";
+import {
+	createWorkflowRuntime,
+	formatWorkflowActionLabel,
+	getCurrentWorkflowStageId,
+	getWorkflowTransitionsForApplication,
+	type WorkflowTransition,
+} from "@/lib/workflow-runtime";
+import { useWorkflowStore } from "@/lib/workflow-store";
 
 export const Route = createFileRoute(
 	"/solution/v2/loan-applications/maker-inbox/$applicationId",
@@ -14,10 +22,59 @@ function V2MakerInboxDetailPage() {
 	const { applicationId } = Route.useParams();
 	const application = useLoanApplicationStore((state) => state.applications[applicationId]);
 	const updateStatus = useLoanApplicationStore((state) => state.updateStatus);
+	const advanceWorkflowStage = useLoanApplicationStore((state) => state.advanceWorkflowStage);
 	const v2Setups = useLoanSetupV2Store((state) => state.setups);
+	const workflows = useWorkflowStore((state) => state.workflows);
 
 	const isV2Application = Boolean(application && v2Setups[application.setupId]);
 	const canTakeDecision = application?.status === "SUBMITTED";
+	const savedWorkflow =
+		application?.workflowId && workflows[application.workflowId]
+			? workflows[application.workflowId]
+			: null;
+	const runtime = useMemo(() => createWorkflowRuntime(savedWorkflow), [savedWorkflow]);
+	const currentStageId = application
+		? getCurrentWorkflowStageId(application, runtime)
+		: null;
+	const currentStageLabel =
+		currentStageId && runtime
+			? (runtime.stageLabelById[currentStageId] ?? currentStageId)
+			: "—";
+	const runtimeActions = application
+		? getWorkflowTransitionsForApplication(application, runtime)
+		: [];
+	const actions = useMemo<WorkflowTransition[]>(() => {
+		if (runtimeActions.length > 0) {
+			return runtimeActions;
+		}
+
+		return [
+			{
+				id: "legacy-approve",
+				label: "approve",
+				nextStageId: null,
+				nextStageLabel: null,
+				isTerminal: true,
+				nextStatus: "APPROVED",
+			},
+			{
+				id: "legacy-reject",
+				label: "reject",
+				nextStageId: null,
+				nextStageLabel: null,
+				isTerminal: true,
+				nextStatus: "REJECTED",
+			},
+			{
+				id: "legacy-submit-checker",
+				label: "submit-to-checker",
+				nextStageId: null,
+				nextStageLabel: null,
+				isTerminal: false,
+				nextStatus: "CHECKER_PENDING",
+			},
+		];
+	}, [runtimeActions]);
 
 	const decisionSummary = useMemo(() => {
 		switch (application?.status) {
@@ -40,25 +97,31 @@ function V2MakerInboxDetailPage() {
 		return `${application.creditScore} / ${application.creditMax}`;
 	}, [application?.creditMax, application?.creditScore]);
 
-	const handleApprove = () => {
+	const handleAction = (action: WorkflowTransition) => {
 		if (!application || !canTakeDecision) return;
-		updateStatus(application.id, "APPROVED");
-		navigate({ to: "/solution/v2/loan-applications/maker-inbox" });
-	};
 
-	const handleReject = () => {
-		if (!application || !canTakeDecision) return;
-		updateStatus(application.id, "REJECTED");
-		navigate({ to: "/solution/v2/loan-applications/maker-inbox" });
-	};
+		if (action.nextStageId) {
+			advanceWorkflowStage(application.id, {
+				stageId: action.nextStageId,
+				stageIndex: application.workflowStageIndex + 1,
+				stageLabel: action.nextStageLabel ?? action.nextStageId,
+				occurredAt: Date.now(),
+			});
+		}
 
-	const handleSubmitToChecker = () => {
-		if (!application || !canTakeDecision) return;
-		updateStatus(application.id, "CHECKER_PENDING");
-		navigate({
-			to: "/solution/v2/loan-applications/checker-inbox/$applicationId",
-			params: { applicationId: application.id },
-		});
+		if (action.nextStatus !== application.status) {
+			updateStatus(application.id, action.nextStatus);
+		}
+
+		if (action.nextStatus === "CHECKER_PENDING") {
+			navigate({
+				to: "/solution/v2/loan-applications/checker-inbox/$applicationId",
+				params: { applicationId: application.id },
+			});
+			return;
+		}
+
+		navigate({ to: "/solution/v2/loan-applications/maker-inbox" });
 	};
 
 	if (!application || !isV2Application) {
@@ -108,6 +171,7 @@ function V2MakerInboxDetailPage() {
 					<Field label="Requested amount" value={application.requestedAmount.toLocaleString()} />
 					<Field label="Credit score" value={creditScoreLabel} />
 					<Field label="Workflow" value={application.workflowName || "—"} />
+					<Field label="Current stage" value={currentStageLabel} />
 					<Field label="Current status" value={application.status} />
 				</div>
 			</section>
@@ -116,27 +180,26 @@ function V2MakerInboxDetailPage() {
 				<div className="font-semibold">Maker actions</div>
 				{canTakeDecision ? (
 					<div className="flex gap-2 flex-wrap">
-						<button
-							type="button"
-							onClick={handleApprove}
-							className="px-4 py-2 rounded bg-emerald-600 text-white hover:bg-emerald-700"
-						>
-							Approve
-						</button>
-						<button
-							type="button"
-							onClick={handleReject}
-							className="px-4 py-2 rounded bg-red-600 text-white hover:bg-red-700"
-						>
-							Reject
-						</button>
-						<button
-							type="button"
-							onClick={handleSubmitToChecker}
-							className="px-4 py-2 rounded border hover:bg-gray-50"
-						>
-							Submit to checker
-						</button>
+						{actions.map((action) => {
+							const isReject = action.nextStatus === "REJECTED";
+							const isApprove = action.nextStatus === "APPROVED";
+							const buttonClass = isReject
+								? "px-4 py-2 rounded bg-red-600 text-white hover:bg-red-700"
+								: isApprove
+									? "px-4 py-2 rounded bg-emerald-600 text-white hover:bg-emerald-700"
+									: "px-4 py-2 rounded border hover:bg-gray-50";
+
+							return (
+								<button
+									key={action.id}
+									type="button"
+									onClick={() => handleAction(action)}
+									className={buttonClass}
+								>
+									{formatWorkflowActionLabel(action.label)}
+								</button>
+							);
+						})}
 					</div>
 				) : (
 					<div className="text-sm text-gray-600">

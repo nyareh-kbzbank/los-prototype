@@ -19,6 +19,7 @@ import {
 	type RiskGrade,
 } from "@/lib/scorecard-engine";
 import { buildV2RepaymentSchedulePreview } from "@/lib/v2-repayment-preview";
+import { createWorkflowRuntime } from "@/lib/workflow-runtime";
 import { getWorkflowList, useWorkflowStore } from "@/lib/workflow-store";
 
 export const Route = createFileRoute("/solution/v2/loan-applications/create")({
@@ -57,7 +58,9 @@ const isBuiltInScoreField = (normalizedField: string) => {
 	);
 };
 
-const getSelectableScoreFieldOptions = (rules: Parameters<typeof inferFieldKind>[0]) => {
+const getSelectableScoreFieldOptions = (
+	rules: Parameters<typeof inferFieldKind>[0],
+) => {
 	const kind = inferFieldKind(rules);
 	if (kind === "boolean") {
 		return ["true", "false"];
@@ -191,9 +194,7 @@ const scoreInputResolvers: Array<{
 	{
 		keys: ["dti", "debttoincome", "debttoincomeratio", "debtincome"],
 		resolve: (input) =>
-			input.debtToIncomeRatio === null
-				? ""
-				: String(input.debtToIncomeRatio),
+			input.debtToIncomeRatio === null ? "" : String(input.debtToIncomeRatio),
 	},
 	{
 		keys: ["bankaccount", "accountno", "accountnumber"],
@@ -263,7 +264,7 @@ const buildScoreInputsFromApplication = (
 	return fields.reduce<Record<string, string>>((acc, field) => {
 		const normalizedKey = normalizeScoreFieldKey(field.field);
 		const builtInValue = resolveBuiltInScoreInput(normalizedKey, input);
-		acc[field.field] = builtInValue ?? (customFieldValues[field.field] ?? "");
+		acc[field.field] = builtInValue ?? customFieldValues[field.field] ?? "";
 		return acc;
 	}, {});
 };
@@ -277,8 +278,13 @@ const gradeFromThresholds = (
 	return "HIGH";
 };
 
-const scoreCardHasField = (fields: Array<{ field: string }>, aliases: string[]) =>
-	fields.some((field) => includesAny(normalizeScoreFieldKey(field.field), aliases));
+const scoreCardHasField = (
+	fields: Array<{ field: string }>,
+	aliases: string[],
+) =>
+	fields.some((field) =>
+		includesAny(normalizeScoreFieldKey(field.field), aliases),
+	);
 
 const buildV2DocumentUploadFields = (
 	activeSetup: V2LoanSetupSnapshot,
@@ -417,6 +423,9 @@ function V2LoanApplicationCreate() {
 	const addApplication = useLoanApplicationStore(
 		(state) => state.addApplication,
 	);
+	const advanceWorkflowStage = useLoanApplicationStore(
+		(state) => state.advanceWorkflowStage,
+	);
 	const setups = useLoanSetupV2Store((state) => state.setups);
 	const setupList = useMemo(() => getLoanSetupV2List(setups), [setups]);
 	const workflows = useWorkflowStore((state) => state.workflows);
@@ -514,7 +523,8 @@ function V2LoanApplicationCreate() {
 	const workflowName = selectedWorkflowId
 		? (workflowNameById[selectedWorkflowId] ?? selectedWorkflowId)
 		: null;
-	const activeScoreFields = activeSetup?.creditScoreSetup.scoreCard.fields ?? [];
+	const activeScoreFields =
+		activeSetup?.creditScoreSetup.scoreCard.fields ?? [];
 	const requiresGenderInput = scoreCardHasField(activeScoreFields, [
 		"gender",
 		"sex",
@@ -571,7 +581,8 @@ function V2LoanApplicationCreate() {
 		});
 		setDynamicScoreFieldValues(() => {
 			const next: Record<string, string> = {};
-			for (const field of activeSetup?.creditScoreSetup.scoreCard.fields ?? []) {
+			for (const field of activeSetup?.creditScoreSetup.scoreCard.fields ??
+				[]) {
 				if (!isBuiltInScoreField(normalizeScoreFieldKey(field.field))) {
 					next[field.field] = "";
 				}
@@ -678,31 +689,35 @@ function V2LoanApplicationCreate() {
 		const parsedAge = Number(ageInput);
 		const parsedMonthlyIncome = Number(monthlyIncomeInput);
 		const parsedRequestedAmount = Number(amountInput);
-		return buildScoreInputsFromApplication(fields, {
-			beneficiaryName,
-			nationalId,
-			gender,
-			maritalStatus,
-			education,
-			phone: destinationType === "WALLET" ? phone : "",
-			bankAccountNo: destinationType === "BANK" ? bankAccountNo : "",
-			age: Number.isFinite(parsedAge) ? parsedAge : null,
-			monthlyIncome: Number.isFinite(parsedMonthlyIncome)
-				? parsedMonthlyIncome
-				: null,
-			debtToIncomeRatio: computedDebtToIncomeRatio,
-			requestedAmount: Number.isFinite(parsedRequestedAmount)
-				? parsedRequestedAmount
-				: null,
-			tenureValue,
-			channelCode,
-			destinationType,
-			bureauProvider,
-			bureauPurpose,
-			bureauConsent,
-			isBureauCheck: activeSetup.bureauRequired,
-			notes,
-		}, dynamicScoreFieldValues);
+		return buildScoreInputsFromApplication(
+			fields,
+			{
+				beneficiaryName,
+				nationalId,
+				gender,
+				maritalStatus,
+				education,
+				phone: destinationType === "WALLET" ? phone : "",
+				bankAccountNo: destinationType === "BANK" ? bankAccountNo : "",
+				age: Number.isFinite(parsedAge) ? parsedAge : null,
+				monthlyIncome: Number.isFinite(parsedMonthlyIncome)
+					? parsedMonthlyIncome
+					: null,
+				debtToIncomeRatio: computedDebtToIncomeRatio,
+				requestedAmount: Number.isFinite(parsedRequestedAmount)
+					? parsedRequestedAmount
+					: null,
+				tenureValue,
+				channelCode,
+				destinationType,
+				bureauProvider,
+				bureauPurpose,
+				bureauConsent,
+				isBureauCheck: activeSetup.bureauRequired,
+				notes,
+			},
+			dynamicScoreFieldValues,
+		);
 	}, [
 		activeSetup,
 		ageInput,
@@ -869,7 +884,7 @@ function V2LoanApplicationCreate() {
 			? (workflowNameById[workflowId] ?? workflowId)
 			: null;
 
-		addApplication({
+		const createdApplication = addApplication({
 			status,
 			beneficiaryName,
 			nationalId,
@@ -899,6 +914,20 @@ function V2LoanApplicationCreate() {
 			bureauPurpose,
 			bureauConsent,
 		});
+
+		if (createdApplication.status === "SUBMITTED" && workflowId) {
+			const runtime = createWorkflowRuntime(workflows[workflowId]);
+			if (runtime?.initialStageId) {
+				advanceWorkflowStage(createdApplication.id, {
+					stageId: runtime.initialStageId,
+					stageIndex: 0,
+					stageLabel:
+						runtime.stageLabelById[runtime.initialStageId] ??
+						runtime.initialStageId,
+					occurredAt: Date.now(),
+				});
+			}
+		}
 
 		navigate({ to: ".." });
 	};
@@ -1053,61 +1082,58 @@ function V2LoanApplicationCreate() {
 												setMonthlyIncomeInput(event.target.value)
 											}
 										/>
-									<span className="text-xs text-gray-600">
-										Used for scorecard income rules and background DTI calculation.
-									</span>
+										<span className="text-xs text-gray-600">
+											Used for scorecard income rules and background DTI
+											calculation.
+										</span>
 									</label>
-								<label className="flex flex-col gap-1 text-sm">
-									<span>
-										Gender{requiresGenderInput ? " *" : ""}
-									</span>
-									<select
-										className="border px-2 py-2 rounded"
-										value={gender}
-										onChange={(event) => setGender(event.target.value)}
-									>
-										<option value="">Select gender</option>
-										{genderOptions.map((option) => (
-											<option key={option} value={option}>
-												{option}
-											</option>
-										))}
-									</select>
-								</label>
-								<label className="flex flex-col gap-1 text-sm">
-									<span>
-										Marital status{requiresMaritalStatusInput ? " *" : ""}
-									</span>
-									<select
-										className="border px-2 py-2 rounded"
-										value={maritalStatus}
-										onChange={(event) => setMaritalStatus(event.target.value)}
-									>
-										<option value="">Select marital status</option>
-										{maritalStatusOptions.map((option) => (
-											<option key={option} value={option}>
-												{option}
-											</option>
-										))}
-									</select>
-								</label>
-								<label className="flex flex-col gap-1 text-sm">
-									<span>
-										Education{requiresEducationInput ? " *" : ""}
-									</span>
-									<select
-										className="border px-2 py-2 rounded"
-										value={education}
-										onChange={(event) => setEducation(event.target.value)}
-									>
-										<option value="">Select education</option>
-										{educationOptions.map((option) => (
-											<option key={option} value={option}>
-												{option}
-											</option>
-										))}
-									</select>
-								</label>
+									<label className="flex flex-col gap-1 text-sm">
+										<span>Gender{requiresGenderInput ? " *" : ""}</span>
+										<select
+											className="border px-2 py-2 rounded"
+											value={gender}
+											onChange={(event) => setGender(event.target.value)}
+										>
+											<option value="">Select gender</option>
+											{genderOptions.map((option) => (
+												<option key={option} value={option}>
+													{option}
+												</option>
+											))}
+										</select>
+									</label>
+									<label className="flex flex-col gap-1 text-sm">
+										<span>
+											Marital status{requiresMaritalStatusInput ? " *" : ""}
+										</span>
+										<select
+											className="border px-2 py-2 rounded"
+											value={maritalStatus}
+											onChange={(event) => setMaritalStatus(event.target.value)}
+										>
+											<option value="">Select marital status</option>
+											{maritalStatusOptions.map((option) => (
+												<option key={option} value={option}>
+													{option}
+												</option>
+											))}
+										</select>
+									</label>
+									<label className="flex flex-col gap-1 text-sm">
+										<span>Education{requiresEducationInput ? " *" : ""}</span>
+										<select
+											className="border px-2 py-2 rounded"
+											value={education}
+											onChange={(event) => setEducation(event.target.value)}
+										>
+											<option value="">Select education</option>
+											{educationOptions.map((option) => (
+												<option key={option} value={option}>
+													{option}
+												</option>
+											))}
+										</select>
+									</label>
 									<label className="flex flex-col gap-1 text-sm">
 										<span>Requested amount</span>
 										<input
@@ -1227,7 +1253,8 @@ function V2LoanApplicationCreate() {
 											className="border px-2 py-2 rounded bg-gray-50"
 										/>
 										<span className="text-xs text-gray-600">
-											Calculated in the background from the selected product's repayment preview and income.
+											Calculated in the background from the selected product's
+											repayment preview and income.
 										</span>
 									</label>
 								</div>
@@ -1239,16 +1266,18 @@ function V2LoanApplicationCreate() {
 												Credit score inputs
 											</div>
 											<div className="text-xs text-gray-600">
-												These fields come directly from the selected loan setup scorecard and are required before risk grade and document uploads can be determined.
+												These fields come directly from the selected loan setup
+												scorecard and are required before risk grade and
+												document uploads can be determined.
 											</div>
 										</div>
 										<div className="grid grid-cols-1 gap-4 md:grid-cols-2">
 											{dynamicScoreFields.map((field) => {
 												const inputKind = inferFieldKind(field.rules ?? []);
-												const selectableOptions = getSelectableScoreFieldOptions(
-													field.rules ?? [],
-												);
-												const value = dynamicScoreFieldValues[field.field] ?? "";
+												const selectableOptions =
+													getSelectableScoreFieldOptions(field.rules ?? []);
+												const value =
+													dynamicScoreFieldValues[field.field] ?? "";
 
 												const inputId = `score-field-${normalizeScoreFieldKey(field.field)}`;
 
@@ -1282,8 +1311,12 @@ function V2LoanApplicationCreate() {
 														) : (
 															<input
 																id={inputId}
-																type={inputKind === "number" ? "number" : "text"}
-																step={inputKind === "number" ? "any" : undefined}
+																type={
+																	inputKind === "number" ? "number" : "text"
+																}
+																step={
+																	inputKind === "number" ? "any" : undefined
+																}
 																className="border px-2 py-2 rounded"
 																value={value}
 																onChange={(event) =>
@@ -1363,7 +1396,8 @@ function V2LoanApplicationCreate() {
 											Upcoming installments preview
 										</div>
 										<div className="text-xs text-gray-500">
-											{schedulePreview.schedule.length} installment(s) based on the selected tenure.
+											{schedulePreview.schedule.length} installment(s) based on
+											the selected tenure.
 										</div>
 									</div>
 									{schedulePreview.error ? (
@@ -1491,7 +1525,9 @@ function V2LoanApplicationCreate() {
 									</div>
 									{scoreEvaluationPending ? (
 										<div>
-											Complete all scorecard-driven application inputs in step 1 to calculate the credit score, risk grade, and required documents.
+											Complete all scorecard-driven application inputs in step 1
+											to calculate the credit score, risk grade, and required
+											documents.
 										</div>
 									) : null}
 									<div>

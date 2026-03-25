@@ -9,10 +9,14 @@ import type {
 } from "@/components/loan/v2/DecisionRuleSetupTab";
 import type { DisbursementSetupTabState } from "@/components/loan/v2/DisbursementSetupTab";
 import type { RepaymentSetupTabState } from "@/components/loan/v2/RepaymentSetupTab";
-import type {
-	ChannelConfig,
-	ProductSetupForm,
-	V2InterestConfig,
+import {
+	type ChannelConfig,
+	createDefaultBrandingSetup,
+	createDefaultFormulaSetup,
+	type FormulaSetup,
+	type ProductSetupForm,
+	type V2BrandingSetup,
+	type V2InterestConfig,
 } from "@/components/loan/v2/setup-types";
 
 export type V2LoanSetupSnapshot = {
@@ -21,6 +25,7 @@ export type V2LoanSetupSnapshot = {
 	productSetup: ProductSetupForm;
 	channels: ChannelConfig[];
 	interestRatePlans: V2InterestConfig[];
+	interestFormulaSetup: FormulaSetup;
 	repaymentSetup: RepaymentSetupTabState;
 	creditScoreSetup: CreditScoreEngineState;
 	documentSetup: DocumentRequirementItem[];
@@ -31,12 +36,14 @@ export type V2LoanSetupSnapshot = {
 	decisionRules: DecisionRuleByGrade;
 	decisionRuleSetup?: DecisionRuleSetupState;
 	disbursementSetup: DisbursementSetupTabState;
+	brandingSetup: V2BrandingSetup;
 };
 
 type V2LoanSetupInput = {
 	productSetup: ProductSetupForm;
 	channels: ChannelConfig[];
 	interestRatePlans: V2InterestConfig[];
+	interestFormulaSetup: FormulaSetup;
 	repaymentSetup: RepaymentSetupTabState;
 	creditScoreSetup: CreditScoreEngineState;
 	documentSetup: DocumentRequirementItem[];
@@ -47,6 +54,18 @@ type V2LoanSetupInput = {
 	decisionRules: DecisionRuleByGrade;
 	decisionRuleSetup: DecisionRuleSetupState;
 	disbursementSetup: DisbursementSetupTabState;
+	brandingSetup: V2BrandingSetup;
+};
+
+type PersistedV2LoanSetupSnapshot = Omit<
+	V2LoanSetupSnapshot,
+	"brandingSetup"
+> & {
+	brandingSetup?: V2BrandingSetup;
+};
+
+type PersistedV2LoanSetupState = {
+	setups?: Record<string, PersistedV2LoanSetupSnapshot>;
 };
 
 type V2LoanSetupState = {
@@ -57,6 +76,11 @@ type V2LoanSetupState = {
 	resetStore: () => void;
 };
 
+const createId = () =>
+	typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+		? crypto.randomUUID()
+		: Math.random().toString(36).slice(2);
+
 const cloneProductSetup = (
 	productSetup: ProductSetupForm,
 ): ProductSetupForm => ({
@@ -64,8 +88,24 @@ const cloneProductSetup = (
 	productName: productSetup.productName.trim(),
 	productCode: productSetup.productCode.trim(),
 	description: productSetup.description.trim(),
+	collateralType: productSetup.collateralType ?? "LAND",
+	minimumCollateralValue: Math.max(
+		0,
+		productSetup.minimumCollateralValue ?? 0,
+	),
+	maximumLtvPercentage: Math.max(0, productSetup.maximumLtvPercentage ?? 0),
+	haircutPercentage: Math.max(0, productSetup.haircutPercentage ?? 0),
+	valuationRequired: Boolean(productSetup.valuationRequired),
+	valuationValidityDays:
+		productSetup.valuationValidityDays == null
+			? null
+			: Math.max(0, productSetup.valuationValidityDays),
 	minAmount: Math.max(0, productSetup.minAmount),
 	maxAmount: Math.max(0, productSetup.maxAmount),
+	maxAmountRateType:
+		productSetup.maxAmountRateType === "PERCENTAGE"
+			? "PERCENTAGE"
+			: "FLAT",
 	tenorValues: productSetup.tenorValues.map((item) => ({
 		id: item.id,
 		value: Math.max(0, item.value),
@@ -86,11 +126,13 @@ const cloneInterestRatePlans = (
 	interestRatePlans: V2InterestConfig[],
 ): V2InterestConfig[] =>
 	interestRatePlans.map((plan) => ({
+		id: plan.id || createId(),
 		interestType: plan.interestType,
 		rateType: plan.rateType,
 		baseRate: Number.isFinite(plan.baseRate) ? plan.baseRate : 0,
 		config: {
 			parameters: (plan.config?.parameters ?? []).map((parameter) => ({
+				id: parameter.id || createId(),
 				name: parameter.name,
 				value: Number.isFinite(parameter.value) ? parameter.value : 0,
 				interestRate: Number.isFinite(parameter.interestRate)
@@ -99,12 +141,29 @@ const cloneInterestRatePlans = (
 			})),
 		},
 		policies: (plan.policies ?? []).map((policy) => ({
+			id: policy.id || createId(),
 			interestCategory: policy.interestCategory,
 			interestRate: Number.isFinite(policy.interestRate)
 				? policy.interestRate
 				: 0,
 		})),
 	}));
+
+const cloneFormulaSetup = (formulaSetup?: FormulaSetup): FormulaSetup => ({
+	principalFormula: (
+		formulaSetup?.principalFormula ?? createDefaultFormulaSetup().principalFormula
+	).trim(),
+	interestFormula: (
+		formulaSetup?.interestFormula ?? createDefaultFormulaSetup().interestFormula
+	).trim(),
+	fieldDefinitions: (formulaSetup?.fieldDefinitions ?? []).map((field) => ({
+		id: field.id,
+		key: field.key.trim(),
+		label: field.label.trim(),
+		description: field.description.trim(),
+		defaultValue: Number.isFinite(field.defaultValue) ? field.defaultValue : 0,
+	})),
+});
 
 const cloneDecisionRules = (
 	decisionRules: DecisionRuleByGrade,
@@ -139,21 +198,7 @@ const cloneRepaymentSetup = (
 		methodName: repaymentSetup.form.methodName.trim(),
 		description: repaymentSetup.form.description.trim(),
 	},
-	formulaSetup: {
-		principalFormula: repaymentSetup.formulaSetup.principalFormula.trim(),
-		interestFormula: repaymentSetup.formulaSetup.interestFormula.trim(),
-		fieldDefinitions: repaymentSetup.formulaSetup.fieldDefinitions.map(
-			(field) => ({
-				id: field.id,
-				key: field.key.trim(),
-				label: field.label.trim(),
-				description: field.description.trim(),
-				defaultValue: Number.isFinite(field.defaultValue)
-					? field.defaultValue
-					: 0,
-			}),
-		),
-	},
+	formulaSetup: cloneFormulaSetup(repaymentSetup.formulaSetup),
 });
 
 const cloneCreditScoreSetup = (
@@ -227,6 +272,18 @@ const cloneDisbursementSetup = (
 	})),
 });
 
+const cloneBrandingSetup = (
+	brandingSetup: V2BrandingSetup,
+): V2BrandingSetup => ({
+	bannerImageUrl: brandingSetup.bannerImageUrl.trim(),
+	cardImageUrl: brandingSetup.cardImageUrl.trim(),
+	shortDescription: brandingSetup.shortDescription.trim(),
+	longDescription: brandingSetup.longDescription.trim(),
+	tags: Array.from(
+		new Set(brandingSetup.tags.map((tag) => tag.trim()).filter(Boolean)),
+	),
+});
+
 const createSnapshot = (
 	input: V2LoanSetupInput,
 	id = uuidV4(),
@@ -236,6 +293,7 @@ const createSnapshot = (
 	productSetup: cloneProductSetup(input.productSetup),
 	channels: cloneChannels(input.channels),
 	interestRatePlans: cloneInterestRatePlans(input.interestRatePlans),
+	interestFormulaSetup: cloneFormulaSetup(input.interestFormulaSetup),
 	repaymentSetup: cloneRepaymentSetup(input.repaymentSetup),
 	creditScoreSetup: cloneCreditScoreSetup(input.creditScoreSetup),
 	documentSetup: cloneDocumentSetup(input.documentSetup),
@@ -246,6 +304,7 @@ const createSnapshot = (
 	decisionRules: cloneDecisionRules(input.decisionRules),
 	decisionRuleSetup: cloneDecisionRuleSetup(input.decisionRuleSetup),
 	disbursementSetup: cloneDisbursementSetup(input.disbursementSetup),
+	brandingSetup: cloneBrandingSetup(input.brandingSetup),
 });
 
 export const useLoanSetupV2Store = create<V2LoanSetupState>()(
@@ -281,7 +340,51 @@ export const useLoanSetupV2Store = create<V2LoanSetupState>()(
 		}),
 		{
 			name: "loan-workflow-setups-v2",
-			version: 1,
+			version: 3,
+			migrate: (persistedState, version) => {
+				const state = persistedState as PersistedV2LoanSetupState | undefined;
+				if (!state?.setups) {
+					return { setups: {} };
+				}
+
+				if (version < 2) {
+					return {
+						setups: Object.fromEntries(
+							Object.entries(state.setups).map(([setupId, setup]) => [
+								setupId,
+								{
+									...setup,
+									brandingSetup: cloneBrandingSetup(
+										setup.brandingSetup ?? createDefaultBrandingSetup(),
+									),
+									interestFormulaSetup: cloneFormulaSetup(
+										setup.repaymentSetup?.formulaSetup,
+									),
+								},
+							]),
+						),
+					};
+				}
+
+				if (version < 3) {
+					return {
+						setups: Object.fromEntries(
+							Object.entries(state.setups).map(([setupId, setup]) => [
+								setupId,
+								{
+									...setup,
+									interestFormulaSetup: cloneFormulaSetup(
+										(setup as V2LoanSetupSnapshot).interestFormulaSetup ??
+										setup.repaymentSetup?.formulaSetup,
+									),
+								},
+							]),
+						),
+					};
+				}
+
+				return state as { setups: Record<string, V2LoanSetupSnapshot> };
+			},
 			partialize: (state) => ({ setups: state.setups }),
 		},
 	),

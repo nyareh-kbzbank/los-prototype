@@ -426,6 +426,16 @@ function buildDecisionEvent(
     };
   }
 
+  if (fromStatus === "CHECKER_PENDING" && toStatus === "SUBMITTED") {
+    return {
+      actor: "CHECKER",
+      fromStatus,
+      toStatus,
+      note: "Returned to maker",
+      occurredAt,
+    };
+  }
+
   if (toStatus === "SUBMITTED") {
     return {
       actor: "SYSTEM",

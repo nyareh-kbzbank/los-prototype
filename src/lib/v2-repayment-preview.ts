@@ -1,7 +1,7 @@
 import type {
-	FormulaSetup,
 	RepaymentSetupForm,
 } from "@/components/loan/v2/RepaymentSetupTab";
+import type { FormulaSetup } from "@/components/loan/v2/setup-types";
 
 export type V2RepaymentScheduleRow = {
 	period: number;
