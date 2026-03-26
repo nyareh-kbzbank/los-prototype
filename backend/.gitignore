@@ -1,0 +1,25 @@
+## Build artifacts
+**/bin/
+**/obj/
+
+## SQLite database
+*.db
+*.db-shm
+*.db-wal
+
+## User-specific files
+*.user
+.vs/
+
+## Rider
+.idea/
+
+## Visual Studio Code
+.vscode/
+
+## NuGet
+*.nupkg
+*.snupkg
+
+## dotnet tool manifest
+.config/dotnet-tools.json
