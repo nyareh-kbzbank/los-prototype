@@ -203,17 +203,17 @@ function LoanProductSetup() {
 	const steps = [
 		{
 			id: "product-setup",
-			title: "Product Core",
+			title: "Product DNA",
 			description: "Product, loan, channel, and workflow mapping",
 		},
 		{
 			id: "interest-setup",
-			title: "Interest Setup",
+			title: "Yield Engine",
 			description: "Interest rate plans, policies, and custom formula",
 		},
 		{
 			id: "repayment-setup",
-			title: "Repayment Setup",
+			title: "Repayment Advisory",
 			description: "Repayment rules and schedule timing",
 		},
 		{

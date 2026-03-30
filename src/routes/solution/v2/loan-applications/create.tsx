@@ -134,6 +134,9 @@ type ScoreInputContext = {
 	education: string;
 	phone: string;
 	bankAccountNo: string;
+	collateralType: string;
+	collateralEstimatedValue: number | null;
+	valuationReportReference: string;
 	age: number | null;
 	monthlyIncome: number | null;
 	debtToIncomeRatio: number | null;
@@ -199,6 +202,21 @@ const scoreInputResolvers: Array<{
 	{
 		keys: ["bankaccount", "accountno", "accountnumber"],
 		resolve: (input) => input.bankAccountNo.trim(),
+	},
+	{
+		keys: ["collateraltype", "securitytype"],
+		resolve: (input) => input.collateralType.trim().toLowerCase(),
+	},
+	{
+		keys: ["collateralvalue", "collateralamount", "securityvalue"],
+		resolve: (input) =>
+			input.collateralEstimatedValue === null
+				? ""
+				: String(input.collateralEstimatedValue),
+	},
+	{
+		keys: ["valuationreference", "valuationreport", "valuationreportreference"],
+		resolve: (input) => input.valuationReportReference.trim(),
 	},
 	{
 		keys: ["channelcode", "channel"],
@@ -346,6 +364,8 @@ const validateV2StepOne = (input: {
 	destinationType: DisbursementDestinationType;
 	bankAccountNo: string;
 	phone: string;
+	collateralEstimatedValueInput: string;
+	valuationReportReference: string;
 }) => {
 	if (!input.activeSetup)
 		return { error: "No active V2 setup selected.", parsed: null };
@@ -378,6 +398,42 @@ const validateV2StepOne = (input: {
 			error: `Amount must be at most ${input.activeSetup.productSetup.maxAmount.toLocaleString()}.`,
 			parsed: null,
 		};
+	}
+
+	const isSecuredProduct =
+		input.activeSetup.productSetup.loanSecurity === "SECURED";
+	let parsedCollateralEstimatedValue: number | null = null;
+	if (isSecuredProduct) {
+		parsedCollateralEstimatedValue = Number(
+			input.collateralEstimatedValueInput,
+		);
+		if (
+			!Number.isFinite(parsedCollateralEstimatedValue) ||
+			parsedCollateralEstimatedValue <= 0
+		) {
+			return {
+				error: "Enter a valid collateral estimated value.",
+				parsed: null,
+			};
+		}
+		if (
+			parsedCollateralEstimatedValue <
+			input.activeSetup.productSetup.minimumCollateralValue
+		) {
+			return {
+				error: `Collateral value must be at least ${input.activeSetup.productSetup.minimumCollateralValue.toLocaleString()}.`,
+				parsed: null,
+			};
+		}
+		if (
+			input.activeSetup.productSetup.valuationRequired &&
+			!input.valuationReportReference.trim()
+		) {
+			return {
+				error: "Valuation report reference is required.",
+				parsed: null,
+			};
+		}
 	}
 
 	if (
@@ -414,6 +470,7 @@ const validateV2StepOne = (input: {
 			parsedAge,
 			parsedMonthlyIncome,
 			parsedAmount,
+			parsedCollateralEstimatedValue,
 		},
 	};
 };
@@ -463,6 +520,10 @@ function V2LoanApplicationCreate() {
 	const [education, setEducation] = useState("");
 	const [phone, setPhone] = useState("");
 	const [bankAccountNo, setBankAccountNo] = useState("");
+	const [collateralEstimatedValueInput, setCollateralEstimatedValueInput] =
+		useState("");
+	const [collateralDescription, setCollateralDescription] = useState("");
+	const [valuationReportReference, setValuationReportReference] = useState("");
 	const [ageInput, setAgeInput] = useState("");
 	const [monthlyIncomeInput, setMonthlyIncomeInput] = useState("");
 	const [amountInput, setAmountInput] = useState("");
@@ -484,8 +545,10 @@ function V2LoanApplicationCreate() {
 	const [notes, setNotes] = useState("");
 	const [formError, setFormError] = useState<string | null>(null);
 	const [currentStep, setCurrentStep] = useState<1 | 2>(1);
-	const [repaymentStartDateIso, setRepaymentStartDateIso] = useState(() =>
-		formatDateForInput(new Date()),
+	const [isSchedulePreviewOpen, setIsSchedulePreviewOpen] = useState(false);
+	const scheduleStartDateIso = useMemo(
+		() => formatDateForInput(new Date()),
+		[],
 	);
 	const [customFormulaFieldValues, setCustomFormulaFieldValues] = useState<
 		Record<string, number>
@@ -511,18 +574,7 @@ function V2LoanApplicationCreate() {
 	const disabled = setupList.length === 0;
 	const tenorOptions =
 		activeSetup?.productSetup.tenorValues.map((item) => item.value) ?? [];
-	const channelOptions = activeSetup?.channels ?? [];
-	const selectedChannel = useMemo(
-		() =>
-			channelOptions.find((channel) => channel.code === channelCode) ??
-			channelOptions[0] ??
-			null,
-		[channelCode, channelOptions],
-	);
-	const selectedWorkflowId = selectedChannel?.workflowId ?? null;
-	const workflowName = selectedWorkflowId
-		? (workflowNameById[selectedWorkflowId] ?? selectedWorkflowId)
-		: null;
+	const isSecuredProduct = activeSetup?.productSetup.loanSecurity === "SECURED";
 	const activeScoreFields =
 		activeSetup?.creditScoreSetup.scoreCard.fields ?? [];
 	const requiresGenderInput = scoreCardHasField(activeScoreFields, [
@@ -560,17 +612,20 @@ function V2LoanApplicationCreate() {
 		setGender("");
 		setMaritalStatus("");
 		setEducation("");
+		setCollateralEstimatedValueInput("");
+		setCollateralDescription("");
+		setValuationReportReference("");
 		setDocumentFiles({});
 		setOtherDocumentFiles([createOtherDocumentUpload()]);
 		setBureauProvider(activeSetup?.bureauProvider ?? "");
 		setBureauPurpose(activeSetup?.bureauPurpose ?? "");
 		setBureauConsent(false);
+		setIsSchedulePreviewOpen(false);
 		if (activeSetup?.disbursementSetup.method === "WALLET") {
 			setDestinationType("WALLET");
 		} else {
 			setDestinationType("BANK");
 		}
-		setRepaymentStartDateIso(formatDateForInput(new Date()));
 		setCustomFormulaFieldValues(() => {
 			const next: Record<string, number> = {};
 			for (const field of activeSetup?.repaymentSetup.formulaSetup
@@ -602,6 +657,29 @@ function V2LoanApplicationCreate() {
 		if (!Number.isFinite(parsedMonthlyIncome) || parsedMonthlyIncome < 0)
 			return false;
 		if (!Number.isFinite(parsedRequestedAmount)) return false;
+		if (isSecuredProduct) {
+			const parsedCollateralEstimatedValue = Number(
+				collateralEstimatedValueInput,
+			);
+			if (
+				!Number.isFinite(parsedCollateralEstimatedValue) ||
+				parsedCollateralEstimatedValue <= 0
+			) {
+				return false;
+			}
+			if (
+				parsedCollateralEstimatedValue <
+				(activeSetup.productSetup.minimumCollateralValue ?? 0)
+			) {
+				return false;
+			}
+			if (
+				activeSetup.productSetup.valuationRequired &&
+				!valuationReportReference.trim()
+			) {
+				return false;
+			}
+		}
 		if (tenureValue === null || tenureValue <= 0) return false;
 		if (requiresGenderInput && !gender.trim()) return false;
 		if (requiresMaritalStatusInput && !maritalStatus.trim()) return false;
@@ -621,8 +699,10 @@ function V2LoanApplicationCreate() {
 		bureauConsent,
 		bureauProvider,
 		bureauPurpose,
+		collateralEstimatedValueInput,
 		education,
 		gender,
+		isSecuredProduct,
 		monthlyIncomeInput,
 		missingDynamicScoreField,
 		maritalStatus,
@@ -631,6 +711,7 @@ function V2LoanApplicationCreate() {
 		requiresGenderInput,
 		requiresMaritalStatusInput,
 		tenureValue,
+		valuationReportReference,
 	]);
 	const scoreEvaluationPending = !riskEvaluationReady;
 
@@ -649,7 +730,7 @@ function V2LoanApplicationCreate() {
 			parsedAmount,
 			annualRate,
 			months,
-			repaymentStartDateIso,
+			scheduleStartDateIso,
 			{
 				frequency: activeSetup.repaymentSetup.form.frequency,
 				dueDayOfMonth: activeSetup.repaymentSetup.form.dueDayOfMonth,
@@ -664,7 +745,7 @@ function V2LoanApplicationCreate() {
 		activeSetup,
 		amountInput,
 		customFormulaFieldValues,
-		repaymentStartDateIso,
+		scheduleStartDateIso,
 		tenureValue,
 	]);
 
@@ -682,6 +763,56 @@ function V2LoanApplicationCreate() {
 		return Number(((firstPayment / parsedMonthlyIncome) * 100).toFixed(2));
 	}, [monthlyIncomeInput, schedulePreview.schedule]);
 
+	const repaymentScheduleMeta = useMemo(() => {
+		if (!activeSetup) {
+			return {
+				dueDayLabel: "—",
+				processingFeeLabel: "0.00",
+				disbursementFeeLabel: "0.00",
+				lateFeeLabel: "0.00",
+				prepaymentPenaltyLabel: "0%",
+			};
+		}
+
+		const repaymentForm = activeSetup.repaymentSetup.form;
+		const dueDayOffsetLabel =
+			repaymentForm.firstDueAfterDueDayDays > 0
+				? ` + ${repaymentForm.firstDueAfterDueDayDays} day(s)`
+				: "";
+		let dueDayLabel: string;
+
+		if (
+			repaymentForm.frequency === "MONTHLY" ||
+			repaymentForm.frequency === "QUARTERLY"
+		) {
+			dueDayLabel = `Day ${repaymentForm.dueDayOfMonth ?? 1}${dueDayOffsetLabel}`;
+		} else if (repaymentForm.frequency === "WEEKLY") {
+			dueDayLabel = `Every 7 days after ${repaymentForm.firstDueAfterDays} day(s)`;
+		} else {
+			dueDayLabel = `Every 14 days after ${repaymentForm.firstDueAfterDays} day(s)`;
+		}
+
+		const lateFeeParts: string[] = [];
+		if (repaymentForm.lateFeeFlat > 0) {
+			lateFeeParts.push(formatAmountWithTwoDecimals(repaymentForm.lateFeeFlat));
+		}
+		if (repaymentForm.lateFeePct > 0) {
+			lateFeeParts.push(`${formatAmountWithTwoDecimals(repaymentForm.lateFeePct)}%`);
+		}
+
+		return {
+			dueDayLabel,
+			processingFeeLabel: formatAmountWithTwoDecimals(
+				activeSetup.disbursementSetup.processingFee,
+			),
+			disbursementFeeLabel: formatAmountWithTwoDecimals(
+				activeSetup.disbursementSetup.disbursementFee,
+			),
+			lateFeeLabel: lateFeeParts.join(" + ") || "0.00",
+			prepaymentPenaltyLabel: `${formatAmountWithTwoDecimals(repaymentForm.prepaymentPenaltyPct)}%`,
+		};
+	}, [activeSetup]);
+
 	const computedScoreInputs = useMemo(() => {
 		if (!activeSetup) return null;
 		const fields = activeSetup.creditScoreSetup.scoreCard.fields;
@@ -689,6 +820,9 @@ function V2LoanApplicationCreate() {
 		const parsedAge = Number(ageInput);
 		const parsedMonthlyIncome = Number(monthlyIncomeInput);
 		const parsedRequestedAmount = Number(amountInput);
+		const parsedCollateralEstimatedValue = Number(
+			collateralEstimatedValueInput,
+		);
 		return buildScoreInputsFromApplication(
 			fields,
 			{
@@ -699,6 +833,16 @@ function V2LoanApplicationCreate() {
 				education,
 				phone: destinationType === "WALLET" ? phone : "",
 				bankAccountNo: destinationType === "BANK" ? bankAccountNo : "",
+				collateralType: isSecuredProduct
+					? (activeSetup.productSetup.collateralType ?? "")
+					: "",
+				collateralEstimatedValue:
+					isSecuredProduct && Number.isFinite(parsedCollateralEstimatedValue)
+						? parsedCollateralEstimatedValue
+						: null,
+				valuationReportReference: isSecuredProduct
+					? valuationReportReference
+					: "",
 				age: Number.isFinite(parsedAge) ? parsedAge : null,
 				monthlyIncome: Number.isFinite(parsedMonthlyIncome)
 					? parsedMonthlyIncome
@@ -728,17 +872,20 @@ function V2LoanApplicationCreate() {
 		bureauProvider,
 		bureauPurpose,
 		channelCode,
+		collateralEstimatedValueInput,
 		computedDebtToIncomeRatio,
 		destinationType,
 		dynamicScoreFieldValues,
 		education,
 		gender,
+		isSecuredProduct,
 		monthlyIncomeInput,
 		maritalStatus,
 		nationalId,
 		notes,
 		phone,
 		tenureValue,
+		valuationReportReference,
 	]);
 
 	const computedRisk = useMemo(() => {
@@ -795,6 +942,8 @@ function V2LoanApplicationCreate() {
 			destinationType,
 			bankAccountNo,
 			phone,
+			collateralEstimatedValueInput,
+			valuationReportReference,
 		});
 		if (validation.error) {
 			setFormError(validation.error);
@@ -900,6 +1049,16 @@ function V2LoanApplicationCreate() {
 			requestedAmount: validated.parsedAmount,
 			tenureValue,
 			tenureUnit: toTenorUnit(activeSetup.productSetup.tenorUnit),
+			collateralType: isSecuredProduct
+				? activeSetup.productSetup.collateralType
+				: "",
+			collateralEstimatedValue: isSecuredProduct
+				? validated.parsedCollateralEstimatedValue
+				: null,
+			collateralDescription: isSecuredProduct ? collateralDescription : "",
+			valuationReportReference: isSecuredProduct
+				? valuationReportReference
+				: "",
 			channelCode,
 			destinationType,
 			notes,
@@ -990,9 +1149,26 @@ function V2LoanApplicationCreate() {
 
 						{currentStep === 1 ? (
 							<>
+								{/* <div className="flex flex-col gap-1 text-sm">
+									<label className="flex flex-col gap-1 text-sm flex-1 w-1/2">
+										<span>Channel code</span>
+										<select
+											className="border px-2 py-2 rounded"
+											value={channelCode}
+											onChange={(event) => setChannelCode(event.target.value)}
+										>
+											{channelOptions.map((channel) => (
+												<option key={channel.id} value={channel.code}>
+													{channel.code || channel.name || "Unnamed channel"}
+												</option>
+											))}
+										</select>
+									</label>
+									<div className="flex-1"></div>
+								</div> */}
 								<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 									<label className="flex flex-col gap-1 text-sm">
-										<span>V2 loan setup</span>
+										<span>Product Code</span>
 										<select
 											className="border px-2 py-2 rounded"
 											value={selectedSetupId}
@@ -1023,11 +1199,12 @@ function V2LoanApplicationCreate() {
 										<input
 											readOnly
 											value={
-												riskEvaluationReady
-													? getApplicationStatusFromRiskGrade(
-															computedRisk?.riskGrade ?? null,
-														)
-													: ""
+												"Draft"
+												// riskEvaluationReady
+												// 	? getApplicationStatusFromRiskGrade(
+												// 			computedRisk?.riskGrade ?? null,
+												// 		)
+												// 	: ""
 											}
 											placeholder="Complete inputs to determine"
 											className="border px-2 py-2 rounded bg-gray-50"
@@ -1058,6 +1235,7 @@ function V2LoanApplicationCreate() {
 											type="text"
 											className="border px-2 py-2 rounded"
 											value={nationalId}
+											placeholder="12/THALANA(N)xxxxxx"
 											onChange={(event) => setNationalId(event.target.value)}
 										/>
 									</label>
@@ -1135,7 +1313,7 @@ function V2LoanApplicationCreate() {
 										</select>
 									</label>
 									<label className="flex flex-col gap-1 text-sm">
-										<span>Requested amount</span>
+										<span>Requested Loan Amount</span>
 										<input
 											type="number"
 											className="border px-2 py-2 rounded"
@@ -1166,28 +1344,17 @@ function V2LoanApplicationCreate() {
 											))}
 										</select>
 									</label>
-									<label className="flex flex-col gap-1 text-sm">
-										<span>Channel code</span>
-										<select
-											className="border px-2 py-2 rounded"
-											value={channelCode}
-											onChange={(event) => setChannelCode(event.target.value)}
-										>
-											{channelOptions.map((channel) => (
-												<option key={channel.id} value={channel.code}>
-													{channel.code || channel.name || "Unnamed channel"}
-												</option>
-											))}
-										</select>
-									</label>
-									<label className="flex flex-col gap-1 text-sm">
+
+									{/* <label className="flex flex-col gap-1 text-sm">
 										<span>Workflow</span>
 										<input
 											readOnly
 											value={workflowName ?? "—"}
 											className="border px-2 py-2 rounded bg-gray-50"
 										/>
-									</label>
+									</label> */}
+                  <div></div>
+
 									<label className="flex flex-col gap-1 text-sm">
 										<span>Disbursement destination</span>
 										<select
@@ -1226,21 +1393,6 @@ function V2LoanApplicationCreate() {
 										/>
 									</label>
 									<label className="flex flex-col gap-1 text-sm">
-										<span>Repayment start date</span>
-										<input
-											type="date"
-											className="border px-2 py-2 rounded"
-											value={repaymentStartDateIso}
-											onChange={(event) =>
-												setRepaymentStartDateIso(event.target.value)
-											}
-										/>
-										<span className="text-xs text-gray-600">
-											Preview dates use the repayment setup frequency and
-											due-day rules.
-										</span>
-									</label>
-									<label className="flex flex-col gap-1 text-sm">
 										<span>DTI</span>
 										<input
 											readOnly
@@ -1258,6 +1410,89 @@ function V2LoanApplicationCreate() {
 										</span>
 									</label>
 								</div>
+
+								{isSecuredProduct ? (
+									<div className="space-y-3 border rounded p-3 bg-amber-50 text-sm text-gray-800">
+										<div>
+											<div className="text-sm font-medium">
+												Secured loan details
+											</div>
+											<div className="text-xs text-gray-700">
+												These fields are required based on the selected secured
+												product setup.
+											</div>
+										</div>
+										<div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+											<label className="flex flex-col gap-1 text-sm">
+												<span>Collateral type</span>
+												<input
+													readOnly
+													value={activeSetup?.productSetup.collateralType ?? ""}
+													className="border px-2 py-2 rounded bg-gray-50"
+												/>
+											</label>
+											<label className="flex flex-col gap-1 text-sm">
+												<span>Collateral estimated value</span>
+												<input
+													type="number"
+													min={0}
+													value={collateralEstimatedValueInput}
+													onChange={(event) =>
+														setCollateralEstimatedValueInput(event.target.value)
+													}
+													className="border px-2 py-2 rounded"
+												/>
+												<span className="text-xs text-gray-700">
+													Minimum required:{" "}
+													{activeSetup?.productSetup.minimumCollateralValue.toLocaleString()}
+												</span>
+											</label>
+											<label className="flex flex-col gap-1 text-sm md:col-span-2">
+												<span>Collateral description</span>
+												<textarea
+													className="border px-2 py-2 rounded min-h-20"
+													value={collateralDescription}
+													onChange={(event) =>
+														setCollateralDescription(event.target.value)
+													}
+													placeholder="Briefly describe collateral details"
+												/>
+											</label>
+											<label className="flex flex-col gap-1 text-sm">
+												<span>Valuation required</span>
+												<input
+													readOnly
+													value={
+														activeSetup?.productSetup.valuationRequired
+															? "Yes"
+															: "No"
+													}
+													className="border px-2 py-2 rounded bg-gray-50"
+												/>
+											</label>
+											{activeSetup?.productSetup.valuationRequired ? (
+												<label className="flex flex-col gap-1 text-sm">
+													<span>Valuation report reference</span>
+													<input
+														type="text"
+														value={valuationReportReference}
+														onChange={(event) =>
+															setValuationReportReference(event.target.value)
+														}
+														className="border px-2 py-2 rounded"
+														placeholder="Enter valuation report ID/reference"
+													/>
+													<span className="text-xs text-gray-700">
+														Validity window:{" "}
+														{activeSetup.productSetup.valuationValidityDays ??
+															0}{" "}
+														day(s)
+													</span>
+												</label>
+											) : null}
+										</div>
+									</div>
+								) : null}
 
 								{dynamicScoreFields.length ? (
 									<div className="space-y-3 border rounded p-3 bg-white text-sm">
@@ -1387,86 +1622,21 @@ function V2LoanApplicationCreate() {
 									</div>
 								) : null}
 
-								<div className="space-y-3 border rounded p-3 bg-gray-50 text-sm text-gray-700">
-									<div>
-										<div className="text-xs text-gray-600">
-											Payment schedule (custom EMI)
-										</div>
-										<div className="text-base font-semibold">
-											Upcoming installments preview
-										</div>
-										<div className="text-xs text-gray-500">
-											{schedulePreview.schedule.length} installment(s) based on
-											the selected tenure.
-										</div>
+								<div className="space-y-2 border rounded p-3 bg-gray-50 text-sm text-gray-700">
+									<div className="text-xs text-gray-600">
+										Loan calculation preview moved to dialog.
 									</div>
-									{schedulePreview.error ? (
-										<div className="text-xs text-red-700">
-											{schedulePreview.error}
-										</div>
-									) : null}
-									{schedulePreview.schedule.length > 0 ? (
-										<div className="border rounded bg-white overflow-x-auto">
-											<table className="min-w-full text-xs text-left">
-												<thead className="bg-gray-100 text-gray-700 font-semibold border-b">
-													<tr>
-														<th className="px-3 py-2 whitespace-nowrap">#</th>
-														<th className="px-3 py-2 whitespace-nowrap">
-															Date
-														</th>
-														<th className="px-3 py-2 text-right whitespace-nowrap">
-															Payment
-														</th>
-														<th className="px-3 py-2 text-right whitespace-nowrap">
-															Principal
-														</th>
-														<th className="px-3 py-2 text-right whitespace-nowrap">
-															Interest
-														</th>
-														<th className="px-3 py-2 text-right whitespace-nowrap">
-															Balance
-														</th>
-													</tr>
-												</thead>
-												<tbody className="divide-y divide-gray-200">
-													{schedulePreview.schedule.map((row) => (
-														<tr key={row.period} className="hover:bg-gray-50">
-															<td className="px-3 py-2 text-gray-500">
-																{row.period}
-															</td>
-															<td className="px-3 py-2 text-gray-500 whitespace-nowrap">
-																{new Intl.DateTimeFormat("en-US", {
-																	year: "numeric",
-																	month: "short",
-																	day: "numeric",
-																}).format(row.date)}
-															</td>
-															<td className="px-3 py-2 text-right font-medium">
-																{formatAmountWithTwoDecimals(row.payment)}
-															</td>
-															<td className="px-3 py-2 text-right text-gray-600">
-																{formatAmountWithTwoDecimals(row.principal)}
-															</td>
-															<td className="px-3 py-2 text-right text-orange-600">
-																{formatAmountWithTwoDecimals(row.interest)}
-															</td>
-															<td className="px-3 py-2 text-right text-gray-500">
-																{formatAmountWithTwoDecimals(row.balance)}
-															</td>
-														</tr>
-													))}
-												</tbody>
-											</table>
-										</div>
-									) : (
-										<div className="text-xs text-gray-600">
-											Enter amount, tenure, and any custom EMI inputs to preview
-											the schedule.
-										</div>
-									)}
-									<div className="text-xs text-gray-500">
-										Schedule preview uses the saved V2 repayment formula,
-										repayment frequency, and the values entered above.
+									<div className="flex items-center gap-3">
+										<button
+											type="button"
+											onClick={() => setIsSchedulePreviewOpen(true)}
+											className="px-3 py-2 rounded border text-sm hover:bg-gray-100"
+										>
+											Repayment Preview
+										</button>
+										<span className="text-xs text-gray-500">
+											{schedulePreview.schedule.length} installment(s) currently generated.
+										</span>
 									</div>
 								</div>
 
@@ -1515,6 +1685,84 @@ function V2LoanApplicationCreate() {
 										onChange={(event) => setNotes(event.target.value)}
 									/>
 								</label>
+
+								{isSchedulePreviewOpen ? (
+									<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+										<div className="w-full max-w-6xl max-h-[90vh] overflow-y-auto rounded-2xl border bg-white p-4 md:p-6">
+											<div className="flex items-start justify-between gap-3">
+												<div>
+													<div className="text-xs text-gray-600">Payment schedule (custom EMI)</div>
+													<div className="text-lg font-semibold">Upcoming installments preview</div>
+													<div className="text-xs text-gray-500">
+														{schedulePreview.schedule.length} installment(s) based on the selected tenure.
+													</div>
+												</div>
+												<button
+													type="button"
+													onClick={() => setIsSchedulePreviewOpen(false)}
+													className="px-3 py-2 rounded border text-sm hover:bg-gray-50"
+												>
+													Close
+												</button>
+											</div>
+											<div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
+												<div className="rounded border bg-white p-3">
+													<div className="text-[11px] uppercase tracking-wide text-gray-500">Due day rule</div>
+													<div className="mt-1 font-medium text-gray-900">{repaymentScheduleMeta.dueDayLabel}</div>
+												</div>
+												<div className="rounded border bg-white p-3">
+													<div className="text-[11px] uppercase tracking-wide text-gray-500">Processing fee</div>
+													<div className="mt-1 font-medium text-gray-900">{repaymentScheduleMeta.processingFeeLabel}</div>
+												</div>
+												<div className="rounded border bg-white p-3">
+													<div className="text-[11px] uppercase tracking-wide text-gray-500">Disbursement fee</div>
+													<div className="mt-1 font-medium text-gray-900">{repaymentScheduleMeta.disbursementFeeLabel}</div>
+												</div>
+												<div className="rounded border bg-white p-3">
+													<div className="text-[11px] uppercase tracking-wide text-gray-500">Late fee</div>
+													<div className="mt-1 font-medium text-gray-900">{repaymentScheduleMeta.lateFeeLabel}</div>
+												</div>
+												<div className="rounded border bg-white p-3">
+													<div className="text-[11px] uppercase tracking-wide text-gray-500">Prepayment penalty</div>
+													<div className="mt-1 font-medium text-gray-900">{repaymentScheduleMeta.prepaymentPenaltyLabel}</div>
+												</div>
+											</div>
+											{schedulePreview.error ? (
+												<div className="mt-3 text-xs text-red-700">{schedulePreview.error}</div>
+											) : null}
+											{schedulePreview.schedule.length > 0 ? (
+												<div className="mt-3 border rounded bg-white overflow-x-auto">
+													<table className="min-w-full text-xs text-left">
+														<thead className="bg-gray-100 text-gray-700 font-semibold border-b">
+															<tr>
+																<th className="px-3 py-2 whitespace-nowrap w-12">Installment no</th>
+																<th className="px-3 py-2 text-right whitespace-nowrap">Payment</th>
+																<th className="px-3 py-2 text-right whitespace-nowrap">Principal</th>
+																<th className="px-3 py-2 text-right whitespace-nowrap">Interest</th>
+																<th className="px-3 py-2 text-right whitespace-nowrap">Balance</th>
+															</tr>
+														</thead>
+														<tbody className="divide-y divide-gray-200">
+															{schedulePreview.schedule.map((row) => (
+																<tr key={row.period} className="hover:bg-gray-50">
+																	<td className="px-3 py-2 text-gray-500">{row.period}</td>
+																	<td className="px-3 py-2 text-right font-medium">{formatAmountWithTwoDecimals(row.payment)}</td>
+																	<td className="px-3 py-2 text-right text-gray-600">{formatAmountWithTwoDecimals(row.principal)}</td>
+																	<td className="px-3 py-2 text-right text-orange-600">{formatAmountWithTwoDecimals(row.interest)}</td>
+																	<td className="px-3 py-2 text-right text-gray-500">{formatAmountWithTwoDecimals(row.balance)}</td>
+																</tr>
+															))}
+														</tbody>
+													</table>
+												</div>
+											) : (
+												<div className="mt-3 text-xs text-gray-600">
+													Enter amount, tenure, and any custom EMI inputs to preview the schedule.
+												</div>
+											)}
+										</div>
+									</div>
+								) : null}
 							</>
 						) : (
 							<div className="space-y-4">

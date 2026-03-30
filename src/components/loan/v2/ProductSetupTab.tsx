@@ -526,7 +526,7 @@ export function ProductSetupTab({
 						</div>
 					) : (
 						<div className="space-y-1">
-							<InputInfoLabel
+							{/* <InputInfoLabel
 								label="Loan Type"
 								info="For secured loans, loan type is fixed to EMI."
 							/>
@@ -535,7 +535,7 @@ export function ProductSetupTab({
 								value="EMI"
 								readOnly
 								className="border rounded px-3 py-2 w-full bg-gray-50 text-gray-700"
-							/>
+							/> */}
 						</div>
 					)}
 				</div>

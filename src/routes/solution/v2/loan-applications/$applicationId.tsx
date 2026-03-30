@@ -31,6 +31,27 @@ function V2LoanApplicationDetail() {
 		return new Date(application.bureauRequestedAt).toLocaleString();
 	}, [application?.bureauRequestedAt]);
 
+	const collateralValueLabel = useMemo(() => {
+		if (application?.collateralEstimatedValue == null) return "—";
+		return application.collateralEstimatedValue.toLocaleString();
+	}, [application?.collateralEstimatedValue]);
+
+	const showCollateralFields = useMemo(
+		() =>
+			Boolean(
+				application?.collateralType ||
+				application?.collateralEstimatedValue !== null ||
+				application?.collateralDescription ||
+				application?.valuationReportReference,
+			),
+		[
+			application?.collateralDescription,
+			application?.collateralEstimatedValue,
+			application?.collateralType,
+			application?.valuationReportReference,
+		],
+	);
+
 	const decisionWorkflowHistory = useMemo(() => {
 		const history = [...(application?.decisionHistory ?? [])];
 		history.sort((a, b) => a.occurredAt - b.occurredAt);
@@ -156,6 +177,27 @@ function V2LoanApplicationDetail() {
 					<Field label="Destination" value={application.destinationType} />
 					<Field label="Setup ID" value={application.setupId} />
 					<Field label="Score result" value={scoreLabel} />
+					{showCollateralFields ? (
+						<Field
+							label="Collateral type"
+							value={application.collateralType || "—"}
+						/>
+					) : null}
+					{showCollateralFields ? (
+						<Field label="Collateral value" value={collateralValueLabel} />
+					) : null}
+					{showCollateralFields ? (
+						<Field
+							label="Valuation report reference"
+							value={application.valuationReportReference || "—"}
+						/>
+					) : null}
+					{showCollateralFields ? (
+						<Field
+							label="Collateral description"
+							value={application.collateralDescription || "—"}
+						/>
+					) : null}
 					<Field label="Bureau provider" value={application.bureauProvider || "—"} />
 					<Field label="Bureau purpose" value={application.bureauPurpose || "—"} />
 					<Field label="Bureau consent" value={application.bureauConsent ? "Yes" : "No"} />

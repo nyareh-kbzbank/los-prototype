@@ -129,6 +129,7 @@ Sources:
 - For V2 scorecard matching, core scoring inputs are normalized to align with setup keywords: `age`, `gender` (`male`/`female`), `maritalstatus` (`single`/`married`/`divorced`), `education` (`graduate`/`under graduate`), `dti`, `income`, and `isburaeucheck` (`true`/`false`).
 - The V2 application page installment preview uses the saved V2 repayment setup directly: repayment frequency and due-day rules come from the setup, while amount, tenure, start date, and custom formula field values come from the application page inputs.
 - The V2 application form also captures applicant `gender`, `marital status`, `education`, and `income`; it derives `DTI` in the background from the selected product's repayment preview and income, and passes all of these into scorecard evaluation when the chosen product's scorecard references those fields.
+- For V2 applications created from secured products, Step 1 now captures collateral details from customer input where required: collateral estimated value (validated against setup minimum collateral value), optional collateral description, and valuation report reference when setup marks valuation as required.
 
 ## Scorecards
 
