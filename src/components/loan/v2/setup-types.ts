@@ -1,4 +1,5 @@
 export type LoanSecurityType = "SECURED" | "UNSECURED";
+export type LoanType = "EMI" | "OPEN_LINE_LOAN";
 export type TenorUnit = "DAY" | "MONTH" | "YEAR";
 export type MaxAmountRateType = "FLAT" | "PERCENTAGE";
 export type CollateralType =
@@ -45,9 +46,17 @@ export type FieldDefinition = {
 	defaultValue: number;
 };
 
+export type OpenLineFormulaSetup = {
+	closingPrincipalFormula: string;
+	dailyInterestFormula: string;
+	accruedInterestFormula: string;
+	totalPaymentFormula: string;
+};
+
 export type FormulaSetup = {
 	principalFormula: string;
 	interestFormula: string;
+	openLineFormulas: OpenLineFormulaSetup;
 	fieldDefinitions: FieldDefinition[];
 };
 
@@ -55,6 +64,14 @@ export function createDefaultFormulaSetup(): FormulaSetup {
 	return {
 		principalFormula: "max(0, baseEmi - (balance * rateMonthly))",
 		interestFormula: "balance * rateMonthly",
+		openLineFormulas: {
+			closingPrincipalFormula:
+				"max(0, openingPrincipal + drawdownAmount - principalRepayment)",
+			dailyInterestFormula: "principalAfterRepayment * dailyRate",
+			accruedInterestFormula:
+				"max(0, openingAccruedInterest + dailyInterest - interestRepayment)",
+			totalPaymentFormula: "principalRepayment + interestRepayment",
+		},
 		fieldDefinitions: [],
 	};
 }
@@ -69,6 +86,7 @@ export type ProductSetupForm = {
 	productCode: string;
 	description: string;
 	loanSecurity: LoanSecurityType;
+	loanType: LoanType;
 	collateralType: CollateralType;
 	minimumCollateralValue: number;
 	maximumLtvPercentage: number;

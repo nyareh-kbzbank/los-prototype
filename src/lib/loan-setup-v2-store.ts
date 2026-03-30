@@ -81,36 +81,51 @@ const createId = () =>
 		? crypto.randomUUID()
 		: Math.random().toString(36).slice(2);
 
+const normalizeLoanType = (productSetup: ProductSetupForm) => {
+	if (productSetup.loanSecurity === "SECURED") {
+		return "EMI" as const;
+	}
+	if (productSetup.loanType === "OPEN_LINE_LOAN") {
+		return "OPEN_LINE_LOAN" as const;
+	}
+	return "EMI" as const;
+};
+
 const cloneProductSetup = (
 	productSetup: ProductSetupForm,
-): ProductSetupForm => ({
-	...productSetup,
-	productName: productSetup.productName.trim(),
-	productCode: productSetup.productCode.trim(),
-	description: productSetup.description.trim(),
-	collateralType: productSetup.collateralType ?? "LAND",
-	minimumCollateralValue: Math.max(
-		0,
-		productSetup.minimumCollateralValue ?? 0,
-	),
-	maximumLtvPercentage: Math.max(0, productSetup.maximumLtvPercentage ?? 0),
-	haircutPercentage: Math.max(0, productSetup.haircutPercentage ?? 0),
-	valuationRequired: Boolean(productSetup.valuationRequired),
-	valuationValidityDays:
-		productSetup.valuationValidityDays == null
-			? null
-			: Math.max(0, productSetup.valuationValidityDays),
-	minAmount: Math.max(0, productSetup.minAmount),
-	maxAmount: Math.max(0, productSetup.maxAmount),
-	maxAmountRateType:
-		productSetup.maxAmountRateType === "PERCENTAGE"
-			? "PERCENTAGE"
-			: "FLAT",
-	tenorValues: productSetup.tenorValues.map((item) => ({
-		id: item.id,
-		value: Math.max(0, item.value),
-	})),
-});
+): ProductSetupForm => {
+	const normalizedLoanType = normalizeLoanType(productSetup);
+
+	return {
+		...productSetup,
+		productName: productSetup.productName.trim(),
+		productCode: productSetup.productCode.trim(),
+		description: productSetup.description.trim(),
+		loanType: normalizedLoanType,
+		collateralType: productSetup.collateralType ?? "LAND",
+		minimumCollateralValue: Math.max(
+			0,
+			productSetup.minimumCollateralValue ?? 0,
+		),
+		maximumLtvPercentage: Math.max(0, productSetup.maximumLtvPercentage ?? 0),
+		haircutPercentage: Math.max(0, productSetup.haircutPercentage ?? 0),
+		valuationRequired: Boolean(productSetup.valuationRequired),
+		valuationValidityDays:
+			productSetup.valuationValidityDays == null
+				? null
+				: Math.max(0, productSetup.valuationValidityDays),
+		minAmount: Math.max(0, productSetup.minAmount),
+		maxAmount: Math.max(0, productSetup.maxAmount),
+		maxAmountRateType:
+			productSetup.maxAmountRateType === "PERCENTAGE"
+				? "PERCENTAGE"
+				: "FLAT",
+		tenorValues: productSetup.tenorValues.map((item) => ({
+			id: item.id,
+			value: Math.max(0, item.value),
+		})),
+	};
+};
 
 const cloneChannels = (channels: ChannelConfig[]): ChannelConfig[] =>
 	channels
@@ -156,6 +171,24 @@ const cloneFormulaSetup = (formulaSetup?: FormulaSetup): FormulaSetup => ({
 	interestFormula: (
 		formulaSetup?.interestFormula ?? createDefaultFormulaSetup().interestFormula
 	).trim(),
+	openLineFormulas: {
+		closingPrincipalFormula: (
+			formulaSetup?.openLineFormulas?.closingPrincipalFormula ??
+			createDefaultFormulaSetup().openLineFormulas.closingPrincipalFormula
+		).trim(),
+		dailyInterestFormula: (
+			formulaSetup?.openLineFormulas?.dailyInterestFormula ??
+			createDefaultFormulaSetup().openLineFormulas.dailyInterestFormula
+		).trim(),
+		accruedInterestFormula: (
+			formulaSetup?.openLineFormulas?.accruedInterestFormula ??
+			createDefaultFormulaSetup().openLineFormulas.accruedInterestFormula
+		).trim(),
+		totalPaymentFormula: (
+			formulaSetup?.openLineFormulas?.totalPaymentFormula ??
+			createDefaultFormulaSetup().openLineFormulas.totalPaymentFormula
+		).trim(),
+	},
 	fieldDefinitions: (formulaSetup?.fieldDefinitions ?? []).map((field) => ({
 		id: field.id,
 		key: field.key.trim(),
@@ -234,21 +267,38 @@ const cloneCreditScoreSetup = (
 	},
 });
 
+const normalizeDocumentValidityDays = (
+	hasValidityDays: boolean,
+	validityDays: number | null,
+): number | null => {
+	if (!hasValidityDays) return null;
+	if (!Number.isFinite(validityDays)) return 0;
+	return Math.max(0, Number(validityDays));
+};
+
 const cloneDocumentSetup = (
 	documentSetup: DocumentRequirementItem[],
 ): DocumentRequirementItem[] =>
 	documentSetup.map((item) => ({
 		id: item.id,
 		grade: item.grade,
-		documents: item.documents.map((doc) => ({
-			id: doc.id,
-			documentTypeId: doc.documentTypeId,
-			minAmount: Number.isFinite(doc.minAmount) ? doc.minAmount : 0,
-			maxAmount: Number.isFinite(doc.maxAmount) ? doc.maxAmount : 0,
-			employmentType: doc.employmentType,
-			collateralRequired: Boolean(doc.collateralRequired),
-			isMandatory: Boolean(doc.isMandatory),
-		})),
+		documents: item.documents.map((doc) => {
+			const hasValidityDays = doc.hasValidityDays === true;
+			return {
+				id: doc.id,
+				documentTypeId: doc.documentTypeId,
+				minAmount: Number.isFinite(doc.minAmount) ? doc.minAmount : 0,
+				maxAmount: Number.isFinite(doc.maxAmount) ? doc.maxAmount : 0,
+				employmentType: doc.employmentType,
+				collateralRequired: Boolean(doc.collateralRequired),
+				isMandatory: Boolean(doc.isMandatory),
+				hasValidityDays,
+				validityDays: normalizeDocumentValidityDays(
+					hasValidityDays,
+					doc.validityDays,
+				),
+			};
+		}),
 	}));
 
 const cloneDisbursementSetup = (
@@ -266,7 +316,9 @@ const cloneDisbursementSetup = (
 	tranches: disbursementSetup.tranches.map((tranche) => ({
 		id: tranche.id,
 		tranche: tranche.tranche,
-		amount: Number.isFinite(tranche.amount) ? tranche.amount : 0,
+		amount: Number.isFinite(tranche.amount)
+			? Math.min(100, Math.max(0, tranche.amount))
+			: 0,
 		triggerType: tranche.triggerType,
 		timingMeaning: tranche.timingMeaning,
 	})),
@@ -340,7 +392,7 @@ export const useLoanSetupV2Store = create<V2LoanSetupState>()(
 		}),
 		{
 			name: "loan-workflow-setups-v2",
-			version: 3,
+			version: 4,
 			migrate: (persistedState, version) => {
 				const state = persistedState as PersistedV2LoanSetupState | undefined;
 				if (!state?.setups) {
@@ -376,6 +428,26 @@ export const useLoanSetupV2Store = create<V2LoanSetupState>()(
 									interestFormulaSetup: cloneFormulaSetup(
 										(setup as V2LoanSetupSnapshot).interestFormulaSetup ??
 										setup.repaymentSetup?.formulaSetup,
+									),
+								},
+							]),
+						),
+					};
+				}
+
+				if (version < 4) {
+					return {
+						setups: Object.fromEntries(
+							Object.entries(state.setups).map(([setupId, setup]) => [
+								setupId,
+								{
+									...setup,
+									productSetup: {
+										...setup.productSetup,
+										loanType: normalizeLoanType(setup.productSetup),
+									},
+									interestFormulaSetup: cloneFormulaSetup(
+										(setup as V2LoanSetupSnapshot).interestFormulaSetup,
 									),
 								},
 							]),

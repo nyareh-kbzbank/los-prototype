@@ -3,19 +3,21 @@ import { useState } from "react";
 import {
 	createDefaultFormulaSetup,
 	type FormulaSetup,
+	type LoanSecurityType,
 	type V2InterestConfig,
 } from "./setup-types";
 
 type InterestEngineTabProps = {
 	interestRatePlans: V2InterestConfig[];
 	formulaSetup?: FormulaSetup;
+	loanSecurity?: LoanSecurityType;
 	updateFormulaSetup?: (
 		updater: (current: FormulaSetup) => FormulaSetup,
 	) => void;
 	updateInterestConfig: (
 		updater: (current: V2InterestConfig[]) => V2InterestConfig[],
 	) => void;
-	addPlan: () => void;
+	addPlan?: () => void;
 	removePlan: (planIndex: number) => void;
 	addParameter: (planIndex: number) => void;
 	updateParameter: (
@@ -25,14 +27,14 @@ type InterestEngineTabProps = {
 		value: string,
 	) => void;
 	removeParameter: (planIndex: number, paramIndex: number) => void;
-	addPolicy: (planIndex: number) => void;
-	updatePolicy: (
+	addPolicy?: (planIndex: number) => void;
+	updatePolicy?: (
 		planIndex: number,
 		policyIndex: number,
 		field: "interestCategory" | "interestRate",
 		value: string,
 	) => void;
-	removePolicy: (planIndex: number, policyIndex: number) => void;
+	removePolicy?: (planIndex: number, policyIndex: number) => void;
 };
 
 const createId = () =>
@@ -100,21 +102,111 @@ const coreFieldDefinitions: Array<{
 	},
 ];
 
+const unsecuredFieldDefinitions: Array<{
+	key: string;
+	label: string;
+	description: string;
+}> = [
+	{
+		key: "openingPrincipal",
+		label: "Opening Principal",
+		description: "Outstanding principal balance at the start of the row/date.",
+	},
+	{
+		key: "drawdownAmount",
+		label: "Drawdown Amount",
+		description: "Amount drawn on the current row/date.",
+	},
+	{
+		key: "principalRepayment",
+		label: "Principal Repayment",
+		description: "Principal repaid on the current row/date.",
+	},
+	{
+		key: "interestRepayment",
+		label: "Interest Repayment",
+		description: "Interest repaid on the current row/date.",
+	},
+	{
+		key: "openingAccruedInterest",
+		label: "Opening Accrued Interest",
+		description: "Accrued interest carried into the row before new daily accrual.",
+	},
+	{
+		key: "principalAfterDrawdown",
+		label: "Principal After Drawdown",
+		description: "Opening principal plus drawdown amount before repayment.",
+	},
+	{
+		key: "principalAfterRepayment",
+		label: "Principal After Repayment",
+		description: "Principal balance after applying principal repayment.",
+	},
+	{
+		key: "creditLimit",
+		label: "Credit Limit",
+		description: "Approved credit limit for the line facility.",
+	},
+	{
+		key: "availableLimit",
+		label: "Available Limit",
+		description: "Remaining drawable limit before the current event is applied.",
+	},
+	{
+		key: "annualRate",
+		label: "Annual Rate",
+		description: "Annual interest rate in percent for the unsecured line.",
+	},
+	{
+		key: "daysInYear",
+		label: "Days In Year",
+		description: "Day-count basis used to convert annual rate to daily rate.",
+	},
+	{
+		key: "dailyRate",
+		label: "Daily Rate",
+		description: "Derived daily rate based on annual rate and days-in-year.",
+	},
+	{
+		key: "dayIndex",
+		label: "Day Index",
+		description: "1-based row counter from the open date.",
+	},
+	{
+		key: "daysFromOpen",
+		label: "Days From Open",
+		description: "Elapsed days from the facility open date to the current row.",
+	},
+	{
+		key: "prevClosingPrincipal",
+		label: "Previous Closing Principal",
+		description: "Closing principal from the previous row.",
+	},
+	{
+		key: "prevAccruedInterest",
+		label: "Previous Accrued Interest",
+		description: "Accrued interest from the previous row.",
+	},
+	{
+		key: "prevTotalPayment",
+		label: "Previous Total Payment",
+		description: "Total payment recorded on the previous row.",
+	},
+];
+
 export function InterestEngineTab({
 	interestRatePlans,
 	formulaSetup = createDefaultFormulaSetup(),
+	loanSecurity = "UNSECURED",
 	updateFormulaSetup,
 	updateInterestConfig,
-	addPlan,
 	removePlan,
 	addParameter,
 	updateParameter,
 	removeParameter,
-	addPolicy,
-	updatePolicy,
-	removePolicy,
 }: Readonly<InterestEngineTabProps>) {
 	const [showPredefinedFields, setShowPredefinedFields] = useState(false);
+	const isUnsecured = loanSecurity === "UNSECURED";
 
 	const updatePlanType = (
 		planIndex: number,
@@ -189,6 +281,19 @@ export function InterestEngineTab({
 			fieldDefinitions: current.fieldDefinitions.filter(
 				(item) => item.id !== fieldId,
 			),
+		}));
+	};
+
+	const updateOpenLineFormula = (
+		field: keyof FormulaSetup["openLineFormulas"],
+		value: string,
+	) => {
+		updateFormula((current) => ({
+			...current,
+			openLineFormulas: {
+				...current.openLineFormulas,
+				[field]: value,
+			},
 		}));
 	};
 
@@ -525,6 +630,75 @@ export function InterestEngineTab({
 					</label>
 				</div>
 
+				{isUnsecured ? (
+					<div className="space-y-4 border rounded-lg p-4 bg-gray-50">
+						<div>
+							<h3 className="text-sm font-medium">Additional Unsecured Formulas</h3>
+							<div className="text-xs text-gray-600">
+								Required formula fields for unsecured and open-line style interest calculations.
+							</div>
+						</div>
+						<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+							<label className="flex flex-col gap-1 text-sm">
+								<span>Closing Principal Formula</span>
+								<textarea
+									value={formulaSetup.openLineFormulas?.closingPrincipalFormula}
+									onChange={(event) =>
+										updateOpenLineFormula(
+											"closingPrincipalFormula",
+											event.target.value,
+										)
+									}
+									rows={3}
+									className="border rounded px-2 py-2 font-mono text-sm bg-white"
+								/>
+							</label>
+							<label className="flex flex-col gap-1 text-sm">
+								<span>Daily Interest Formula</span>
+								<textarea
+									value={formulaSetup.openLineFormulas?.dailyInterestFormula}
+									onChange={(event) =>
+										updateOpenLineFormula(
+											"dailyInterestFormula",
+											event.target.value,
+										)
+									}
+									rows={3}
+									className="border rounded px-2 py-2 font-mono text-sm bg-white"
+								/>
+							</label>
+							<label className="flex flex-col gap-1 text-sm">
+								<span>Accrued Interest Formula</span>
+								<textarea
+									value={formulaSetup.openLineFormulas?.accruedInterestFormula}
+									onChange={(event) =>
+										updateOpenLineFormula(
+											"accruedInterestFormula",
+											event.target.value,
+										)
+									}
+									rows={3}
+									className="border rounded px-2 py-2 font-mono text-sm bg-white"
+								/>
+							</label>
+							<label className="flex flex-col gap-1 text-sm">
+								<span>Total Payment Formula</span>
+								<textarea
+									value={formulaSetup.openLineFormulas?.totalPaymentFormula}
+									onChange={(event) =>
+										updateOpenLineFormula(
+											"totalPaymentFormula",
+											event.target.value,
+										)
+									}
+									rows={3}
+									className="border rounded px-2 py-2 font-mono text-sm bg-white"
+								/>
+							</label>
+						</div>
+					</div>
+				) : null}
+
 				<div className="space-y-2">
 					<div className="flex items-center justify-between">
 						<h3 className="text-sm font-medium">Custom Formula Fields</h3>
@@ -639,6 +813,18 @@ export function InterestEngineTab({
 											</td>
 										</tr>
 									))}
+									{isUnsecured
+										? unsecuredFieldDefinitions.map((field) => (
+											<tr key={field.key} className="border-t bg-blue-50/40">
+												<td className="px-3 py-2 font-mono text-xs">
+													{field.key}
+												</td>
+												<td className="px-3 py-2 text-xs text-gray-700">
+													{field.description}
+												</td>
+											</tr>
+										))
+										: null}
 								</tbody>
 							</table>
 						</div>

@@ -78,6 +78,7 @@ function getDefaultProductSetup(): ProductSetupForm {
 		productCode: "",
 		description: "",
 		loanSecurity: "UNSECURED",
+		loanType: "EMI",
 		collateralType: "LAND",
 		minimumCollateralValue: 0,
 		maximumLtvPercentage: 80,
@@ -103,9 +104,15 @@ function getDefaultProductSetup(): ProductSetupForm {
 
 function normalizeProductSetup(productSetup: ProductSetupForm): ProductSetupForm {
 	const defaults = getDefaultProductSetup();
+	let normalizedLoanType: ProductSetupForm["loanType"] = "EMI";
+	if (productSetup.loanSecurity !== "SECURED") {
+		normalizedLoanType =
+			productSetup.loanType === "OPEN_LINE_LOAN" ? "OPEN_LINE_LOAN" : "EMI";
+	}
 	return {
 		...defaults,
 		...productSetup,
+		loanType: normalizedLoanType,
 		minimumCollateralValue: Math.max(
 			0,
 			productSetup.minimumCollateralValue ?? defaults.minimumCollateralValue,
@@ -126,6 +133,19 @@ function normalizeProductSetup(productSetup: ProductSetupForm): ProductSetupForm
 			productSetup.maxAmountRateType === "PERCENTAGE"
 				? "PERCENTAGE"
 				: "FLAT",
+	};
+}
+
+function normalizeFormulaSetup(formulaSetup?: ReturnType<typeof createDefaultFormulaSetup>) {
+	const defaults = createDefaultFormulaSetup();
+	return {
+		...defaults,
+		...formulaSetup,
+		openLineFormulas: {
+			...defaults.openLineFormulas,
+			...formulaSetup?.openLineFormulas,
+		},
+		fieldDefinitions: formulaSetup?.fieldDefinitions ?? defaults.fieldDefinitions,
 	};
 }
 
@@ -183,7 +203,7 @@ function LoanProductSetup() {
 	const steps = [
 		{
 			id: "product-setup",
-			title: "Product Setup",
+			title: "Product Core",
 			description: "Product, loan, channel, and workflow mapping",
 		},
 		{
@@ -291,9 +311,7 @@ function LoanProductSetup() {
 				: getDefaultInterestRatePlans(),
 		);
 		setInterestFormulaSetup(
-			structuredClone(
-				editingSetup.interestFormulaSetup ?? createDefaultFormulaSetup(),
-			),
+			structuredClone(normalizeFormulaSetup(editingSetup.interestFormulaSetup)),
 		);
 		setBureauRequired(editingSetup.bureauRequired);
 		setBureauProvider(editingSetup.bureauProvider || "MMCB");
@@ -404,13 +422,6 @@ function LoanProductSetup() {
 		);
 	};
 
-	const addPlan = () => {
-		setInterestRatePlans((current) => {
-			const fallbackRate = current.at(-1)?.baseRate ?? 18.5;
-			return [...current, createInterestConfig(fallbackRate)];
-		});
-	};
-
 	const removePlan = (planIndex: number) => {
 		setInterestRatePlans((current) =>
 			current.length === 1
@@ -470,53 +481,6 @@ function LoanProductSetup() {
 					(_, index) => index !== paramIndex,
 				),
 			},
-		}));
-	};
-
-	const addPolicy = (planIndex: number) => {
-		updatePlan(planIndex, (current) => ({
-			...current,
-			policies: [
-				...(current.policies ?? []),
-				{ id: createId(), interestCategory: "", interestRate: 0 },
-			],
-		}));
-	};
-
-	const updatePolicy = (
-		planIndex: number,
-		policyIndex: number,
-		field: "interestCategory" | "interestRate",
-		value: string,
-	) => {
-		updatePlan(planIndex, (current) => {
-			const nextPolicies = [...(current.policies ?? [])];
-			const targetPolicy = nextPolicies[policyIndex];
-			if (!targetPolicy) return current;
-			if (field === "interestCategory") {
-				nextPolicies[policyIndex] = {
-					...targetPolicy,
-					interestCategory: value,
-				};
-			} else {
-				const parsed = Number(value);
-				nextPolicies[policyIndex] = {
-					...targetPolicy,
-					interestRate: Number.isFinite(parsed)
-						? parsed
-						: targetPolicy.interestRate,
-				};
-			}
-			return { ...current, policies: nextPolicies };
-		});
-	};
-
-	const removePolicy = (planIndex: number, policyIndex: number) => {
-		updatePlan(planIndex, (current) => ({
-			...current,
-			policies: (current.policies ?? []).filter(
-				(_, index) => index !== policyIndex,
-			),
 		}));
 	};
 
@@ -587,18 +551,15 @@ function LoanProductSetup() {
 			<InterestEngineTab
 				interestRatePlans={interestRatePlans}
 				formulaSetup={interestFormulaSetup}
+				loanSecurity={productSetup.loanSecurity}
 				updateFormulaSetup={(updater) =>
 					setInterestFormulaSetup((current) => updater(current))
 				}
 				updateInterestConfig={updateInterestConfig}
-				addPlan={addPlan}
 				removePlan={removePlan}
 				addParameter={addParameter}
 				updateParameter={updateParameter}
 				removeParameter={removeParameter}
-				addPolicy={addPolicy}
-				updatePolicy={updatePolicy}
-				removePolicy={removePolicy}
 			/>
 		);
 	} else if (currentStep === 2) {
@@ -606,6 +567,8 @@ function LoanProductSetup() {
 			<RepaymentSetupTab
 				state={repaymentSetup}
 				onStateChange={setRepaymentSetup}
+				loanType={productSetup.loanType}
+				interestFormulaSetup={interestFormulaSetup}
 			/>
 		);
 	} else if (currentStep === 3) {

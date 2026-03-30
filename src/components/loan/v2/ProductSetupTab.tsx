@@ -144,7 +144,7 @@ function SecuredSetupSection({
 				</div>
 			</div>
 
-			<div className="space-y-2">
+			{/* <div className="space-y-2">
 				<InputInfoLabel
 					label="Valuation Required"
 					info="Enable if a recent valuation report is mandatory."
@@ -159,7 +159,7 @@ function SecuredSetupSection({
 					/>
 					<span>Valuation report is required</span>
 				</label>
-			</div>
+			</div> */}
 
 			{productSetup.valuationRequired ? (
 				<div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -484,7 +484,10 @@ export function ProductSetupTab({
 									type="radio"
 									name="loan-security"
 									checked={productSetup.loanSecurity === "SECURED"}
-									onChange={() => updateProductField("loanSecurity", "SECURED")}
+									onChange={() => {
+										updateProductField("loanSecurity", "SECURED");
+										updateProductField("loanType", "EMI");
+									}}
 								/>
 								<span>Secured</span>
 							</label>
@@ -501,6 +504,40 @@ export function ProductSetupTab({
 							</label>
 						</div>
 					</div>
+					{productSetup.loanSecurity === "UNSECURED" ? (
+						<div className="space-y-1">
+							<InputInfoLabel
+								label="Loan Type"
+								info="Select EMI or Open Line Loan."
+							/>
+							<select
+								value={productSetup.loanType}
+								onChange={(event) =>
+									updateProductField(
+										"loanType",
+										event.target.value as ProductSetupForm["loanType"],
+									)
+								}
+								className="border rounded px-3 py-2 w-full"
+							>
+								<option value="EMI">EMI</option>
+								<option value="OPEN_LINE_LOAN">Open Line Loan</option>
+							</select>
+						</div>
+					) : (
+						<div className="space-y-1">
+							<InputInfoLabel
+								label="Loan Type"
+								info="For secured loans, loan type is fixed to EMI."
+							/>
+							<input
+								type="text"
+								value="EMI"
+								readOnly
+								className="border rounded px-3 py-2 w-full bg-gray-50 text-gray-700"
+							/>
+						</div>
+					)}
 				</div>
 
 				{isSecured ? (

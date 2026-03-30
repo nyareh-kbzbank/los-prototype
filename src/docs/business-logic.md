@@ -66,13 +66,18 @@ Sources:
 - V2 step 2 is an **Interest Setup** section that configures interest rate plans.
 - Interest setup includes the same plan fields as the main setup interest section: interest type, rate type, base rate, parameter overrides, and policies.
 - V2 Interest Setup also persists its own custom interest formula configuration (principal formula, interest formula, and custom field definitions) independently from repayment setup.
+- When `loanSecurity` is `UNSECURED`, V2 Interest Setup also shows additional formula fields for unsecured/open-line style calculations: `closingPrincipalFormula`, `dailyInterestFormula`, `accruedInterestFormula`, and `totalPaymentFormula`, alongside extra predefined variables for those formulas.
 - For backward compatibility, older V2 snapshots hydrate the new interest formula state from the formula data previously stored under repayment setup.
+- Backward compatibility normalization also ensures older V2 snapshots default missing `loanType` to `EMI` (or force `EMI` when secured) and default missing unsecured open-line formula fields during edit hydration/persistence migration.
 - V2 Interest Setup intentionally does not use an accordion; all fields are always visible in this step.
 - V2 Interest Setup allows multiple interest plans to be added and removed within the same setup snapshot.
 - V2 step 3 is a **Repayment Setup** section inserted between Interest Setup and Credit Score Engine.
 - V2 Repayment Setup is local to the V2 flow (not reusable/global), so it does not include reusable plan naming or saved-plan config selection.
 - V2 Repayment Setup also includes inline custom formula fields based on the Custom EMI calculator format (principal formula, interest formula, and custom field definitions).
 - V2 Repayment Setup custom formula includes a **Test Calculate** action that opens a dialog for sample input values and displays installment/interest/payment output from the configured formulas.
+- In V2 Repayment Setup, when `loanType` is `EMI`, **Test Calculate** evaluates EMI schedule values using the formulas configured in V2 Interest Setup (`principalFormula`, `interestFormula`) and the same custom field definitions/values.
+- In V2 Repayment Setup, when `loanType` is `OPEN_LINE_LOAN`, **Test Calculate** switches to an open-line simulation table (Date, Opening, Drawdown, Principal Repayment, Closing, Interest, Interest Repayment, Accrued Interest, Total Payment) and accepts explicit drawdown and repayment event inputs.
+- In V2 Repayment Setup, Open Line **Test Calculate** now evaluates the unsecured/open-line formulas configured in V2 Interest Setup (`closingPrincipalFormula`, `dailyInterestFormula`, `accruedInterestFormula`, `totalPaymentFormula`) and supports their custom field values during testing.
 - V2 Repayment Setup references repayment fields from the main repayment setup flow but is configured only for the current V2 setup session.
 - V2 step 4 is a **Credit Score Engine** section that keeps scorecard setup and bureau settings in the same step.
 - Credit Score Engine behavior in V2 includes table-based rule editing, a sample calculation modal, and no raw JSON preview panel.
@@ -80,8 +85,11 @@ Sources:
 - Sample calculation in V2 applies the configured thresholds when displaying risk grade outcomes.
 - V2 step 5 is a **Document Rule** section that reuses the existing document-requirements configuration pattern from the main loan setup flow.
 - V2 Document Rule maps required documents by risk grade and starts with default required documents for `LOW` risk.
+- Each configured document can optionally enable a validity window using a flag (`hasValidityDays`) and `validityDays`; when disabled, validity days remain `null`.
 - In V2 Document Rule, when loan security is set to `SECURED`, collateral (`DOC-COLLATERAL`) is automatically enforced as `isMandatory=true` and `collateralRequired=true` for all configured risk grades.
 - In V2 Product Setup, when `loanSecurity` is `SECURED`, additional collateral controls are required: collateral type, minimum collateral value, maximum LTV percentage, haircut percentage, valuation-required toggle, and valuation-validity days (when valuation is required).
+- In V2 Product Setup, `loanType` supports `EMI` and `OPEN_LINE_LOAN`; `OPEN_LINE_LOAN` is only available when `loanSecurity` is `UNSECURED` and secured selection forces `loanType` back to `EMI`.
+- In V2 Product Setup, when `loanSecurity` is `SECURED`, loan type selection is not user-selectable and remains fixed at `EMI` by default.
 - V2 Product Setup for secured loans also includes a **Run Test** dialog that evaluates sample loan amount/collateral value (and valuation age, when applicable) against the configured minimum collateral, LTV limit, haircut-adjusted collateral value, and valuation-validity rules.
 - V2 Product Setup allows `maxAmount` to be configured as either a `FLAT` value or a `PERCENTAGE` rate (`maxAmountRateType`) to support product-specific maximum-amount interpretation.
 - V2 step 6 is a **Decision Rule** section where users can configure decision outcomes (`AUTO_APPROVE`, `MANUAL_REVIEW`, `AUTO_REJECT`) using conditional rules.
@@ -90,7 +98,8 @@ Sources:
 - V2 step 7 is a **Disbursement Setup** section.
 - Disbursement Setup supports `Single` and `Multiple` disbursement types:
   - `Single` auto-enforces “Release full amount at once”.
-  - `Multiple` enables tranche configuration with columns: Tranche, Amount, Trigger Type, and Timing Meaning.
+  - `Multiple` enables tranche configuration with columns: Tranche, Amount (%), Trigger Type, and Timing Meaning.
+  - Tranche amount is interpreted as a percentage value (`0` to `100`) instead of a flat amount.
 - Tranche timing meaning supports `Immediate` and `Based on milestone`.
 - Disbursement Setup includes method selection (`Bank Transfer`, `Wallet`, `Cash`, `Pay to Merchant`) and fee inputs (`Processing Fee`, `Disbursement Fee`).
 - In V2, clicking **Completed** on the final step saves a setup snapshot into a dedicated V2 store (`loan-workflow-setups-v2`) that is separate from the V1 loan setup list/store.
