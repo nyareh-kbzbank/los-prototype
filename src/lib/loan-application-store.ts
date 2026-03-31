@@ -47,6 +47,10 @@ export type LoanApplication = {
   requestedAmount: number;
   tenureValue: number | null;
   tenureUnit: TenorUnit | null;
+  collateralType: string;
+  collateralEstimatedValue: number | null;
+  collateralDescription: string;
+  valuationReportReference: string;
   channelCode: string;
   destinationType: DisbursementDestinationType;
   notes: string;
@@ -83,6 +87,10 @@ export type LoanApplicationInput = {
   requestedAmount: number;
   tenureValue: number | null;
   tenureUnit?: TenorUnit | null;
+  collateralType?: string;
+  collateralEstimatedValue?: number | null;
+  collateralDescription?: string;
+  valuationReportReference?: string;
   channelCode: string;
   destinationType: DisbursementDestinationType;
   notes?: string;
@@ -129,6 +137,11 @@ export const useLoanApplicationStore = create<LoanApplicationState>()(
           input.debtToIncomeRatio !== null
             ? Math.max(0, input.debtToIncomeRatio ?? 0)
             : null;
+        const normalizedCollateralEstimatedValue =
+          Number.isFinite(input.collateralEstimatedValue ?? NaN) &&
+          input.collateralEstimatedValue !== null
+            ? Math.max(0, input.collateralEstimatedValue ?? 0)
+            : null;
         const application: LoanApplication = {
           id: uuidV4(),
           applicationNo,
@@ -153,6 +166,10 @@ export const useLoanApplicationStore = create<LoanApplicationState>()(
             ? input.tenureValue
             : null,
           tenureUnit: input.tenureUnit || null,
+          collateralType: input.collateralType?.trim() ?? "",
+          collateralEstimatedValue: normalizedCollateralEstimatedValue,
+          collateralDescription: input.collateralDescription?.trim() ?? "",
+          valuationReportReference: input.valuationReportReference?.trim() ?? "",
           channelCode: input.channelCode.trim(),
           destinationType: input.destinationType,
           notes: input.notes?.trim() ?? "",
@@ -270,7 +287,7 @@ export const useLoanApplicationStore = create<LoanApplicationState>()(
     }),
     {
       name: "loan-applications",
-      version: 7,
+      version: 8,
       partialize: (state) => ({ applications: state.applications }),
       migrate: (persistedState, version) => {
         const base = persistedState as Partial<LoanApplicationState> &
@@ -364,6 +381,21 @@ export const useLoanApplicationStore = create<LoanApplicationState>()(
 			}
 			return { ...base, applications: patched } satisfies Partial<LoanApplicationState>;
 		}
+
+        if (version < 8) {
+          const patched: Record<string, LoanApplication> = {};
+          for (const [id, app] of Object.entries(applications)) {
+            const existing = app as Partial<LoanApplication>;
+            patched[id] = {
+              ...existing,
+              collateralType: existing.collateralType ?? "",
+              collateralEstimatedValue: existing.collateralEstimatedValue ?? null,
+              collateralDescription: existing.collateralDescription ?? "",
+              valuationReportReference: existing.valuationReportReference ?? "",
+            } as LoanApplication;
+          }
+          return { ...base, applications: patched } satisfies Partial<LoanApplicationState>;
+        }
 
         return base as LoanApplicationState;
       },

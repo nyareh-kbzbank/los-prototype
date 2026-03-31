@@ -76,6 +76,8 @@ export type DocumentRequirement = {
 	collateralRequired: boolean;
 	riskGrade: RiskGrade | null;
 	isMandatory: boolean;
+	hasValidityDays: boolean;
+	validityDays: number | null;
 };
 
 const DEFAULT_MIN_AMOUNT = 0;
@@ -85,6 +87,15 @@ const normalizeDocumentTypeId = (value: string) => {
 	const trimmed = value.trim();
 	if (!trimmed) return trimmed;
 	return trimmed.startsWith("DOC-") ? trimmed : `DOC-${trimmed}`;
+};
+
+const normalizeDocumentValidityDays = (
+	hasValidityDays: boolean,
+	validityDays: number | null,
+): number | null => {
+	if (!hasValidityDays) return null;
+	if (!Number.isFinite(validityDays)) return 0;
+	return Math.max(0, Number(validityDays));
 };
 
 const sanitizeDocumentRequirement = (
@@ -101,6 +112,7 @@ const sanitizeDocumentRequirement = (
 	const maxAmount = Number.isFinite(requirement.maxAmount)
 		? requirement.maxAmount
 		: DEFAULT_MAX_AMOUNT;
+	const hasValidityDays = requirement.hasValidityDays === true;
 	return {
 		documentTypeId,
 		minAmount,
@@ -112,6 +124,11 @@ const sanitizeDocumentRequirement = (
 			requirement.isMandatory === undefined
 				? true
 				: Boolean(requirement.isMandatory),
+		hasValidityDays,
+		validityDays: normalizeDocumentValidityDays(
+			hasValidityDays,
+			requirement.validityDays,
+		),
 	};
 };
 
@@ -132,6 +149,8 @@ const normalizeDocumentRequirements = (
 			collateralRequired: false,
 			riskGrade: "LOW",
 			isMandatory: true,
+			hasValidityDays: false,
+			validityDays: null,
 		}));
 	}
 	return sanitized;
@@ -337,6 +356,8 @@ export const useLoanSetupStore = create<LoanWorkflowState>()(
 							collateralRequired: requirement.collateralRequired,
 							riskGrade: requirement.riskGrade,
 							isMandatory: requirement.isMandatory,
+							hasValidityDays: requirement.hasValidityDays,
+							validityDays: requirement.validityDays,
 						}));
 
 				const updated: LoanWorkflowSnapshot = {
@@ -439,6 +460,8 @@ export const useLoanSetupStore = create<LoanWorkflowState>()(
 												snapshot.riskGrade ??
 												"LOW",
 												isMandatory: true,
+												hasValidityDays: false,
+												validityDays: null,
 										}))
 									: undefined);
 							const normalizedRequirements = normalizeDocumentRequirements(
@@ -486,6 +509,8 @@ export const useLoanSetupStore = create<LoanWorkflowState>()(
 									collateralRequired: false,
 									riskGrade: grade,
 									isMandatory: true,
+									hasValidityDays: false,
+									validityDays: null,
 								}));
 							});
 							return [

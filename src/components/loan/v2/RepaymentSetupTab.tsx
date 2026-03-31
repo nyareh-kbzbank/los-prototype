@@ -1,6 +1,15 @@
 import { useEffect, useState } from "react";
-import { buildV2RepaymentSchedulePreview } from "@/lib/v2-repayment-preview";
-import { createDefaultFormulaSetup, type FormulaSetup } from "./setup-types";
+import {
+	buildOpenLineLoanPreview,
+	buildV2RepaymentSchedulePreview,
+	type OpenLineDrawdownEvent,
+	type OpenLineRepaymentEvent,
+} from "@/lib/v2-repayment-preview";
+import {
+	createDefaultFormulaSetup,
+	type FormulaSetup,
+	type ProductSetupForm,
+} from "./setup-types";
 
 export type RepaymentSetupForm = {
 	methodName: string;
@@ -45,15 +54,30 @@ export const createDefaultRepaymentSetupTabState = (): RepaymentSetupTabState =>
 type RepaymentSetupTabProps = {
 	state?: RepaymentSetupTabState;
 	onStateChange?: (value: RepaymentSetupTabState) => void;
+	loanType?: ProductSetupForm["loanType"];
+	interestFormulaSetup?: FormulaSetup;
 };
+
+const createTestEventId = () =>
+	`${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+
+const formatDateLabel = (value: Date) =>
+	new Intl.DateTimeFormat("en-US", {
+		year: "numeric",
+		month: "short",
+		day: "numeric",
+	}).format(value);
 
 export function RepaymentSetupTab({
 	state,
 	onStateChange,
+	loanType = "EMI",
+	interestFormulaSetup,
 }: Readonly<RepaymentSetupTabProps>) {
 	const [form, setForm] = useState<RepaymentSetupForm>(
 		state?.form ?? emptyForm,
 	);
+	const isOpenLineLoan = loanType === "OPEN_LINE_LOAN";
 	const [isTestDialogOpen, setIsTestDialogOpen] = useState(false);
 	const [testAmount, setTestAmount] = useState(500000);
 	const [testRate, setTestRate] = useState(18.5);
@@ -68,14 +92,29 @@ export function RepaymentSetupTab({
 	const [testCustomFieldValues, setTestCustomFieldValues] = useState<
 		Record<string, number>
 	>({});
-	const [testResult, setTestResult] = useState<{
+	const [emiTestResult, setEmiTestResult] = useState<{
 		installment: number;
 		totalInterest: number;
 		totalPayment: number;
 		schedule: ReturnType<typeof buildV2RepaymentSchedulePreview>["schedule"];
 		error: string | null;
 	} | null>(null);
+	const [openLineCreditLimit, setOpenLineCreditLimit] = useState(10000000);
+	const [openLineInitialBorrowedAmount, setOpenLineInitialBorrowedAmount] =
+		useState(0);
+	const [openLineDrawPeriodYears, setOpenLineDrawPeriodYears] = useState(1);
+	const [openLineDaysInYear, setOpenLineDaysInYear] = useState(365);
+	const [openLineDrawdowns, setOpenLineDrawdowns] = useState<
+		OpenLineDrawdownEvent[]
+	>([]);
+	const [openLineRepayments, setOpenLineRepayments] = useState<
+		OpenLineRepaymentEvent[]
+	>([]);
+	const [openLineTestResult, setOpenLineTestResult] = useState<ReturnType<
+		typeof buildOpenLineLoanPreview
+	> | null>(null);
 	const formulaSetup = state?.formulaSetup ?? createDefaultFormulaSetup();
+	const selectedInterestFormulaSetup = interestFormulaSetup ?? formulaSetup;
 
 	useEffect(() => {
 		onStateChange?.({
@@ -90,16 +129,35 @@ export function RepaymentSetupTab({
 	const openTestDialog = () => {
 		setTestCustomFieldValues((prev) => {
 			const next: Record<string, number> = {};
-			for (const field of formulaSetup.fieldDefinitions) {
+			const source = selectedInterestFormulaSetup;
+			for (const field of source.fieldDefinitions) {
 				next[field.key] = prev[field.key] ?? field.defaultValue;
 			}
 			return next;
 		});
-		setTestResult(null);
+		setEmiTestResult(null);
+		setOpenLineTestResult(null);
 		setIsTestDialogOpen(true);
 	};
 
 	const runTestCalculation = () => {
+		if (isOpenLineLoan) {
+			const preview = buildOpenLineLoanPreview({
+				creditLimit: openLineCreditLimit,
+				initialBorrowedAmount: openLineInitialBorrowedAmount,
+				startingInterestRate: testRate,
+				drawPeriodYears: openLineDrawPeriodYears,
+				openDateIso: testStartDateIso,
+				daysInYear: openLineDaysInYear,
+				drawdowns: openLineDrawdowns,
+				repayments: openLineRepayments,
+				formulaSetup: selectedInterestFormulaSetup,
+				customFieldValues: testCustomFieldValues,
+			});
+			setOpenLineTestResult(preview);
+			return;
+		}
+
 		const preview = buildV2RepaymentSchedulePreview(
 			testAmount,
 			testRate,
@@ -111,7 +169,7 @@ export function RepaymentSetupTab({
 				firstDueAfterDays: form.firstDueAfterDays,
 				firstDueAfterDueDayDays: form.firstDueAfterDueDayDays,
 			},
-			formulaSetup,
+			selectedInterestFormulaSetup,
 			testCustomFieldValues,
 		);
 		const totalInterest = preview.schedule.reduce(
@@ -122,13 +180,75 @@ export function RepaymentSetupTab({
 			(sum, row) => sum + row.payment,
 			0,
 		);
-		setTestResult({
+		setEmiTestResult({
 			installment: preview.schedule[0]?.payment ?? 0,
 			totalInterest,
 			totalPayment,
 			schedule: preview.schedule,
 			error: preview.error,
 		});
+	};
+
+	const addDrawdownEvent = () => {
+		setOpenLineDrawdowns((prev) => [
+			...prev,
+			{ id: createTestEventId(), dateIso: testStartDateIso, amount: 0 },
+		]);
+	};
+
+	const updateDrawdownEvent = (
+		eventId: string,
+		field: "dateIso" | "amount",
+		value: string,
+	) => {
+		setOpenLineDrawdowns((prev) =>
+			prev.map((item) => {
+				if (item.id !== eventId) return item;
+				if (field === "dateIso") {
+					return { ...item, dateIso: value };
+				}
+				return { ...item, amount: Number(value) || 0 };
+			}),
+		);
+	};
+
+	const removeDrawdownEvent = (eventId: string) => {
+		setOpenLineDrawdowns((prev) => prev.filter((item) => item.id !== eventId));
+	};
+
+	const addRepaymentEvent = () => {
+		setOpenLineRepayments((prev) => [
+			...prev,
+			{
+				id: createTestEventId(),
+				dateIso: testStartDateIso,
+				principalAmount: 0,
+				interestAmount: 0,
+			},
+		]);
+	};
+
+	const updateRepaymentEvent = (
+		eventId: string,
+		field: "dateIso" | "principalAmount" | "interestAmount",
+		value: string,
+	) => {
+		setOpenLineRepayments((prev) =>
+			prev.map((item) => {
+				if (item.id !== eventId) return item;
+				if (field === "dateIso") {
+					return { ...item, dateIso: value };
+				}
+				if (field === "principalAmount") {
+					return { ...item, principalAmount: Number(value) || 0 };
+				}
+				return { ...item, interestAmount: Number(value) || 0 };
+			}),
+		);
+	};
+
+	const removeRepaymentEvent = (eventId: string) => {
+		setOpenLineRepayments((prev) => prev.filter((item) => item.id !== eventId));
 	};
 
 	return (
@@ -367,88 +487,318 @@ export function RepaymentSetupTab({
 						</div>
 
 						<div className="p-4 space-y-4 overflow-y-auto max-h-[calc(90vh-72px)]">
-							<div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-								<label className="flex flex-col gap-1 text-sm">
-									<span>Loan Amount</span>
-									<input
-										type="number"
-										min={0}
-										value={testAmount}
-										onChange={(event) =>
-											setTestAmount(Number(event.target.value) || 0)
-										}
-										className="border px-2 py-2 rounded"
-									/>
-								</label>
-								<label className="flex flex-col gap-1 text-sm">
-									<span>Annual Rate (%)</span>
-									<input
-										type="number"
-										step="0.1"
-										min={0}
-										value={testRate}
-										onChange={(event) =>
-											setTestRate(Number(event.target.value) || 0)
-										}
-										className="border px-2 py-2 rounded"
-									/>
-								</label>
-								<label className="flex flex-col gap-1 text-sm">
-									<span>Tenure (Months)</span>
-									<input
-										type="number"
-										min={1}
-										value={testTenureMonths}
-										onChange={(event) =>
-											setTestTenureMonths(Number(event.target.value) || 1)
-										}
-										className="border px-2 py-2 rounded"
-									/>
-								</label>
-								<label className="flex flex-col gap-1 text-sm">
-									<span>Start Date</span>
-									<input
-										type="date"
-										value={testStartDateIso}
-										onChange={(event) =>
-											setTestStartDateIso(event.target.value)
-										}
-										className="border px-2 py-2 rounded"
-									/>
-								</label>
-							</div>
-
-							{formulaSetup.fieldDefinitions.length > 0 ? (
-								<div className="space-y-2">
-									<h3 className="text-sm font-medium">Custom Field Values</h3>
-									<div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-										{formulaSetup.fieldDefinitions.map((field) => (
-											<label
-												key={field.id}
-												className="flex flex-col gap-1 text-sm"
-											>
-												<span>
-													{field.label || field.key || "Custom field"}
-												</span>
-												<input
-													type="number"
-													value={
-														testCustomFieldValues[field.key] ??
-														field.defaultValue
-													}
-													onChange={(event) =>
-														setTestCustomFieldValues((prev) => ({
-															...prev,
-															[field.key]: Number(event.target.value) || 0,
-														}))
-													}
-													className="border px-2 py-2 rounded"
-												/>
-											</label>
-										))}
+							{isOpenLineLoan ? (
+								<>
+									<div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+										<label className="flex flex-col gap-1 text-sm">
+											<span>Credit Limit</span>
+											<input
+												type="number"
+												min={0}
+												value={openLineCreditLimit}
+												onChange={(event) =>
+													setOpenLineCreditLimit(Number(event.target.value) || 0)
+												}
+												className="border px-2 py-2 rounded"
+											/>
+										</label>
+										<label className="flex flex-col gap-1 text-sm">
+											<span>Initial Borrowed Amount</span>
+											<input
+												type="number"
+												min={0}
+												value={openLineInitialBorrowedAmount}
+												onChange={(event) =>
+													setOpenLineInitialBorrowedAmount(
+														Number(event.target.value) || 0,
+													)
+												}
+												className="border px-2 py-2 rounded"
+											/>
+										</label>
+										<label className="flex flex-col gap-1 text-sm">
+											<span>Starting Interest Rate (%)</span>
+											<input
+												type="number"
+												step="0.1"
+												min={0}
+												value={testRate}
+												onChange={(event) =>
+													setTestRate(Number(event.target.value) || 0)
+												}
+												className="border px-2 py-2 rounded"
+											/>
+										</label>
+										<label className="flex flex-col gap-1 text-sm">
+											<span>Draw Period (Years)</span>
+											<input
+												type="number"
+												min={0.01}
+												step="0.01"
+												value={openLineDrawPeriodYears}
+												onChange={(event) =>
+													setOpenLineDrawPeriodYears(
+														Number(event.target.value) || 0.01,
+													)
+												}
+												className="border px-2 py-2 rounded"
+											/>
+										</label>
+										<label className="flex flex-col gap-1 text-sm">
+											<span>Open Date</span>
+											<input
+												type="date"
+												value={testStartDateIso}
+												onChange={(event) =>
+													setTestStartDateIso(event.target.value)
+												}
+												className="border px-2 py-2 rounded"
+											/>
+										</label>
+										<label className="flex flex-col gap-1 text-sm">
+											<span>Days in Year</span>
+											<input
+												type="number"
+												min={1}
+												value={openLineDaysInYear}
+												onChange={(event) =>
+													setOpenLineDaysInYear(Number(event.target.value) || 365)
+												}
+												className="border px-2 py-2 rounded"
+											/>
+										</label>
 									</div>
-								</div>
-							) : null}
+
+									<div className="space-y-2">
+										<div className="flex items-center justify-between gap-2">
+											<h3 className="text-sm font-medium">Drawdown Inputs</h3>
+											<button
+												type="button"
+												onClick={addDrawdownEvent}
+												className="text-xs border rounded px-2 py-1 hover:bg-gray-50"
+											>
+												Add drawdown
+											</button>
+										</div>
+										<div className="space-y-2">
+											{openLineDrawdowns.map((event) => (
+												<div key={event.id} className="grid grid-cols-1 md:grid-cols-3 gap-2">
+													<input
+														type="date"
+														value={event.dateIso}
+														onChange={(evt) =>
+															updateDrawdownEvent(event.id, "dateIso", evt.target.value)
+														}
+														className="border px-2 py-2 rounded"
+													/>
+													<input
+														type="number"
+														min={0}
+														value={event.amount}
+														onChange={(evt) =>
+															updateDrawdownEvent(event.id, "amount", evt.target.value)
+														}
+														className="border px-2 py-2 rounded"
+														placeholder="Drawdown amount"
+													/>
+													<button
+														type="button"
+														onClick={() => removeDrawdownEvent(event.id)}
+														className="text-xs border rounded px-2 py-1 hover:bg-gray-50"
+													>
+														Remove
+													</button>
+												</div>
+											))}
+											{openLineDrawdowns.length === 0 ? (
+												<div className="text-xs text-gray-500">No drawdown events added.</div>
+											) : null}
+										</div>
+									</div>
+
+									<div className="space-y-2">
+										<div className="flex items-center justify-between gap-2">
+											<h3 className="text-sm font-medium">Repayment Inputs</h3>
+											<button
+												type="button"
+												onClick={addRepaymentEvent}
+												className="text-xs border rounded px-2 py-1 hover:bg-gray-50"
+											>
+												Add repayment
+											</button>
+										</div>
+										<div className="space-y-2">
+											{openLineRepayments.map((event) => (
+												<div key={event.id} className="grid grid-cols-1 md:grid-cols-4 gap-2">
+													<input
+														type="date"
+														value={event.dateIso}
+														onChange={(evt) =>
+															updateRepaymentEvent(event.id, "dateIso", evt.target.value)
+														}
+														className="border px-2 py-2 rounded"
+													/>
+													<input
+														type="number"
+														min={0}
+														value={event.principalAmount}
+														onChange={(evt) =>
+															updateRepaymentEvent(
+																event.id,
+																"principalAmount",
+																evt.target.value,
+															)
+														}
+														className="border px-2 py-2 rounded"
+														placeholder="Principal repayment"
+													/>
+													<input
+														type="number"
+														min={0}
+														value={event.interestAmount}
+														onChange={(evt) =>
+															updateRepaymentEvent(
+																event.id,
+																"interestAmount",
+																evt.target.value,
+															)
+														}
+														className="border px-2 py-2 rounded"
+														placeholder="Interest repayment"
+													/>
+													<button
+														type="button"
+														onClick={() => removeRepaymentEvent(event.id)}
+														className="text-xs border rounded px-2 py-1 hover:bg-gray-50"
+													>
+														Remove
+													</button>
+												</div>
+											))}
+											{openLineRepayments.length === 0 ? (
+												<div className="text-xs text-gray-500">No repayment events added.</div>
+											) : null}
+										</div>
+									</div>
+
+									{selectedInterestFormulaSetup.fieldDefinitions.length > 0 ? (
+										<div className="space-y-2">
+											<h3 className="text-sm font-medium">Custom Field Values</h3>
+											<div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+												{selectedInterestFormulaSetup.fieldDefinitions.map((field) => (
+													<label
+														key={field.id}
+														className="flex flex-col gap-1 text-sm"
+													>
+														<span>
+															{field.label || field.key || "Custom field"}
+														</span>
+														<input
+															type="number"
+															value={
+																testCustomFieldValues[field.key] ??
+																field.defaultValue
+															}
+															onChange={(event) =>
+																setTestCustomFieldValues((prev) => ({
+																	...prev,
+																	[field.key]: Number(event.target.value) || 0,
+																}))
+															}
+															className="border px-2 py-2 rounded"
+														/>
+													</label>
+												))}
+											</div>
+										</div>
+									) : null}
+								</>
+							) : (
+								<>
+									<div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+										<label className="flex flex-col gap-1 text-sm">
+											<span>Loan Amount</span>
+											<input
+												type="number"
+												min={0}
+												value={testAmount}
+												onChange={(event) =>
+													setTestAmount(Number(event.target.value) || 0)
+												}
+												className="border px-2 py-2 rounded"
+											/>
+										</label>
+										<label className="flex flex-col gap-1 text-sm">
+											<span>Annual Rate (%)</span>
+											<input
+												type="number"
+												step="0.1"
+												min={0}
+												value={testRate}
+												onChange={(event) =>
+													setTestRate(Number(event.target.value) || 0)
+												}
+												className="border px-2 py-2 rounded"
+											/>
+										</label>
+										<label className="flex flex-col gap-1 text-sm">
+											<span>Tenure (Months)</span>
+											<input
+												type="number"
+												min={1}
+												value={testTenureMonths}
+												onChange={(event) =>
+													setTestTenureMonths(Number(event.target.value) || 1)
+												}
+												className="border px-2 py-2 rounded"
+											/>
+										</label>
+										<label className="flex flex-col gap-1 text-sm">
+											<span>Start Date</span>
+											<input
+												type="date"
+												value={testStartDateIso}
+												onChange={(event) =>
+													setTestStartDateIso(event.target.value)
+												}
+												className="border px-2 py-2 rounded"
+											/>
+										</label>
+									</div>
+
+									{selectedInterestFormulaSetup.fieldDefinitions.length > 0 ? (
+										<div className="space-y-2">
+											<h3 className="text-sm font-medium">Custom Field Values</h3>
+											<div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+												{selectedInterestFormulaSetup.fieldDefinitions.map((field) => (
+													<label
+														key={field.id}
+														className="flex flex-col gap-1 text-sm"
+													>
+														<span>
+															{field.label || field.key || "Custom field"}
+														</span>
+														<input
+															type="number"
+															value={
+																testCustomFieldValues[field.key] ??
+																field.defaultValue
+															}
+															onChange={(event) =>
+																setTestCustomFieldValues((prev) => ({
+																	...prev,
+																	[field.key]: Number(event.target.value) || 0,
+																}))
+															}
+															className="border px-2 py-2 rounded"
+														/>
+													</label>
+												))}
+											</div>
+										</div>
+									) : null}
+								</>
+							)}
 
 							<div>
 								<button
@@ -460,34 +810,34 @@ export function RepaymentSetupTab({
 								</button>
 							</div>
 
-							{testResult ? (
+							{emiTestResult && !isOpenLineLoan ? (
 								<div className="border rounded p-3 bg-gray-50">
 									<div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
 										<div>
 											<div className="text-xs text-gray-600">Installment</div>
 											<div className="text-lg font-semibold">
-												{formatNumber(testResult.installment)}
+												{formatNumber(emiTestResult.installment)}
 											</div>
 										</div>
 										<div>
 											<div className="text-xs text-gray-600">Total Interest</div>
 											<div className="text-lg font-semibold">
-												{formatNumber(testResult.totalInterest)}
+												{formatNumber(emiTestResult.totalInterest)}
 											</div>
 										</div>
 										<div>
 											<div className="text-xs text-gray-600">Total Payment</div>
 											<div className="text-lg font-semibold">
-												{formatNumber(testResult.totalPayment)}
+												{formatNumber(emiTestResult.totalPayment)}
 											</div>
 										</div>
 									</div>
-									{testResult.error ? (
+									{emiTestResult.error ? (
 										<div className="text-sm text-red-700 mt-2">
-											{testResult.error}
+											{emiTestResult.error}
 										</div>
 									) : null}
-									{testResult.schedule.length > 0 ? (
+									{emiTestResult.schedule.length > 0 ? (
 										<div className="mt-4">
 											<h3 className="text-sm font-medium mb-2">
 												Payment Schedule
@@ -505,15 +855,11 @@ export function RepaymentSetupTab({
 														</tr>
 													</thead>
 													<tbody className="divide-y divide-gray-200">
-														{testResult.schedule.map((row) => (
+														{emiTestResult.schedule.map((row) => (
 															<tr key={row.period} className="hover:bg-gray-50">
 																<td className="px-3 py-2 text-gray-500">{row.period}</td>
 																<td className="px-3 py-2">
-																	{new Intl.DateTimeFormat("en-US", {
-																		year: "numeric",
-																		month: "short",
-																		day: "numeric",
-																	}).format(row.date)}
+																	{formatDateLabel(row.date)}
 																</td>
 																<td className="px-3 py-2 text-right font-medium">{formatNumber(row.payment)}</td>
 																<td className="px-3 py-2 text-right text-gray-600">{formatNumber(row.principal)}</td>
@@ -524,6 +870,53 @@ export function RepaymentSetupTab({
 													</tbody>
 												</table>
 											</div>
+										</div>
+									) : null}
+								</div>
+							) : null}
+
+							{isOpenLineLoan && openLineTestResult ? (
+								<div className="border rounded p-3 bg-gray-50 space-y-3">
+									{openLineTestResult.error ? (
+										<div className="text-sm text-red-700">{openLineTestResult.error}</div>
+									) : null}
+									{openLineTestResult.rows.length > 0 ? (
+										<div className="border rounded-lg overflow-x-auto bg-white">
+											<table className="min-w-full text-sm text-left">
+												<thead className="bg-gray-100 text-gray-700 font-semibold border-b">
+													<tr>
+														<th className="px-3 py-2 whitespace-nowrap">Date</th>
+														<th className="px-3 py-2 text-right whitespace-nowrap">Opening</th>
+														<th className="px-3 py-2 text-right whitespace-nowrap">Drawdown</th>
+														<th className="px-3 py-2 text-right whitespace-nowrap">Principal Repayment</th>
+														<th className="px-3 py-2 text-right whitespace-nowrap">Closing</th>
+														<th className="px-3 py-2 text-right whitespace-nowrap">Interest</th>
+														<th className="px-3 py-2 text-right whitespace-nowrap">Interest Repayment</th>
+														<th className="px-3 py-2 text-right whitespace-nowrap">Accrued Interest</th>
+														<th className="px-3 py-2 text-right whitespace-nowrap">Total Payment</th>
+													</tr>
+												</thead>
+												<tbody className="divide-y divide-gray-200">
+													{openLineTestResult.rows.map((row) => (
+														<tr
+															key={row.date.toISOString()}
+															className="hover:bg-gray-50"
+														>
+															<td className="px-3 py-2 whitespace-nowrap">
+																{formatDateLabel(row.date)}
+															</td>
+															<td className="px-3 py-2 text-right">{formatNumber(row.opening)}</td>
+															<td className="px-3 py-2 text-right">{formatNumber(row.drawdown)}</td>
+															<td className="px-3 py-2 text-right">{formatNumber(row.principalRepayment)}</td>
+															<td className="px-3 py-2 text-right font-medium">{formatNumber(row.closing)}</td>
+															<td className="px-3 py-2 text-right text-orange-600">{formatNumber(row.interest)}</td>
+															<td className="px-3 py-2 text-right">{formatNumber(row.interestRepayment)}</td>
+															<td className="px-3 py-2 text-right">{formatNumber(row.accruedInterest)}</td>
+															<td className="px-3 py-2 text-right font-medium">{formatNumber(row.totalPayment)}</td>
+														</tr>
+													))}
+												</tbody>
+											</table>
 										</div>
 									) : null}
 								</div>

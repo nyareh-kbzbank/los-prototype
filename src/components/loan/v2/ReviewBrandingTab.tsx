@@ -1,4 +1,11 @@
-import { CheckCircle2, ImageIcon, Plus, Sparkles, Trash2, X } from "lucide-react";
+import {
+	CheckCircle2,
+	ImageIcon,
+	Plus,
+	Sparkles,
+	Trash2,
+	X,
+} from "lucide-react";
 import { useMemo, useState } from "react";
 import { InputInfoLabel } from "./InputInfoLabel";
 import type {
@@ -165,7 +172,8 @@ export function ReviewBrandingTab({
 							Channel Configuration
 						</h2>
 						<p className="mt-1 text-sm text-slate-600">
-							Assign origination channels and connect each one to the workflow that should run during review.
+							Assign origination channels and connect each one to the workflow
+							that should run during review.
 						</p>
 					</div>
 					<button
@@ -204,7 +212,7 @@ export function ReviewBrandingTab({
 									))}
 								</select>
 							</div>
-							<div className="space-y-1">
+							{/* <div className="space-y-1">
 								<InputInfoLabel
 									label="Channel Code"
 									info="Short code for integrations and reporting."
@@ -218,7 +226,7 @@ export function ReviewBrandingTab({
 									className="w-full rounded-xl border bg-white px-3 py-2"
 									placeholder="Channel Code"
 								/>
-							</div>
+							</div> */}
 							<div className="space-y-1">
 								<InputInfoLabel
 									label="Workflow"
@@ -227,31 +235,43 @@ export function ReviewBrandingTab({
 								<select
 									value={channel.workflowId}
 									onChange={(event) =>
-										updateChannelField(channel.id, "workflowId", event.target.value)
+										updateChannelField(
+											channel.id,
+											"workflowId",
+											event.target.value,
+										)
 									}
 									className="w-full rounded-xl border bg-white px-3 py-2"
 								>
 									<option value="">(Select workflow)</option>
 									{workflowList.map((workflow) => (
-										<option key={workflow.workflowId} value={workflow.workflowId}>
+										<option
+											key={workflow.workflowId}
+											value={workflow.workflowId}
+										>
 											{workflow.name}
 										</option>
 									))}
 								</select>
 							</div>
-							<button
-								type="button"
-								onClick={() => removeChannel(channel.id)}
-								className="inline-flex items-center justify-center gap-2 rounded-xl border bg-white px-3 py-2 text-sm hover:bg-slate-100"
-							>
-								<Trash2 className="h-4 w-4" />
-								Remove
-							</button>
+							<div className="space-y-1 flex flex-col justify-end">
+								{/* <InputInfoLabel
+									label=""
+									info=""
+								/> */}
+								<button
+									type="button"
+									onClick={() => removeChannel(channel.id)}
+									className="inline-flex items-center justify-center gap-2 rounded-xl border bg-white px-3 py-2 text-sm hover:bg-slate-100"
+								>
+									<Trash2 className="h-4 w-4" />
+									Remove
+								</button>
+							</div>
 						</div>
 					))}
 				</div>
 			</section>
-
 
 			<div className="grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(340px,0.9fr)]">
 				<div className="space-y-6">
@@ -315,7 +335,8 @@ export function ReviewBrandingTab({
 									<div>
 										<div className="text-xs text-slate-500">Distribution</div>
 										<div className="text-sm font-semibold text-slate-950">
-											{workflowCount} workflow path{workflowCount === 1 ? "" : "s"}
+											{workflowCount} workflow path
+											{workflowCount === 1 ? "" : "s"}
 										</div>
 									</div>
 								</div>
@@ -330,7 +351,8 @@ export function ReviewBrandingTab({
 									Marketplace Branding
 								</h2>
 								<p className="mt-1 text-sm text-slate-600">
-									Configure visual assets and the product story shown in catalog or partner channels.
+									Configure visual assets and the product story shown in catalog
+									or partner channels.
 								</p>
 							</div>
 							<div className="inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
@@ -347,7 +369,9 @@ export function ReviewBrandingTab({
 								/>
 								<input
 									type="url"
-									value={brandingSetup.bannerImageUrl}
+									value={
+										brandingSetup.bannerImageUrl
+									}
 									onChange={(event) =>
 										updateBrandingField("bannerImageUrl", event.target.value)
 									}
@@ -363,7 +387,9 @@ export function ReviewBrandingTab({
 								/>
 								<input
 									type="url"
-									value={brandingSetup.cardImageUrl}
+									value={
+										brandingSetup.cardImageUrl
+									}
 									onChange={(event) =>
 										updateBrandingField("cardImageUrl", event.target.value)
 									}
@@ -471,20 +497,24 @@ export function ReviewBrandingTab({
 								Banner Aspect 4:3
 							</div>
 							<div className="overflow-hidden rounded-[28px] border border-white/10 bg-white/5">
-								{previewBannerImage ? (
+								{true? (
 									<img
-										src={previewBannerImage}
+										src={previewBannerImage||
+										"https://plus.unsplash.com/premium_photo-1661313685117-fc961baf8121?w=600&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8MXx8TG9hbnxlbnwwfHwwfHx8MA%3D%3D"}
 										alt={`${displayName} banner preview`}
 										className="aspect-4/3 h-full w-full object-cover"
 									/>
 								) : (
-										<div className="flex aspect-4/3 flex-col items-center justify-center gap-3 bg-[radial-gradient(circle_at_top,rgba(59,130,246,0.35),transparent_55%),linear-gradient(135deg,rgba(15,23,42,1),rgba(30,41,59,0.92))] px-6 text-center text-slate-300">
+									<div className="flex aspect-4/3 flex-col items-center justify-center gap-3 bg-[radial-gradient(circle_at_top,rgba(59,130,246,0.35),transparent_55%),linear-gradient(135deg,rgba(15,23,42,1),rgba(30,41,59,0.92))] px-6 text-center text-slate-300">
 										<div className="rounded-2xl bg-white/10 p-3">
 											<ImageIcon className="h-6 w-6" />
 										</div>
-										<div className="text-sm font-medium">Add a banner image URL</div>
+										<div className="text-sm font-medium">
+											Add a banner image URL
+										</div>
 										<div className="max-w-xs text-xs text-slate-400">
-											This will preview your marketplace hero banner in real time.
+											This will preview your marketplace hero banner in real
+											time.
 										</div>
 									</div>
 								)}
@@ -493,14 +523,15 @@ export function ReviewBrandingTab({
 
 						<div className="overflow-hidden rounded-[30px] bg-white text-slate-950">
 							<div className="relative border-b border-slate-100">
-								{previewCardImage ? (
+								{true? (
 									<img
-										src={previewCardImage}
+										src={previewCardImage||
+										"https://plus.unsplash.com/premium_photo-1661313685117-fc961baf8121?w=600&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8MXx8TG9hbnxlbnwwfHwwfHx8MA%3D%3D"}
 										alt={`${displayName} card preview`}
 										className="aspect-16/10 h-full w-full object-cover"
 									/>
 								) : (
-										<div className="flex aspect-16/10 items-center justify-center bg-[linear-gradient(135deg,#dbeafe,#eff6ff_45%,#ffffff)] text-slate-400">
+									<div className="flex aspect-16/10 items-center justify-center bg-[linear-gradient(135deg,#dbeafe,#eff6ff_45%,#ffffff)] text-slate-400">
 										<ImageIcon className="h-8 w-8" />
 									</div>
 								)}
@@ -536,7 +567,9 @@ export function ReviewBrandingTab({
 									</div>
 								</div>
 
-								<p className="text-sm leading-6 text-slate-600">{displayDescription}</p>
+								<p className="text-sm leading-6 text-slate-600">
+									{displayDescription}
+								</p>
 
 								<div className="flex flex-wrap gap-2">
 									{previewTags.map((tag) => (
@@ -563,7 +596,9 @@ export function ReviewBrandingTab({
 											Setup coverage
 										</div>
 										<div className="mt-1 font-semibold text-slate-900">
-											{interestPlanCount} plan{interestPlanCount === 1 ? "" : "s"} · {documentRuleCount} doc band{documentRuleCount === 1 ? "" : "s"}
+											{interestPlanCount} plan
+											{interestPlanCount === 1 ? "" : "s"} · {documentRuleCount}{" "}
+											doc band{documentRuleCount === 1 ? "" : "s"}
 										</div>
 									</div>
 								</div>

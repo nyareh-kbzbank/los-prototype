@@ -1087,6 +1087,10 @@ function LoanSetup() {
 					collateralRequired: document.collateralRequired,
 					riskGrade: requirement.grade,
 					isMandatory: document.isMandatory,
+					hasValidityDays: document.hasValidityDays,
+					validityDays: document.hasValidityDays
+						? (document.validityDays ?? 0)
+						: null,
 				})),
 		);
 
