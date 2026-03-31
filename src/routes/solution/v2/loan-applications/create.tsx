@@ -400,8 +400,8 @@ const validateV2StepOne = (input: {
 		};
 	}
 
-	const isSecuredProduct =
-		input.activeSetup.productSetup.loanSecurity === "SECURED";
+	const isSecuredProduct =false;
+
 	let parsedCollateralEstimatedValue: number | null = null;
 	if (isSecuredProduct) {
 		parsedCollateralEstimatedValue = Number(
@@ -574,7 +574,8 @@ function V2LoanApplicationCreate() {
 	const disabled = setupList.length === 0;
 	const tenorOptions =
 		activeSetup?.productSetup.tenorValues.map((item) => item.value) ?? [];
-	const isSecuredProduct = activeSetup?.productSetup.loanSecurity === "SECURED";
+	// const isSecuredProduct = activeSetup?.productSetup.loanSecurity === "SECURED";
+  const isSecuredProduct = false;
 	const activeScoreFields =
 		activeSetup?.creditScoreSetup.scoreCard.fields ?? [];
 	const requiresGenderInput = scoreCardHasField(activeScoreFields, [
@@ -766,6 +767,8 @@ function V2LoanApplicationCreate() {
 	const repaymentScheduleMeta = useMemo(() => {
 		if (!activeSetup) {
 			return {
+				requestedLoanAmountLabel: "0.00",
+				interestRateLabel: "0.00%",
 				dueDayLabel: "—",
 				processingFeeLabel: "0.00",
 				disbursementFeeLabel: "0.00",
@@ -801,6 +804,10 @@ function V2LoanApplicationCreate() {
 		}
 
 		return {
+			requestedLoanAmountLabel: formatAmountWithTwoDecimals(
+				Number(amountInput),
+			),
+			interestRateLabel: `${formatAmountWithTwoDecimals(activeSetup.interestRatePlans[0]?.baseRate ?? 0)}%`,
 			dueDayLabel,
 			processingFeeLabel: formatAmountWithTwoDecimals(
 				activeSetup.disbursementSetup.processingFee,
@@ -811,7 +818,7 @@ function V2LoanApplicationCreate() {
 			lateFeeLabel: lateFeeParts.join(" + ") || "0.00",
 			prepaymentPenaltyLabel: `${formatAmountWithTwoDecimals(repaymentForm.prepaymentPenaltyPct)}%`,
 		};
-	}, [activeSetup]);
+	}, [activeSetup, amountInput]);
 
 	const computedScoreInputs = useMemo(() => {
 		if (!activeSetup) return null;
@@ -1705,7 +1712,15 @@ function V2LoanApplicationCreate() {
 													Close
 												</button>
 											</div>
-											<div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
+											<div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7">
+												<div className="rounded border bg-white p-3">
+													<div className="text-[11px] uppercase tracking-wide text-gray-500">Requested loan amount</div>
+													<div className="mt-1 font-medium text-gray-900">{repaymentScheduleMeta.requestedLoanAmountLabel}</div>
+												</div>
+												<div className="rounded border bg-white p-3">
+													<div className="text-[11px] uppercase tracking-wide text-gray-500">Interest rate</div>
+													<div className="mt-1 font-medium text-gray-900">{repaymentScheduleMeta.interestRateLabel}</div>
+												</div>
 												<div className="rounded border bg-white p-3">
 													<div className="text-[11px] uppercase tracking-wide text-gray-500">Due day rule</div>
 													<div className="mt-1 font-medium text-gray-900">{repaymentScheduleMeta.dueDayLabel}</div>

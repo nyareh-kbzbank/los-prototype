@@ -369,7 +369,9 @@ export function ReviewBrandingTab({
 								/>
 								<input
 									type="url"
-									value={brandingSetup.bannerImageUrl}
+									value={
+										brandingSetup.bannerImageUrl
+									}
 									onChange={(event) =>
 										updateBrandingField("bannerImageUrl", event.target.value)
 									}
@@ -385,7 +387,9 @@ export function ReviewBrandingTab({
 								/>
 								<input
 									type="url"
-									value={brandingSetup.cardImageUrl}
+									value={
+										brandingSetup.cardImageUrl
+									}
 									onChange={(event) =>
 										updateBrandingField("cardImageUrl", event.target.value)
 									}
@@ -493,9 +497,10 @@ export function ReviewBrandingTab({
 								Banner Aspect 4:3
 							</div>
 							<div className="overflow-hidden rounded-[28px] border border-white/10 bg-white/5">
-								{previewBannerImage ? (
+								{true? (
 									<img
-										src={previewBannerImage}
+										src={previewBannerImage||
+										"https://plus.unsplash.com/premium_photo-1661313685117-fc961baf8121?w=600&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8MXx8TG9hbnxlbnwwfHwwfHx8MA%3D%3D"}
 										alt={`${displayName} banner preview`}
 										className="aspect-4/3 h-full w-full object-cover"
 									/>
@@ -518,9 +523,10 @@ export function ReviewBrandingTab({
 
 						<div className="overflow-hidden rounded-[30px] bg-white text-slate-950">
 							<div className="relative border-b border-slate-100">
-								{previewCardImage ? (
+								{true? (
 									<img
-										src={previewCardImage}
+										src={previewCardImage||
+										"https://plus.unsplash.com/premium_photo-1661313685117-fc961baf8121?w=600&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8MXx8TG9hbnxlbnwwfHwwfHx8MA%3D%3D"}
 										alt={`${displayName} card preview`}
 										className="aspect-16/10 h-full w-full object-cover"
 									/>

@@ -52,7 +52,7 @@ type DecisionRuleSetupTabProps = {
 
 const decisionActionLabel: Record<DecisionRuleAction, string> = {
 	AUTO_APPROVE: "Auto Approve",
-	MANUAL_REVIEW: "Manual Review",
+	MANUAL_REVIEW: "Approval Workflow Process",
 	AUTO_REJECT: "Auto Reject",
 };
 
