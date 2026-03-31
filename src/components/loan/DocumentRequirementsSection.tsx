@@ -66,6 +66,8 @@ export type DocumentRequirementDocument = {
 	employmentType: string | null;
 	collateralRequired: boolean;
 	isMandatory: boolean;
+	hasValidityDays: boolean;
+	validityDays: number | null;
 };
 
 const generateRequirementId = () =>
@@ -84,6 +86,8 @@ export const createDocumentRequirementDocument = (
 	employmentType: null,
 	collateralRequired: false,
 	isMandatory: true,
+	hasValidityDays: false,
+	validityDays: null,
 	...overrides,
 });
 
@@ -100,6 +104,12 @@ export const createDocumentRequirementItem = (
 					...document,
 					id: document.id || generateRequirementId(),
 					documentTypeId: normalizeDocumentTypeId(document.documentTypeId),
+					hasValidityDays:
+						document.hasValidityDays ?? document.validityDays != null,
+					validityDays:
+						document.hasValidityDays ?? document.validityDays != null
+							? (document.validityDays ?? 0)
+							: null,
 				},
 	),
 });
@@ -201,6 +211,20 @@ function DocumentRequirementsSection(
 		);
 	};
 
+	const normalizeValidityValues = (
+		document: DocumentRequirementDocument,
+	): DocumentRequirementDocument => {
+		const hasValidityDays = Boolean(document.hasValidityDays);
+		const parsedValidityDays = Number.isFinite(document.validityDays)
+			? Math.max(0, Number(document.validityDays))
+			: null;
+		return {
+			...document,
+			hasValidityDays,
+			validityDays: hasValidityDays ? (parsedValidityDays ?? 0) : null,
+		};
+	};
+
 	const resetBuilder = () => {
 		const preferredGrade =
 			riskResult?.riskGrade && !blockedGradeSet.has(riskResult.riskGrade)
@@ -226,7 +250,7 @@ function DocumentRequirementsSection(
 								...requirement,
 								grade: draftGrade,
 								documents: draftDocuments.map((document) => ({
-									...document,
+									...normalizeValidityValues(document),
 									documentTypeId: normalizeDocumentTypeId(
 										document.documentTypeId,
 									),
@@ -238,7 +262,7 @@ function DocumentRequirementsSection(
 		} else {
 			const nextRequirement = createDocumentRequirementItem(
 				draftGrade,
-				draftDocuments,
+				draftDocuments.map((document) => normalizeValidityValues(document)),
 			);
 			onChangeRequirements((prev) => [...prev, nextRequirement]);
 		}
@@ -408,6 +432,37 @@ function DocumentRequirementsSection(
 												/>
 												<span>Mandatory</span>
 											</label>
+											<label className="flex items-center gap-2">
+												<input
+													type="checkbox"
+													checked={doc.hasValidityDays}
+													onChange={(event) =>
+														updateDraftDocument(doc.id, {
+															hasValidityDays: event.target.checked,
+															validityDays: event.target.checked
+																? (doc.validityDays ?? 0)
+																: null,
+														})
+													}
+												/>
+												<span>Enable validity days</span>
+											</label>
+											{doc.hasValidityDays ? (
+												<label className="flex flex-col gap-1 text-xs">
+													<span>Validity days</span>
+													<input
+														type="number"
+														min={0}
+														value={doc.validityDays ?? 0}
+														onChange={(event) =>
+															updateDraftDocument(doc.id, {
+																validityDays: Number(event.target.value),
+															})
+														}
+														className="border rounded px-2 py-1"
+													/>
+												</label>
+											) : null}
 										</div>
 									</div>
 								</div>
@@ -504,6 +559,9 @@ function DocumentRequirementsSection(
 													Collateral: {doc.collateralRequired ? "Yes" : "No"}
 												</div>
 												<div>Mandatory: {doc.isMandatory ? "Yes" : "No"}</div>
+												<div>
+													Validity days: {doc.hasValidityDays ? `${doc.validityDays ?? 0}` : "—"}
+												</div>
 											</div>
 										</div>
 									))}

@@ -9,10 +9,14 @@ import type {
 } from "@/components/loan/v2/DecisionRuleSetupTab";
 import type { DisbursementSetupTabState } from "@/components/loan/v2/DisbursementSetupTab";
 import type { RepaymentSetupTabState } from "@/components/loan/v2/RepaymentSetupTab";
-import type {
-	ChannelConfig,
-	ProductSetupForm,
-	V2InterestConfig,
+import {
+	type ChannelConfig,
+	createDefaultBrandingSetup,
+	createDefaultFormulaSetup,
+	type FormulaSetup,
+	type ProductSetupForm,
+	type V2BrandingSetup,
+	type V2InterestConfig,
 } from "@/components/loan/v2/setup-types";
 
 export type V2LoanSetupSnapshot = {
@@ -21,6 +25,7 @@ export type V2LoanSetupSnapshot = {
 	productSetup: ProductSetupForm;
 	channels: ChannelConfig[];
 	interestRatePlans: V2InterestConfig[];
+	interestFormulaSetup: FormulaSetup;
 	repaymentSetup: RepaymentSetupTabState;
 	creditScoreSetup: CreditScoreEngineState;
 	documentSetup: DocumentRequirementItem[];
@@ -31,12 +36,14 @@ export type V2LoanSetupSnapshot = {
 	decisionRules: DecisionRuleByGrade;
 	decisionRuleSetup?: DecisionRuleSetupState;
 	disbursementSetup: DisbursementSetupTabState;
+	brandingSetup: V2BrandingSetup;
 };
 
 type V2LoanSetupInput = {
 	productSetup: ProductSetupForm;
 	channels: ChannelConfig[];
 	interestRatePlans: V2InterestConfig[];
+	interestFormulaSetup: FormulaSetup;
 	repaymentSetup: RepaymentSetupTabState;
 	creditScoreSetup: CreditScoreEngineState;
 	documentSetup: DocumentRequirementItem[];
@@ -47,6 +54,18 @@ type V2LoanSetupInput = {
 	decisionRules: DecisionRuleByGrade;
 	decisionRuleSetup: DecisionRuleSetupState;
 	disbursementSetup: DisbursementSetupTabState;
+	brandingSetup: V2BrandingSetup;
+};
+
+type PersistedV2LoanSetupSnapshot = Omit<
+	V2LoanSetupSnapshot,
+	"brandingSetup"
+> & {
+	brandingSetup?: V2BrandingSetup;
+};
+
+type PersistedV2LoanSetupState = {
+	setups?: Record<string, PersistedV2LoanSetupSnapshot>;
 };
 
 type V2LoanSetupState = {
@@ -57,20 +76,56 @@ type V2LoanSetupState = {
 	resetStore: () => void;
 };
 
+const createId = () =>
+	typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+		? crypto.randomUUID()
+		: Math.random().toString(36).slice(2);
+
+const normalizeLoanType = (productSetup: ProductSetupForm) => {
+	if (productSetup.loanSecurity === "SECURED") {
+		return "EMI" as const;
+	}
+	if (productSetup.loanType === "OPEN_LINE_LOAN") {
+		return "OPEN_LINE_LOAN" as const;
+	}
+	return "EMI" as const;
+};
+
 const cloneProductSetup = (
 	productSetup: ProductSetupForm,
-): ProductSetupForm => ({
-	...productSetup,
-	productName: productSetup.productName.trim(),
-	productCode: productSetup.productCode.trim(),
-	description: productSetup.description.trim(),
-	minAmount: Math.max(0, productSetup.minAmount),
-	maxAmount: Math.max(0, productSetup.maxAmount),
-	tenorValues: productSetup.tenorValues.map((item) => ({
-		id: item.id,
-		value: Math.max(0, item.value),
-	})),
-});
+): ProductSetupForm => {
+	const normalizedLoanType = normalizeLoanType(productSetup);
+
+	return {
+		...productSetup,
+		productName: productSetup.productName.trim(),
+		productCode: productSetup.productCode.trim(),
+		description: productSetup.description.trim(),
+		loanType: normalizedLoanType,
+		collateralType: productSetup.collateralType ?? "LAND",
+		minimumCollateralValue: Math.max(
+			0,
+			productSetup.minimumCollateralValue ?? 0,
+		),
+		maximumLtvPercentage: Math.max(0, productSetup.maximumLtvPercentage ?? 0),
+		haircutPercentage: Math.max(0, productSetup.haircutPercentage ?? 0),
+		valuationRequired: Boolean(productSetup.valuationRequired),
+		valuationValidityDays:
+			productSetup.valuationValidityDays == null
+				? null
+				: Math.max(0, productSetup.valuationValidityDays),
+		minAmount: Math.max(0, productSetup.minAmount),
+		maxAmount: Math.max(0, productSetup.maxAmount),
+		maxAmountRateType:
+			productSetup.maxAmountRateType === "PERCENTAGE"
+				? "PERCENTAGE"
+				: "FLAT",
+		tenorValues: productSetup.tenorValues.map((item) => ({
+			id: item.id,
+			value: Math.max(0, item.value),
+		})),
+	};
+};
 
 const cloneChannels = (channels: ChannelConfig[]): ChannelConfig[] =>
 	channels
@@ -86,11 +141,13 @@ const cloneInterestRatePlans = (
 	interestRatePlans: V2InterestConfig[],
 ): V2InterestConfig[] =>
 	interestRatePlans.map((plan) => ({
+		id: plan.id || createId(),
 		interestType: plan.interestType,
 		rateType: plan.rateType,
 		baseRate: Number.isFinite(plan.baseRate) ? plan.baseRate : 0,
 		config: {
 			parameters: (plan.config?.parameters ?? []).map((parameter) => ({
+				id: parameter.id || createId(),
 				name: parameter.name,
 				value: Number.isFinite(parameter.value) ? parameter.value : 0,
 				interestRate: Number.isFinite(parameter.interestRate)
@@ -99,12 +156,47 @@ const cloneInterestRatePlans = (
 			})),
 		},
 		policies: (plan.policies ?? []).map((policy) => ({
+			id: policy.id || createId(),
 			interestCategory: policy.interestCategory,
 			interestRate: Number.isFinite(policy.interestRate)
 				? policy.interestRate
 				: 0,
 		})),
 	}));
+
+const cloneFormulaSetup = (formulaSetup?: FormulaSetup): FormulaSetup => ({
+	principalFormula: (
+		formulaSetup?.principalFormula ?? createDefaultFormulaSetup().principalFormula
+	).trim(),
+	interestFormula: (
+		formulaSetup?.interestFormula ?? createDefaultFormulaSetup().interestFormula
+	).trim(),
+	openLineFormulas: {
+		closingPrincipalFormula: (
+			formulaSetup?.openLineFormulas?.closingPrincipalFormula ??
+			createDefaultFormulaSetup().openLineFormulas.closingPrincipalFormula
+		).trim(),
+		dailyInterestFormula: (
+			formulaSetup?.openLineFormulas?.dailyInterestFormula ??
+			createDefaultFormulaSetup().openLineFormulas.dailyInterestFormula
+		).trim(),
+		accruedInterestFormula: (
+			formulaSetup?.openLineFormulas?.accruedInterestFormula ??
+			createDefaultFormulaSetup().openLineFormulas.accruedInterestFormula
+		).trim(),
+		totalPaymentFormula: (
+			formulaSetup?.openLineFormulas?.totalPaymentFormula ??
+			createDefaultFormulaSetup().openLineFormulas.totalPaymentFormula
+		).trim(),
+	},
+	fieldDefinitions: (formulaSetup?.fieldDefinitions ?? []).map((field) => ({
+		id: field.id,
+		key: field.key.trim(),
+		label: field.label.trim(),
+		description: field.description.trim(),
+		defaultValue: Number.isFinite(field.defaultValue) ? field.defaultValue : 0,
+	})),
+});
 
 const cloneDecisionRules = (
 	decisionRules: DecisionRuleByGrade,
@@ -139,21 +231,7 @@ const cloneRepaymentSetup = (
 		methodName: repaymentSetup.form.methodName.trim(),
 		description: repaymentSetup.form.description.trim(),
 	},
-	formulaSetup: {
-		principalFormula: repaymentSetup.formulaSetup.principalFormula.trim(),
-		interestFormula: repaymentSetup.formulaSetup.interestFormula.trim(),
-		fieldDefinitions: repaymentSetup.formulaSetup.fieldDefinitions.map(
-			(field) => ({
-				id: field.id,
-				key: field.key.trim(),
-				label: field.label.trim(),
-				description: field.description.trim(),
-				defaultValue: Number.isFinite(field.defaultValue)
-					? field.defaultValue
-					: 0,
-			}),
-		),
-	},
+	formulaSetup: cloneFormulaSetup(repaymentSetup.formulaSetup),
 });
 
 const cloneCreditScoreSetup = (
@@ -189,21 +267,38 @@ const cloneCreditScoreSetup = (
 	},
 });
 
+const normalizeDocumentValidityDays = (
+	hasValidityDays: boolean,
+	validityDays: number | null,
+): number | null => {
+	if (!hasValidityDays) return null;
+	if (!Number.isFinite(validityDays)) return 0;
+	return Math.max(0, Number(validityDays));
+};
+
 const cloneDocumentSetup = (
 	documentSetup: DocumentRequirementItem[],
 ): DocumentRequirementItem[] =>
 	documentSetup.map((item) => ({
 		id: item.id,
 		grade: item.grade,
-		documents: item.documents.map((doc) => ({
-			id: doc.id,
-			documentTypeId: doc.documentTypeId,
-			minAmount: Number.isFinite(doc.minAmount) ? doc.minAmount : 0,
-			maxAmount: Number.isFinite(doc.maxAmount) ? doc.maxAmount : 0,
-			employmentType: doc.employmentType,
-			collateralRequired: Boolean(doc.collateralRequired),
-			isMandatory: Boolean(doc.isMandatory),
-		})),
+		documents: item.documents.map((doc) => {
+			const hasValidityDays = doc.hasValidityDays === true;
+			return {
+				id: doc.id,
+				documentTypeId: doc.documentTypeId,
+				minAmount: Number.isFinite(doc.minAmount) ? doc.minAmount : 0,
+				maxAmount: Number.isFinite(doc.maxAmount) ? doc.maxAmount : 0,
+				employmentType: doc.employmentType,
+				collateralRequired: Boolean(doc.collateralRequired),
+				isMandatory: Boolean(doc.isMandatory),
+				hasValidityDays,
+				validityDays: normalizeDocumentValidityDays(
+					hasValidityDays,
+					doc.validityDays,
+				),
+			};
+		}),
 	}));
 
 const cloneDisbursementSetup = (
@@ -221,10 +316,24 @@ const cloneDisbursementSetup = (
 	tranches: disbursementSetup.tranches.map((tranche) => ({
 		id: tranche.id,
 		tranche: tranche.tranche,
-		amount: Number.isFinite(tranche.amount) ? tranche.amount : 0,
+		amount: Number.isFinite(tranche.amount)
+			? Math.min(100, Math.max(0, tranche.amount))
+			: 0,
 		triggerType: tranche.triggerType,
 		timingMeaning: tranche.timingMeaning,
 	})),
+});
+
+const cloneBrandingSetup = (
+	brandingSetup: V2BrandingSetup,
+): V2BrandingSetup => ({
+	bannerImageUrl: brandingSetup.bannerImageUrl.trim(),
+	cardImageUrl: brandingSetup.cardImageUrl.trim(),
+	shortDescription: brandingSetup.shortDescription.trim(),
+	longDescription: brandingSetup.longDescription.trim(),
+	tags: Array.from(
+		new Set(brandingSetup.tags.map((tag) => tag.trim()).filter(Boolean)),
+	),
 });
 
 const createSnapshot = (
@@ -236,6 +345,7 @@ const createSnapshot = (
 	productSetup: cloneProductSetup(input.productSetup),
 	channels: cloneChannels(input.channels),
 	interestRatePlans: cloneInterestRatePlans(input.interestRatePlans),
+	interestFormulaSetup: cloneFormulaSetup(input.interestFormulaSetup),
 	repaymentSetup: cloneRepaymentSetup(input.repaymentSetup),
 	creditScoreSetup: cloneCreditScoreSetup(input.creditScoreSetup),
 	documentSetup: cloneDocumentSetup(input.documentSetup),
@@ -246,6 +356,7 @@ const createSnapshot = (
 	decisionRules: cloneDecisionRules(input.decisionRules),
 	decisionRuleSetup: cloneDecisionRuleSetup(input.decisionRuleSetup),
 	disbursementSetup: cloneDisbursementSetup(input.disbursementSetup),
+	brandingSetup: cloneBrandingSetup(input.brandingSetup),
 });
 
 export const useLoanSetupV2Store = create<V2LoanSetupState>()(
@@ -281,7 +392,71 @@ export const useLoanSetupV2Store = create<V2LoanSetupState>()(
 		}),
 		{
 			name: "loan-workflow-setups-v2",
-			version: 1,
+			version: 4,
+			migrate: (persistedState, version) => {
+				const state = persistedState as PersistedV2LoanSetupState | undefined;
+				if (!state?.setups) {
+					return { setups: {} };
+				}
+
+				if (version < 2) {
+					return {
+						setups: Object.fromEntries(
+							Object.entries(state.setups).map(([setupId, setup]) => [
+								setupId,
+								{
+									...setup,
+									brandingSetup: cloneBrandingSetup(
+										setup.brandingSetup ?? createDefaultBrandingSetup(),
+									),
+									interestFormulaSetup: cloneFormulaSetup(
+										setup.repaymentSetup?.formulaSetup,
+									),
+								},
+							]),
+						),
+					};
+				}
+
+				if (version < 3) {
+					return {
+						setups: Object.fromEntries(
+							Object.entries(state.setups).map(([setupId, setup]) => [
+								setupId,
+								{
+									...setup,
+									interestFormulaSetup: cloneFormulaSetup(
+										(setup as V2LoanSetupSnapshot).interestFormulaSetup ??
+										setup.repaymentSetup?.formulaSetup,
+									),
+								},
+							]),
+						),
+					};
+				}
+
+				if (version < 4) {
+					return {
+						setups: Object.fromEntries(
+							Object.entries(state.setups).map(([setupId, setup]) => [
+								setupId,
+								{
+									...setup,
+									productSetup: {
+										...setup.productSetup,
+										loanType: normalizeLoanType(setup.productSetup),
+									},
+									interestFormulaSetup: cloneFormulaSetup(
+										(setup as V2LoanSetupSnapshot).interestFormulaSetup,
+									),
+								},
+							]),
+						),
+					};
+				}
+
+				return state as { setups: Record<string, V2LoanSetupSnapshot> };
+			},
 			partialize: (state) => ({ setups: state.setups }),
 		},
 	),

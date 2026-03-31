@@ -33,6 +33,11 @@ const createTranche = (index: number): TrancheItem => ({
 	timingMeaning: "IMMEDIATE",
 });
 
+const toPercentageValue = (value: number) => {
+	if (!Number.isFinite(value)) return 0;
+	return Math.min(100, Math.max(0, value));
+};
+
 export const createDefaultDisbursementSetupTabState = (): DisbursementSetupTabState => ({
 	disbursementType: "SINGLE",
 	releaseFullAmountAtOnce: true,
@@ -102,9 +107,13 @@ export function DisbursementSetupTab({
 		field: keyof TrancheItem,
 		value: string | number,
 	) => {
+		const normalizedValue =
+			field === "amount" && typeof value === "number"
+				? toPercentageValue(value)
+				: value;
 		setTranches((current) =>
 			current.map((item) =>
-				item.id === trancheId ? { ...item, [field]: value } : item,
+				item.id === trancheId ? { ...item, [field]: normalizedValue } : item,
 			),
 		);
 	};
@@ -122,7 +131,7 @@ export function DisbursementSetupTab({
 			<div>
 				<h2 className="text-lg font-semibold">Disbursement Setup</h2>
 				<div className="text-xs text-gray-600 mt-1">
-					Configure disbursement type, tranches, method, and fees.
+					Configure disbursement type, tranche percentages, method, and fees.
 				</div>
 			</div>
 
@@ -174,7 +183,7 @@ export function DisbursementSetupTab({
 					<div className="space-y-2">
 						<div className="grid grid-cols-5 gap-2 text-xs font-semibold text-gray-600 px-1">
 							<div>Tranche</div>
-							<div>Amount</div>
+							<div>Amount (%)</div>
 							<div>Trigger Type</div>
 							<div>Timing Meaning</div>
 							<div></div>
@@ -195,6 +204,7 @@ export function DisbursementSetupTab({
 								<input
 									type="number"
 									min={0}
+									max={100}
 									value={item.amount}
 									onChange={(event) =>
 										updateTranche(
@@ -204,6 +214,7 @@ export function DisbursementSetupTab({
 										)
 									}
 									className="border rounded px-2 py-2 text-sm"
+									placeholder="0 - 100"
 								/>
 								<input
 									type="text"

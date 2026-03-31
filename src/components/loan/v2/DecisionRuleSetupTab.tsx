@@ -52,7 +52,7 @@ type DecisionRuleSetupTabProps = {
 
 const decisionActionLabel: Record<DecisionRuleAction, string> = {
 	AUTO_APPROVE: "Auto Approve",
-	MANUAL_REVIEW: "Manual Review",
+	MANUAL_REVIEW: "Approval Workflow Process",
 	AUTO_REJECT: "Auto Reject",
 };
 
@@ -245,7 +245,7 @@ export function DecisionRuleSetupTab({
 			</div>
 
 			<div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-				<label className="flex flex-col gap-1 text-sm">
+				{/* <label className="flex flex-col gap-1 text-sm">
 					<span>Rule name</span>
 					<input
 						type="text"
@@ -254,7 +254,7 @@ export function DecisionRuleSetupTab({
 						className="border rounded px-2 py-2"
 						placeholder="e.g. Strong profile auto-approve"
 					/>
-				</label>
+				</label> */}
 				<label className="flex flex-col gap-1 text-sm">
 					<span className="flex items-center gap-2">
 						<span>Result</span>

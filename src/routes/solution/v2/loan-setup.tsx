@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { z } from "zod";
@@ -27,10 +27,14 @@ import {
 	createDefaultRepaymentSetupTabState,
 	RepaymentSetupTab,
 } from "@/components/loan/v2/RepaymentSetupTab";
-import type {
-	ChannelConfig,
-	ProductSetupForm,
-	V2InterestConfig,
+import { ReviewBrandingTab } from "@/components/loan/v2/ReviewBrandingTab";
+import {
+	type ChannelConfig,
+	createDefaultBrandingSetup,
+	createDefaultFormulaSetup,
+	type ProductSetupForm,
+	type V2BrandingSetup,
+	type V2InterestConfig,
 } from "@/components/loan/v2/setup-types";
 import { DEFAULT_REQUIRED_DOCUMENTS } from "@/lib/loan-setup-store";
 import { useLoanSetupV2Store } from "@/lib/loan-setup-v2-store";
@@ -59,6 +63,7 @@ function createTenorValue(value: number) {
 
 function createInterestConfig(baseRate = 18.5): V2InterestConfig {
 	return {
+		id: createId(),
 		interestType: "REDUCING",
 		rateType: "FIXED",
 		baseRate,
@@ -73,8 +78,16 @@ function getDefaultProductSetup(): ProductSetupForm {
 		productCode: "",
 		description: "",
 		loanSecurity: "UNSECURED",
+		loanType: "EMI",
+		collateralType: "LAND",
+		minimumCollateralValue: 0,
+		maximumLtvPercentage: 80,
+		haircutPercentage: 0,
+		valuationRequired: false,
+		valuationValidityDays: null,
 		minAmount: 500000,
 		maxAmount: 10000000,
+		maxAmountRateType: "FLAT",
 		serviceFees: null,
 		adminFees: null,
 		stampDuty: null,
@@ -89,6 +102,53 @@ function getDefaultProductSetup(): ProductSetupForm {
 	};
 }
 
+function normalizeProductSetup(productSetup: ProductSetupForm): ProductSetupForm {
+	const defaults = getDefaultProductSetup();
+	let normalizedLoanType: ProductSetupForm["loanType"] = "EMI";
+	if (productSetup.loanSecurity !== "SECURED") {
+		normalizedLoanType =
+			productSetup.loanType === "OPEN_LINE_LOAN" ? "OPEN_LINE_LOAN" : "EMI";
+	}
+	return {
+		...defaults,
+		...productSetup,
+		loanType: normalizedLoanType,
+		minimumCollateralValue: Math.max(
+			0,
+			productSetup.minimumCollateralValue ?? defaults.minimumCollateralValue,
+		),
+		maximumLtvPercentage: Math.max(
+			0,
+			productSetup.maximumLtvPercentage ?? defaults.maximumLtvPercentage,
+		),
+		haircutPercentage: Math.max(
+			0,
+			productSetup.haircutPercentage ?? defaults.haircutPercentage,
+		),
+		valuationValidityDays:
+			productSetup.valuationValidityDays == null
+				? null
+				: Math.max(0, productSetup.valuationValidityDays),
+		maxAmountRateType:
+			productSetup.maxAmountRateType === "PERCENTAGE"
+				? "PERCENTAGE"
+				: "FLAT",
+	};
+}
+
+function normalizeFormulaSetup(formulaSetup?: ReturnType<typeof createDefaultFormulaSetup>) {
+	const defaults = createDefaultFormulaSetup();
+	return {
+		...defaults,
+		...formulaSetup,
+		openLineFormulas: {
+			...defaults.openLineFormulas,
+			...formulaSetup?.openLineFormulas,
+		},
+		fieldDefinitions: formulaSetup?.fieldDefinitions ?? defaults.fieldDefinitions,
+	};
+}
+
 function getDefaultChannels(): ChannelConfig[] {
 	return [createChannelConfig()];
 }
@@ -99,6 +159,30 @@ function getDefaultInterestRatePlans(): V2InterestConfig[] {
 
 function getDefaultDocumentSetup(): DocumentRequirementItem[] {
 	return [createDocumentRequirementItem("LOW", DEFAULT_REQUIRED_DOCUMENTS)];
+}
+
+function getEditingStateLabel(isEditing: boolean, editingProductName: string) {
+	if (!isEditing) {
+		return "Create a new V2 loan setup snapshot.";
+	}
+
+	if (!editingProductName) {
+		return "Editing saved setup";
+	}
+
+	return `Editing saved setup: ${editingProductName}`;
+}
+
+function getCompletionButtonLabel(canGoNext: boolean, isEditing: boolean) {
+	if (canGoNext) {
+		return "Next";
+	}
+
+	if (isEditing) {
+		return "Update Product";
+	}
+
+	return "Launch Product";
 }
 
 function LoanProductSetup() {
@@ -119,18 +203,18 @@ function LoanProductSetup() {
 	const steps = [
 		{
 			id: "product-setup",
-			title: "Product Setup",
+			title: "Product DNA",
 			description: "Product, loan, channel, and workflow mapping",
 		},
 		{
 			id: "interest-setup",
-			title: "Interest Setup",
-			description: "Interest rate plans, parameters, and policies",
+			title: "Yield Engine",
+			description: "Interest rate plans, policies, and custom formula",
 		},
 		{
 			id: "repayment-setup",
-			title: "Repayment Setup",
-			description: "Repayment rules and custom formula",
+			title: "Repayment Advisory",
+			description: "Repayment rules and schedule timing",
 		},
 		{
 			id: "credit-score-engine",
@@ -152,6 +236,11 @@ function LoanProductSetup() {
 			title: "Disbursement Setup",
 			description: "Single or multiple tranches, method, and fees",
 		},
+		{
+			id: "review-branding",
+			title: "Review & Brand",
+			description: "Validate setup and configure marketplace visuals",
+		},
 	] as const;
 
 	const [productSetup, setProductSetup] = useState<ProductSetupForm>(() =>
@@ -163,14 +252,15 @@ function LoanProductSetup() {
 	const [interestRatePlans, setInterestRatePlans] = useState<
 		V2InterestConfig[]
 	>(() => getDefaultInterestRatePlans());
+	const [interestFormulaSetup, setInterestFormulaSetup] = useState(() =>
+		createDefaultFormulaSetup(),
+	);
 	const [bureauRequired, setBureauRequired] = useState(false);
 	const [bureauProvider, setBureauProvider] = useState("MMCB");
 	const [bureauPurpose, setBureauPurpose] = useState("Credit assessment");
 	const [bureauConsentRequired, setBureauConsentRequired] = useState(true);
 	const [decisionRuleSetup, setDecisionRuleSetup] =
-		useState<DecisionRuleSetupState>(() =>
-			createDefaultDecisionRuleSetup(),
-	);
+		useState<DecisionRuleSetupState>(() => createDefaultDecisionRuleSetup());
 	const [repaymentSetup, setRepaymentSetup] = useState<RepaymentSetupTabState>(
 		() => createDefaultRepaymentSetupTabState(),
 	);
@@ -185,12 +275,16 @@ function LoanProductSetup() {
 		useState<DisbursementSetupTabState>(() =>
 			createDefaultDisbursementSetupTabState(),
 		);
+	const [brandingSetup, setBrandingSetup] = useState<V2BrandingSetup>(() =>
+		createDefaultBrandingSetup(),
+	);
 
 	useEffect(() => {
 		if (!editingSetup) {
 			setProductSetup(getDefaultProductSetup());
 			setChannels(getDefaultChannels());
 			setInterestRatePlans(getDefaultInterestRatePlans());
+			setInterestFormulaSetup(createDefaultFormulaSetup());
 			setBureauRequired(false);
 			setBureauProvider("MMCB");
 			setBureauPurpose("Credit assessment");
@@ -200,11 +294,12 @@ function LoanProductSetup() {
 			setCreditScoreSetup(createDefaultCreditScoreEngineState());
 			setDocumentSetup(getDefaultDocumentSetup());
 			setDisbursementSetup(createDefaultDisbursementSetupTabState());
+			setBrandingSetup(createDefaultBrandingSetup());
 			setCurrentStep(0);
 			return;
 		}
 
-		setProductSetup(structuredClone(editingSetup.productSetup));
+		setProductSetup(normalizeProductSetup(structuredClone(editingSetup.productSetup)));
 		setChannels(
 			editingSetup.channels.length
 				? structuredClone(editingSetup.channels)
@@ -214,6 +309,9 @@ function LoanProductSetup() {
 			editingSetup.interestRatePlans.length
 				? structuredClone(editingSetup.interestRatePlans)
 				: getDefaultInterestRatePlans(),
+		);
+		setInterestFormulaSetup(
+			structuredClone(normalizeFormulaSetup(editingSetup.interestFormulaSetup)),
 		);
 		setBureauRequired(editingSetup.bureauRequired);
 		setBureauProvider(editingSetup.bureauProvider || "MMCB");
@@ -233,6 +331,11 @@ function LoanProductSetup() {
 				: getDefaultDocumentSetup(),
 		);
 		setDisbursementSetup(structuredClone(editingSetup.disbursementSetup));
+		setBrandingSetup(
+			structuredClone(
+				editingSetup.brandingSetup ?? createDefaultBrandingSetup(),
+			),
+		);
 		setCurrentStep(0);
 	}, [editingSetup]);
 
@@ -319,13 +422,6 @@ function LoanProductSetup() {
 		);
 	};
 
-	const addPlan = () => {
-		setInterestRatePlans((current) => {
-			const fallbackRate = current.at(-1)?.baseRate ?? 18.5;
-			return [...current, createInterestConfig(fallbackRate)];
-		});
-	};
-
 	const removePlan = (planIndex: number) => {
 		setInterestRatePlans((current) =>
 			current.length === 1
@@ -340,7 +436,12 @@ function LoanProductSetup() {
 			config: {
 				parameters: [
 					...(current.config?.parameters ?? []),
-					{ name: "", value: 0, interestRate: current.baseRate },
+					{
+						id: createId(),
+						name: "",
+						value: 0,
+						interestRate: current.baseRate,
+					},
 				],
 			},
 		}));
@@ -383,76 +484,34 @@ function LoanProductSetup() {
 		}));
 	};
 
-	const addPolicy = (planIndex: number) => {
-		updatePlan(planIndex, (current) => ({
-			...current,
-			policies: [
-				...(current.policies ?? []),
-				{ interestCategory: "", interestRate: 0 },
-			],
-		}));
-	};
-
-	const updatePolicy = (
-		planIndex: number,
-		policyIndex: number,
-		field: "interestCategory" | "interestRate",
-		value: string,
-	) => {
-		updatePlan(planIndex, (current) => {
-			const nextPolicies = [...(current.policies ?? [])];
-			const targetPolicy = nextPolicies[policyIndex];
-			if (!targetPolicy) return current;
-			if (field === "interestCategory") {
-				nextPolicies[policyIndex] = {
-					...targetPolicy,
-					interestCategory: value,
-				};
-			} else {
-				const parsed = Number(value);
-				nextPolicies[policyIndex] = {
-					...targetPolicy,
-					interestRate: Number.isFinite(parsed)
-						? parsed
-						: targetPolicy.interestRate,
-				};
-			}
-			return { ...current, policies: nextPolicies };
-		});
-	};
-
-	const removePolicy = (planIndex: number, policyIndex: number) => {
-		updatePlan(planIndex, (current) => ({
-			...current,
-			policies: (current.policies ?? []).filter(
-				(_, index) => index !== policyIndex,
-			),
-		}));
-	};
-
 	const canGoBack = currentStep > 0;
 	const canGoNext = currentStep + 1 < steps.length;
+	const configuredChannels = useMemo(
+		() =>
+			channels.filter(
+				(channel) =>
+					Boolean(channel.name.trim()) ||
+					Boolean(channel.code.trim()) ||
+					Boolean(channel.workflowId.trim()),
+			),
+		[channels],
+	);
+	const mappedWorkflowCount = useMemo(
+		() =>
+			configuredChannels.filter((channel) => Boolean(channel.workflowId.trim()))
+				.length,
+		[configuredChannels],
+	);
 	const editingProductName = editingSetup?.productSetup.productName ?? "";
-	let editingStateLabel = "Create a new V2 loan setup snapshot.";
-	if (isEditing) {
-		editingStateLabel = "Editing saved setup";
-		if (editingProductName) {
-			editingStateLabel += `: ${editingProductName}`;
-		}
-	}
-
-	let completionButtonLabel = "Completed";
-	if (canGoNext) {
-		completionButtonLabel = "Next";
-	} else if (isEditing) {
-		completionButtonLabel = "Update Setup";
-	}
+	const editingStateLabel = getEditingStateLabel(isEditing, editingProductName);
+	const completionButtonLabel = getCompletionButtonLabel(canGoNext, isEditing);
 
 	const handleSaveCompleted = () => {
 		const payload = {
 			productSetup,
 			channels,
 			interestRatePlans,
+			interestFormulaSetup,
 			repaymentSetup,
 			creditScoreSetup,
 			documentSetup,
@@ -463,6 +522,7 @@ function LoanProductSetup() {
 			decisionRules: decisionRuleSetup.decisionRules,
 			decisionRuleSetup,
 			disbursementSetup,
+			brandingSetup,
 		};
 
 		if (editingSetup) {
@@ -480,31 +540,26 @@ function LoanProductSetup() {
 		stepContent = (
 			<ProductSetupTab
 				productSetup={productSetup}
-				channels={channels}
-				workflowList={workflowList}
-				mappedChannelWorkflows={mappedChannelWorkflows}
 				updateProductField={updateProductField}
 				addTenorValue={addTenorValue}
 				updateTenorValue={updateTenorValue}
 				removeTenorValue={removeTenorValue}
-				addChannel={addChannel}
-				updateChannelField={updateChannelField}
-				removeChannel={removeChannel}
 			/>
 		);
 	} else if (currentStep === 1) {
 		stepContent = (
 			<InterestEngineTab
 				interestRatePlans={interestRatePlans}
+				formulaSetup={interestFormulaSetup}
+				loanSecurity={productSetup.loanSecurity}
+				updateFormulaSetup={(updater) =>
+					setInterestFormulaSetup((current) => updater(current))
+				}
 				updateInterestConfig={updateInterestConfig}
-				addPlan={addPlan}
 				removePlan={removePlan}
 				addParameter={addParameter}
 				updateParameter={updateParameter}
 				removeParameter={removeParameter}
-				addPolicy={addPolicy}
-				updatePolicy={updatePolicy}
-				removePolicy={removePolicy}
 			/>
 		);
 	} else if (currentStep === 2) {
@@ -512,6 +567,8 @@ function LoanProductSetup() {
 			<RepaymentSetupTab
 				state={repaymentSetup}
 				onStateChange={setRepaymentSetup}
+				loanType={productSetup.loanType}
+				interestFormulaSetup={interestFormulaSetup}
 			/>
 		);
 	} else if (currentStep === 3) {
@@ -544,11 +601,38 @@ function LoanProductSetup() {
 				onStateChange={setDecisionRuleSetup}
 			/>
 		);
-	} else {
+	} else if (currentStep === 6) {
 		stepContent = (
 			<DisbursementSetupTab
 				state={disbursementSetup}
 				onStateChange={setDisbursementSetup}
+			/>
+		);
+	} else {
+		stepContent = (
+			<ReviewBrandingTab
+				brandingSetup={brandingSetup}
+				onBrandingChange={setBrandingSetup}
+				channels={channels}
+				workflowList={workflowList}
+				mappedChannelWorkflows={mappedChannelWorkflows}
+				addChannel={addChannel}
+				updateChannelField={updateChannelField}
+				removeChannel={removeChannel}
+				productName={productSetup.productName}
+				productCode={productSetup.productCode}
+				productDescription={productSetup.description}
+				minAmount={productSetup.minAmount}
+				maxAmount={productSetup.maxAmount}
+				baseRate={interestRatePlans[0]?.baseRate ?? null}
+				channelCount={configuredChannels.length}
+				workflowCount={mappedWorkflowCount}
+				interestPlanCount={interestRatePlans.length}
+				documentRuleCount={documentSetup.length}
+				decisionRuleCount={decisionRuleSetup.rules.length}
+				bureauRequired={bureauRequired}
+				bureauProvider={bureauProvider}
+				disbursementType={disbursementSetup.disbursementType}
 			/>
 		);
 	}
@@ -604,24 +688,22 @@ function LoanProductSetup() {
 							<p className="text-sm text-gray-600 mt-1">
 								{steps[currentStep].description}
 							</p>
-							<p className="text-xs text-gray-500 mt-2">
-								{editingStateLabel}
-							</p>
+							<p className="text-xs text-gray-500 mt-2">{editingStateLabel}</p>
 						</div>
 						<div className="flex items-center gap-3">
-							<Link
+							{/* <Link
 								to="/solution/v2/loan-applications/create"
 								className="inline-flex items-center gap-2 border rounded px-3 py-2 text-sm hover:bg-gray-50"
 							>
-								Create Application
+								Create
 							</Link>
 							<Link
 								to="/solution/v2/loan-setup/list"
 								className="inline-flex items-center gap-2 border rounded px-3 py-2 text-sm hover:bg-gray-50"
 							>
 								Saved List
-							</Link>
-							<span className="text-xs text-gray-500">
+							</Link> */}
+							<span className="">
 								Step {currentStep + 1} / {steps.length}
 							</span>
 							{/* <Link
